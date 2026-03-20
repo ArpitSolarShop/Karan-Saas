@@ -1,0 +1,93 @@
+@charset "UTF-8";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary:       #6366F1;
+  --color-primary-dark:  #4F46E5;
+  --color-primary-light: #818CF8;
+  --color-bg:            #09090B;
+  --color-surface:       #18181B;
+  --color-surface-2:     #27272A;
+  --color-border:        #3F3F46;
+  --color-text:          #F4F4F5;
+  --color-text-muted:    #A1A1AA;
+  --color-success:       #10B981;
+  --color-success-light: #6EE7B7;
+  --color-warning:       #FCD34D;
+  --color-danger:        #F87171;
+  --color-info:          #22D3EE;
+
+  /* shadcn/ui variables mapping */
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text);
+  --primary: var(--color-primary);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-surface-2);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-surface-2);
+  --muted-foreground: var(--color-text-muted);
+  --accent: var(--color-surface-2);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--color-danger);
+  --destructive-foreground: #ffffff;
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --ring: var(--color-primary);
+  --radius: 0.5rem;
+}
+
+.light {
+  --color-bg:         #FAFAFA;
+  --color-surface:    #FFFFFF;
+  --color-surface-2:  #F4F4F5;
+  --color-border:     #E4E4E7;
+  --color-text:       #09090B;
+  --color-text-muted: #71717A;
+}
+
+@layer base {
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  /* Futuristic Scrollbars */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--color-primary);
+  }
+}
+
+@keyframes premiumIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

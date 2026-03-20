@@ -1,0 +1,989 @@
+// ============================================================================
+// Project Alpha — Full Enterprise CRM + Hybrid JSONB Spreadsheet Schema
+// PostgreSQL 15+ | Prisma ORM | 20+ Models
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum Role {
+  ADMIN
+  MANAGER
+  SUPERVISOR
+  TEAM_LEAD
+  AGENT
+  QA
+  VIEWER
+}
+
+enum AgentStatus {
+  AVAILABLE
+  ON_CALL
+  WRAP_UP
+  BREAK
+  OFFLINE
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  FOLLOW_UP
+  INTERESTED
+  NEGOTIATION
+  CONVERTED
+  LOST
+  DNC
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CallType {
+  PREVIEW
+  PROGRESSIVE
+  PREDICTIVE
+  POWER
+  MANUAL
+  AUTO
+}
+
+enum CallStatus {
+  INITIATED
+  RINGING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  NO_ANSWER
+  BUSY
+}
+
+enum FollowupStatus {
+  PENDING
+  COMPLETED
+  MISSED
+  CANCELLED
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum CampaignType {
+  OUTBOUND
+  INBOUND
+  BLENDED
+}
+
+enum DispositionCategory {
+  POSITIVE
+  NEGATIVE
+  NEUTRAL
+  CALLBACK
+  DNC
+}
+
+enum TenantPlan {
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+enum ColumnType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SELECT
+  MULTISELECT
+  FORMULA
+  RELATION
+  ATTACHMENT
+  USER
+}
+
+// ============================================================================
+// WORKFLOW AUTOMATION
+// ============================================================================
+
+model WorkflowRule {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String
+  description  String?
+  isActive     Boolean  @default(true)
+  trigger      String   // e.g., 'LEAD_CREATED', 'DEAL_WON'
+  condition    Json     @default("[]") // Array of { field, operator, value }
+  action       String   // e.g., 'SEND_EMAIL', 'ASSIGN_AGENT', 'CREATE_TASK'
+  actionParams Json     @default("{}") // Payload for the action
+  runCount     Int      @default(0)
+  lastRunAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("workflow_rules")
+}
+
+// ============================================================================
+// CORE: TENANTS, USERS, TEAMS
+// ============================================================================
+
+
+model Tenant {
+  id                String     @id @default(uuid())
+  name              String
+  subdomain         String     @unique
+  plan              TenantPlan @default(STARTER)
+  maxAgents         Int        @default(10)
+  telephonyProvider String?
+  telephonyApiKey   String?
+  settings          Json       @default("{}") // { primaryColor, brandLogo, etc. }
+  createdAt         DateTime   @default(now())
+
+  updatedAt         DateTime   @updatedAt
+
+  users      User[]
+  teams      Team[]
+  leads      Lead[]
+  campaigns  Campaign[]
+  calls      Call[]
+  scripts    Script[]
+  auditLogs  AuditLog[]
+  notifications Notification[]
+  dispositions  Disposition[]
+  leadLists     LeadList[]
+  suppressions  Suppression[]
+  workbooks     Workbook[]
+  deals         Deal[]
+  quotes        Quote[]
+  attachments   Attachment[]
+  workflowRules WorkflowRule[]
+  tickets           Ticket[]
+  knowledgeArticles KnowledgeArticle[]
+  marketingJourneys MarketingJourney[]
+  landingPages      LandingPage[]
+  approvalRequests  ApprovalRequest[]
+
+  @@map("tenants")
+}
+
+model User {
+  id            String      @id @default(uuid())
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+  email         String      @unique
+  phone         String?
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          Role        @default(AGENT)
+  extension     String?     // VoIP extension
+  sipUsername   String?     @unique
+  sipPassword  String?
+  agentStatus   AgentStatus @default(OFFLINE)
+  teamId        String?
+  team          Team?       @relation("TeamMembers", fields: [teamId], references: [id])
+  supervisorId  String?
+  supervisor    User?       @relation("SupervisorAgent", fields: [supervisorId], references: [id])
+  subordinates  User[]      @relation("SupervisorAgent")
+  isActive      Boolean     @default(true)
+  aiCoachingScore Float?
+  mfaEnabled    Boolean     @default(false)
+  mfaSecret     String?
+  lastLoginAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
+
+  managedTeams      Team[]        @relation("TeamManager")
+  assignedLeads     Lead[]        @relation("AssignedTo")
+  calls             Call[]        @relation("AgentCalls")
+  followups         Followup[]
+  notes             Note[]
+  activities        Activity[]
+  tasks             Task[]        @relation("TaskAssignee")
+  callbacks         Callback[]    @relation("CallbackAgent")
+  campaignAgents    CampaignAgent[]
+  statusLogs        AgentStatusLog[]
+  dailyStats        AgentDailyStat[]
+  createdScripts    Script[]      @relation("ScriptAuthor")
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  importedLists     LeadList[]    @relation("ListImporter")
+  addedSuppressions Suppression[] @relation("SuppressionAdder")
+  createdCampaigns  Campaign[]    @relation("CampaignCreator")
+  quotes            Quote[]
+  deals             Deal[]
+  attachments       Attachment[]
+  ticketsAssigned   Ticket[]
+  ticketMessages    TicketMessage[]
+  knowledgeArticles KnowledgeArticle[]
+  approvalRequests  ApprovalRequest[] @relation("ApproverRequests")
+  locations         AgentLocation[]
+
+
+  @@index([tenantId, role])
+  @@map("users")
+}
+
+model Team {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String
+  supervisorId String
+  supervisor   User     @relation("TeamManager", fields: [supervisorId], references: [id])
+  members      User[]   @relation("TeamMembers")
+  createdAt    DateTime @default(now())
+
+  @@map("teams")
+}
+
+// ============================================================================
+// LEADS & CONTACTS
+// ============================================================================
+
+model Lead {
+  id              String     @id @default(uuid())
+  tenantId        String
+  tenant          Tenant     @relation(fields: [tenantId], references: [id])
+  firstName       String
+  lastName        String?
+  // Legacy compat: "name" + "phone" fields for existing frontend
+  name            String?
+  phone           String
+  phoneSecondary  String?
+  email           String?
+  company         String?
+  source          String?
+  status          LeadStatus @default(NEW)
+  score           Int        @default(0)
+  priority        Int        @default(1)
+  assignedTo      String?
+  agent           User?      @relation("AssignedTo", fields: [assignedTo], references: [id])
+  campaignId      String?
+  campaign        Campaign?  @relation(fields: [campaignId], references: [id])
+  isDnc           Boolean    @default(false)
+  dncRegisteredAt DateTime?
+  lastContactedAt DateTime?
+  nextFollowupAt  DateTime?
+  customFields    Json       @default("{}")
+  tags            String[]   @default([])
+  city            String?
+  state           String?
+  country         String     @default("IN")
+  consentStatus   String?
+  consentExpiry   DateTime?
+  aiSentimentLast String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+
+  calls       Call[]
+  followups   Followup[]
+  notes       Note[]
+  activities  Activity[]
+  tasks       Task[]
+  callbacks   Callback[]
+  deals       Deal[]
+  quotes      Quote[]
+  attachments Attachment[]
+  tickets           Ticket[]
+  pageSubmissions   PageSubmission[]
+
+  @@unique([phone, campaignId])
+  @@index([tenantId, assignedTo])
+  @@index([status, score(sort: Desc)])
+  @@index([phone])
+  @@index([nextFollowupAt])
+  @@map("leads")
+}
+
+// ============================================================================
+// COMMERCE & OPPORTUNITIES (from "Unified Customer Workspace" plan)
+// ============================================================================
+
+model Deal {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id])
+  leadId             String
+  lead               Lead      @relation(fields: [leadId], references: [id])
+  ownerId            String
+  owner              User      @relation(fields: [ownerId], references: [id])
+  name               String
+  value              Float     @default(0)
+  currency           String     @default("INR")
+  stage              String     @default("PROSPECTING")
+  probability        Int        @default(10)
+  expectedCloseDate  DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  quotes      Quote[]
+  attachments Attachment[]
+
+  @@index([leadId])
+  @@map("deals")
+}
+
+model Quote {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id])
+  dealId      String?
+  deal        Deal?    @relation(fields: [dealId], references: [id])
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  version     String   @default("v1")
+  totalValue  Float    @default(0)
+  status      String   @default("DRAFT") // DRAFT, SENT, APPROVED, REJECTED, PAID
+  lineItems   Json     @default("[]")
+  validUntil  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attachments Attachment[]
+
+  @@index([leadId])
+  @@map("quotes")
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id])
+  dealId    String?
+  deal      Deal?    @relation(fields: [dealId], references: [id])
+  quoteId   String?
+  quote     Quote?   @relation(fields: [quoteId], references: [id])
+  uploadedById String
+  uploadedBy User    @relation(fields: [uploadedById], references: [id])
+  name      String
+  url       String   // Storage path/URL
+  fileType  String?
+  fileSize  Int?
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@map("attachments")
+}
+
+// ============================================================================
+// CALLS & TELEPHONY
+// ============================================================================
+
+model Call {
+  id               String        @id @default(uuid())
+  tenantId         String
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  leadId           String
+  lead             Lead          @relation(fields: [leadId], references: [id])
+  agentId          String
+  agent            User          @relation("AgentCalls", fields: [agentId], references: [id])
+  campaignId       String?
+  campaign         Campaign?     @relation(fields: [campaignId], references: [id])
+  callDirection    CallDirection @default(OUTBOUND)
+  callType         CallType      @default(MANUAL)
+  phoneDialed      String
+  telephonyCallSid String?       @unique
+  status           CallStatus
+  dispositionId    String?
+  disposition      Disposition?  @relation(fields: [dispositionId], references: [id])
+  startedAt        DateTime?
+  endedAt          DateTime?
+  durationSeconds  Int           @default(0)
+  talkTimeSeconds  Int           @default(0)
+  holdTimeSeconds  Int           @default(0)
+  recordingUrl     String?
+  localRecordingPath String?
+  notes            String?
+  isAmd            Boolean       @default(false)
+  aiSummary        String?
+  aiSentiment      String?
+  aiKeyObjections  String[]      @default([])
+  complianceFlags  String[]      @default([])
+  createdAt        DateTime      @default(now())
+
+  callbacks Callback[]
+  transcript CallTranscript?
+
+  @@index([agentId, createdAt(sort: Desc)])
+  @@index([leadId])
+  @@index([campaignId, createdAt])
+  @@map("calls")
+}
+
+model Disposition {
+  id         String             @id @default(uuid())
+  tenantId   String
+  tenant     Tenant             @relation(fields: [tenantId], references: [id])
+  name       String
+  code       String
+  category   DispositionCategory
+  isCallback Boolean            @default(false)
+  colorHex   String             @default("#888888")
+  isActive   Boolean            @default(true)
+  sortOrder  Int                @default(0)
+
+  calls Call[]
+
+  @@unique([tenantId, code])
+  @@map("dispositions")
+}
+
+model Callback {
+  id          String         @id @default(uuid())
+  leadId      String
+  lead        Lead           @relation(fields: [leadId], references: [id])
+  agentId     String
+  agent       User           @relation("CallbackAgent", fields: [agentId], references: [id])
+  callId      String?
+  call        Call?          @relation(fields: [callId], references: [id])
+  scheduledAt DateTime
+  notes       String?
+  status      FollowupStatus @default(PENDING)
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+
+  @@index([scheduledAt])
+  @@map("callbacks")
+}
+
+// ============================================================================
+// CAMPAIGNS
+// ============================================================================
+
+model Campaign {
+  id                  String         @id @default(uuid())
+  tenantId            String
+  tenant              Tenant         @relation(fields: [tenantId], references: [id])
+  name                String
+  description         String?
+  type                CampaignType   @default(OUTBOUND)
+  dialerMode          CallType       @default(PREVIEW)
+  status              CampaignStatus @default(DRAFT)
+  startDate           DateTime
+  endDate             DateTime?
+  callingStartTime    String         @default("09:00")
+  callingEndTime      String         @default("20:00")
+  timezone            String         @default("Asia/Kolkata")
+  maxAttemptsPerLead  Int            @default(5)
+  retryIntervalHours  Int            @default(4)
+  scriptId            String?
+  script              Script?        @relation(fields: [scriptId], references: [id])
+  createdById         String
+  createdBy           User           @relation("CampaignCreator", fields: [createdById], references: [id])
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  leads          Lead[]
+  calls          Call[]
+  campaignAgents CampaignAgent[]
+  leadLists      CampaignLeadList[]
+
+  @@map("campaigns")
+}
+
+model CampaignAgent {
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  agentId     String
+  agent       User     @relation(fields: [agentId], references: [id])
+  assignedAt  DateTime @default(now())
+  dailyTarget Int?
+
+  @@id([campaignId, agentId])
+  @@map("campaign_agents")
+}
+
+model LeadList {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  name       String
+  totalLeads Int      @default(0)
+  importedBy String
+  importer   User     @relation("ListImporter", fields: [importedBy], references: [id])
+  sourceFile String?
+  createdAt  DateTime @default(now())
+
+  campaignLeadLists CampaignLeadList[]
+
+  @@map("lead_lists")
+}
+
+model CampaignLeadList {
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  leadListId String
+  leadList   LeadList @relation(fields: [leadListId], references: [id])
+  priority   Int      @default(1)
+  addedAt    DateTime @default(now())
+
+  @@id([campaignId, leadListId])
+  @@map("campaign_lead_lists")
+}
+
+// ============================================================================
+// AGENT PERFORMANCE & REPORTING
+// ============================================================================
+
+model AgentDailyStat {
+  id                 String   @id @default(uuid())
+  agentId            String
+  agent              User     @relation(fields: [agentId], references: [id])
+  statDate           DateTime @db.Date
+  callsMade          Int      @default(0)
+  callsAnswered      Int      @default(0)
+  callsConverted     Int      @default(0)
+  totalTalkTime      Int      @default(0)
+  avgHandleTime      Float    @default(0)
+  totalBreakTime     Int      @default(0)
+  loginTime          DateTime?
+  logoutTime         DateTime?
+  callbacksScheduled Int      @default(0)
+  callbacksCompleted Int      @default(0)
+
+  @@unique([agentId, statDate])
+  @@map("agent_daily_stats")
+}
+
+model AgentStatusLog {
+  id              String      @id @default(uuid())
+  agentId         String
+  agent           User        @relation(fields: [agentId], references: [id])
+  status          AgentStatus
+  reason          String?
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationSeconds Int?
+
+  @@index([agentId, startedAt])
+  @@map("agent_status_logs")
+}
+
+// ============================================================================
+// EXISTING TABLES (preserved with enhancements)
+// ============================================================================
+
+model Followup {
+  id          String         @id @default(uuid())
+  leadId      String
+  lead        Lead           @relation(fields: [leadId], references: [id])
+  agentId     String
+  agent       User           @relation(fields: [agentId], references: [id])
+  scheduledAt DateTime
+  status      FollowupStatus @default(PENDING)
+  notes       String?
+  createdAt   DateTime       @default(now())
+
+  @@map("followups")
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id])
+  agentId   String
+  agent     User     @relation(fields: [agentId], references: [id])
+  note      String
+  createdAt DateTime @default(now())
+
+  @@map("notes")
+}
+
+model Activity {
+  id           String   @id @default(uuid())
+  leadId       String
+  lead         Lead     @relation(fields: [leadId], references: [id])
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  activityType String
+  description  String
+  createdAt    DateTime @default(now())
+
+  @@map("activities")
+}
+
+model Tag {
+  id    String @id @default(uuid())
+  name  String @unique
+
+  @@map("tags")
+}
+
+
+model Task {
+  id         String   @id @default(uuid())
+  leadId     String?
+  lead       Lead?    @relation(fields: [leadId], references: [id])
+  assignedTo String
+  user       User     @relation("TaskAssignee", fields: [assignedTo], references: [id])
+  taskType   String?
+  title      String
+  dueDate    DateTime
+  status     String   @default("PENDING")
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  @@index([dueDate, assignedTo])
+  @@map("tasks")
+}
+
+// ============================================================================
+// SUPPORTING TABLES: SCRIPTS, AUDIT, NOTIFICATIONS, SUPPRESSIONS
+// ============================================================================
+
+model Script {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  content   String
+  version   Int      @default(1)
+  createdBy String
+  author    User     @relation("ScriptAuthor", fields: [createdBy], references: [id])
+  createdAt DateTime @default(now())
+
+  campaigns Campaign[]
+
+  @@map("scripts")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  entityType String
+  entityId   String
+  action     String
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  recipientId String
+  recipient   User     @relation(fields: [recipientId], references: [id])
+  type        String
+  title       String
+  body        String?
+  entityType  String?
+  entityId    String?
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model Suppression {
+  id        String    @id @default(uuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  phoneE164 String
+  type      String
+  reason    String?
+  until     DateTime?
+  addedBy   String?
+  adder     User?     @relation("SuppressionAdder", fields: [addedBy], references: [id])
+  addedAt   DateTime  @default(now())
+
+  @@unique([tenantId, phoneE164])
+  @@map("suppressions")
+}
+
+// ============================================================================
+// HYBRID JSONB SPREADSHEET ENGINE (from "My Thought 1")
+// ============================================================================
+
+model Workbook {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sheets Sheet[]
+
+  @@map("workbooks")
+}
+
+model Sheet {
+  id         String   @id @default(uuid())
+  workbookId String
+  workbook   Workbook @relation(fields: [workbookId], references: [id], onDelete: Cascade)
+  name       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  columns SheetColumn[]
+  rows    SheetRow[]
+  views   SheetView[]
+
+  @@map("sheets")
+}
+
+model SheetColumn {
+  id       String     @id @default(uuid())
+  sheetId  String
+  sheet    Sheet      @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  key      String
+  name     String
+  dataType ColumnType @default(TEXT)
+  position Int
+  width    Int        @default(120)
+  formula  String?
+  createdAt DateTime  @default(now())
+
+  @@unique([sheetId, key])
+  @@map("sheet_columns")
+}
+
+model SheetRow {
+  id       String   @id @default(uuid())
+  sheetId  String
+  sheet    Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  rowIndex Int
+  data     Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sheetId, rowIndex])
+  @@index([sheetId, rowIndex])
+  @@map("sheet_rows")
+}
+
+model SheetView {
+  id            String @id @default(uuid())
+  sheetId       String
+  sheet         Sheet  @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  name          String
+  filters       Json   @default("[]")
+  sorts         Json   @default("[]")
+  hiddenColumns Json   @default("[]")
+  createdAt     DateTime @default(now())
+
+  @@map("sheet_views")
+}
+
+// ============================================================================
+// AI CONFIG (for model versioning)
+// ============================================================================
+
+model AiConfig {
+  id        String  @id @default(uuid())
+  modelType String
+  provider  String
+  version   String
+  isActive  Boolean @default(true)
+
+  @@map("ai_configs")
+}
+
+// ============================================================================
+// AI TRANSCRIPTION
+// ============================================================================
+
+model CallTranscript {
+  id           String   @id @default(uuid())
+  callId       String   @unique
+  call         Call     @relation(fields: [callId], references: [id], onDelete: Cascade)
+  text         String
+  sentiment    String?  // POSITIVE | NEGATIVE | NEUTRAL
+  keywordsFound String[] @default([])
+  talkRatio    Int?     // % of call time agent spoke
+  rawResult    Json?    // Full Deepgram response
+  createdAt    DateTime @default(now())
+
+  @@map("call_transcripts")
+}
+
+// ============================================================================
+// SPRINT 18: TICKETING & KNOWLEDGE BASE
+// ============================================================================
+
+enum TicketStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Ticket {
+  id          String        @id @default(uuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  leadId      String?
+  lead        Lead?         @relation(fields: [leadId], references: [id])
+  assignedTo  String?
+  agent       User?         @relation(fields: [assignedTo], references: [id])
+  subject     String
+  description String
+  status      TicketStatus  @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  slaDueAt    DateTime?
+  resolvedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  messages    TicketMessage[]
+
+  @@map("tickets")
+}
+
+model TicketMessage {
+  id        String   @id @default(uuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId  String?  
+  sender    User?    @relation(fields: [senderId], references: [id])
+  body      String
+  isInternal Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("ticket_messages")
+}
+
+model KnowledgeArticle {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  title       String
+  slug        String   @unique
+  content     String   // HTML or Markdown
+  category    String
+  isPublished Boolean  @default(true)
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("knowledge_articles")
+}
+
+// ============================================================================
+// SPRINT 18: MARKETING & WEB-TO-LEAD
+// ============================================================================
+
+model MarketingJourney {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  trigger   String   
+  steps     Json     @default("[]") 
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("marketing_journeys")
+}
+
+model LandingPage {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  slug        String   @unique
+  htmlContent String
+  cssContent  String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  submissions PageSubmission[]
+
+  @@map("landing_pages")
+}
+
+model PageSubmission {
+  id            String      @id @default(uuid())
+  landingPageId String
+  landingPage   LandingPage @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+  leadId        String?
+  lead          Lead?       @relation(fields: [leadId], references: [id])
+  formData      Json
+  createdAt     DateTime    @default(now())
+
+  @@map("page_submissions")
+}
+
+// ============================================================================
+// SPRINT 18: APPROVALS
+// ============================================================================
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ApprovalRequest {
+  id           String         @id @default(uuid())
+  tenantId     String
+  tenant       Tenant         @relation(fields: [tenantId], references: [id])
+  requesterId  String
+  requester    User           @relation("ApproverRequests", fields: [requesterId], references: [id])
+  approverId   String?
+  entityType   String         
+  entityId     String
+  status       ApprovalStatus @default(PENDING)
+  notes        String?
+  createdAt    DateTime       @default(now())
+  resolvedAt   DateTime?
+
+  @@map("approval_requests")
+}
+
+model AgentLocation {
+  id        String   @id @default(uuid())
+  agentId   String
+  agent     User     @relation(fields: [agentId], references: [id])
+  latitude  Float
+  longitude Float
+  accuracy  Float?
+  battery   Int?
+  timestamp DateTime @default(now())
+
+  @@index([agentId, timestamp])
+  @@map("agent_locations")
+}
