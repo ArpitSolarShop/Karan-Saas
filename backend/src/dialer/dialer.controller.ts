@@ -19,8 +19,10 @@ export class DialerController {
   }
 
   @Post('end-call/:id')
-  endCall(@Param('id') id: string, @Body() body: { dispositionId: string; notes?: string }) {
+  endCall(
+    @Param('id') id: string,
+    @Body() body: { dispositionId: string; notes?: string },
+  ) {
     return this.dialerService.endCall(id, body.dispositionId, body.notes);
   }
 }
-

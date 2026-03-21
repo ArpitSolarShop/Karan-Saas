@@ -10,15 +10,19 @@ export class MarketingProcessor extends WorkerHost {
 
   async process(job: Job<any, any, string>): Promise<any> {
     const { journeyId, leadId, stepIndex } = job.data;
-    
-    const journey = await (this.prisma as any).marketingJourney.findUnique({ where: { id: journeyId } });
+
+    const journey = await (this.prisma as any).marketingJourney.findUnique({
+      where: { id: journeyId },
+    });
     if (!journey || !journey.isActive) return;
 
     const steps = journey.steps as any[];
     if (stepIndex >= steps.length) return;
 
     const currentStep = steps[stepIndex];
-    console.log(`Processing Journey ${journey.name} Step ${stepIndex} for Lead ${leadId}`);
+    console.log(
+      `Processing Journey ${journey.name} Step ${stepIndex} for Lead ${leadId}`,
+    );
 
     // Logic for steps: EMAIL, SMS, WAIT
     switch (currentStep.type) {
@@ -28,11 +32,15 @@ export class MarketingProcessor extends WorkerHost {
       case 'WAIT':
         // Schedule next step after delay
         const delay = currentStep.durationMs || 1000 * 60 * 60 * 24; // 1 day default
-        await (job as any).queue.add('process-step', {
-          journeyId,
-          leadId,
-          stepIndex: stepIndex + 1,
-        }, { delay });
+        await (job as any).queue.add(
+          'process-step',
+          {
+            journeyId,
+            leadId,
+            stepIndex: stepIndex + 1,
+          },
+          { delay },
+        );
         return;
       default:
         break;

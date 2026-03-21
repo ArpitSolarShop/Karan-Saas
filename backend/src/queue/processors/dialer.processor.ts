@@ -20,13 +20,15 @@ export class DialerProcessor {
     const { campaignId } = job.data;
 
     // Get campaign config
-    const campaign = await this.prisma.campaign.findUnique({
+    const campaign = (await this.prisma.campaign.findUnique({
       where: { id: campaignId },
       include: { campaignAgents: { include: { agent: true } } },
-    }) as any;
+    })) as any;
 
     if (!campaign || campaign.status !== 'ACTIVE') {
-      this.logger.log(`[Dialer] Campaign ${campaignId} not active — skipping tick`);
+      this.logger.log(
+        `[Dialer] Campaign ${campaignId} not active — skipping tick`,
+      );
       return;
     }
 
@@ -49,13 +51,19 @@ export class DialerProcessor {
     }
 
     // Find an available agent from campaignAgents
-    const availableAgent = campaign.campaignAgents?.find((ca: any) => ca.agent?.agentStatus === 'AVAILABLE')?.agent;
+    const availableAgent = campaign.campaignAgents?.find(
+      (ca: any) => ca.agent?.agentStatus === 'AVAILABLE',
+    )?.agent;
     if (!availableAgent) {
-      this.logger.log(`[Dialer] No available agents for campaign ${campaignId}`);
+      this.logger.log(
+        `[Dialer] No available agents for campaign ${campaignId}`,
+      );
       return;
     }
 
-    this.logger.log(`[Dialer] Initiating call: lead ${nextLead.id} → agent ${availableAgent.id}`);
+    this.logger.log(
+      `[Dialer] Initiating call: lead ${nextLead.id} → agent ${availableAgent.id}`,
+    );
 
     // Mark lead as contacted
     await this.prisma.lead.update({

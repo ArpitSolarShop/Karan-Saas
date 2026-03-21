@@ -1,6 +1,14 @@
 ﻿import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Controller, Get, Post, Patch, Delete, Body, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+} from '@nestjs/common';
 import { TasksService } from './tasks.service';
 
 @UseGuards(JwtAuthGuard)
@@ -28,4 +36,3 @@ export class TasksController {
     return this.tasksService.remove(id);
   }
 }
-

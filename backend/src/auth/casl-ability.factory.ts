@@ -9,7 +9,14 @@ import { Injectable } from '@nestjs/common';
  *   if (ability.cannot('delete', 'Lead')) throw new ForbiddenException();
  */
 export type Action = 'manage' | 'create' | 'read' | 'update' | 'delete';
-export type Subject = 'Lead' | 'Call' | 'Campaign' | 'Report' | 'User' | 'Setting' | 'all';
+export type Subject =
+  | 'Lead'
+  | 'Call'
+  | 'Campaign'
+  | 'Report'
+  | 'User'
+  | 'Setting'
+  | 'all';
 export type AppAbility = PureAbility<[Action, Subject]>;
 
 @Injectable()

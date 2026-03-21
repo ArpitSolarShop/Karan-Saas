@@ -16,11 +16,11 @@ export class DealsService {
   async findOne(id: string) {
     const deal = await this.prisma.deal.findUnique({
       where: { id },
-      include: { 
-        lead: true, 
+      include: {
+        lead: true,
         owner: { select: { firstName: true, lastName: true } },
         quotes: true,
-        attachments: true
+        attachments: true,
       },
     });
     if (!deal) throw new NotFoundException('Deal not found');
@@ -38,7 +38,9 @@ export class DealsService {
         currency: data.currency || 'INR',
         stage: data.stage || 'PROSPECTING',
         probability: data.probability || 10,
-        expectedCloseDate: data.expectedCloseDate ? new Date(data.expectedCloseDate) : null,
+        expectedCloseDate: data.expectedCloseDate
+          ? new Date(data.expectedCloseDate)
+          : null,
       },
     });
   }

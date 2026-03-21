@@ -1,4 +1,9 @@
-import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  MessageBody,
+} from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 
@@ -6,7 +11,7 @@ import { Logger } from '@nestjs/common';
 export class TelephonyGateway {
   @WebSocketServer()
   server: Server;
-  
+
   private readonly logger = new Logger(TelephonyGateway.name);
 
   handleConnection(client: Socket) {

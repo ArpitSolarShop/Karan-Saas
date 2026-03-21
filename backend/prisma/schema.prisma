@@ -179,6 +179,7 @@ model Tenant {
   marketingJourneys MarketingJourney[]
   landingPages      LandingPage[]
   approvalRequests  ApprovalRequest[]
+  whatsAppInstances WhatsAppInstance[]
 
   @@map("tenants")
 }
@@ -987,3 +988,88 @@ model AgentLocation {
   @@index([agentId, timestamp])
   @@map("agent_locations")
 }
+
+// ============================================================================
+// WHATSAPP NATIVE SELF-SUFFICIENT INTEGRATION
+// ============================================================================
+
+enum WaConnectionType {
+  CLOUD_API
+  BAILEYS_NATIVE
+}
+
+enum WaConnectionStatus {
+  disconnected
+  connecting
+  connected
+  banned
+}
+
+enum WaMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+model WhatsAppInstance {
+  id               String              @id @default(cuid())
+  tenantId         String
+  tenant           Tenant              @relation(fields: [tenantId], references: [id])
+  name             String              @unique
+  phoneNumber      String?
+  connectionType   WaConnectionType    @default(BAILEYS_NATIVE)
+  connectionStatus WaConnectionStatus  @default(disconnected)
+
+  phoneNumberId    String?
+  wabaId           String?
+  accessToken      String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  messages         WhatsAppMessage[]
+  contacts         WhatsAppContact[]
+  authStore        WhatsAppAuthState[]
+
+  @@map("whatsapp_instances")
+}
+
+model WhatsAppAuthState {
+  id          String   @id @default(cuid())
+  instanceId  String
+  instance    WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  type        String   @db.VarChar(100) 
+  keyId       String   @db.VarChar(255)
+  data        String   @db.Text         
+
+  @@unique([instanceId, type, keyId])
+  @@map("whatsapp_auth_states")
+}
+
+model WhatsAppMessage {
+  id           String              @id @default(cuid())
+  instanceId   String
+  instance     WhatsAppInstance    @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  direction    WaMessageDirection
+  remoteJid    String              
+  messageId    String              @unique 
+  messageType  String              
+  messageData  Json                
+  status       String              @default("SERVER_ACK")
+  timestamp    DateTime            @default(now())
+
+  @@index([instanceId, remoteJid])
+  @@map("whatsapp_messages")
+}
+
+model WhatsAppContact {
+  id          String           @id @default(cuid())
+  instanceId  String
+  instance    WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  remoteJid   String
+  pushName    String?
+  profilePic  String?
+
+  @@unique([instanceId, remoteJid])
+  @@map("whatsapp_contacts")
+}
+

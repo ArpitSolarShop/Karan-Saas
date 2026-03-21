@@ -1,5 +1,14 @@
 import {
-  Controller, Post, Get, Patch, Delete, Body, Headers, HttpCode, Param, UseGuards
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Delete,
+  Body,
+  Headers,
+  HttpCode,
+  Param,
+  UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -11,10 +20,17 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
-  async register(@Body() body: {
-    email: string; password: string; firstName: string; lastName: string;
-    role?: string; extension?: string;
-  }) {
+  async register(
+    @Body()
+    body: {
+      email: string;
+      password: string;
+      firstName: string;
+      lastName: string;
+      role?: string;
+      extension?: string;
+    },
+  ) {
     return this.authService.register(body);
   }
 
@@ -38,9 +54,17 @@ export class AuthController {
 
   @Patch('users/:id')
   @UseGuards(JwtAuthGuard)
-  async updateUser(@Param('id') id: string, @Body() body: {
-    role?: string; extension?: string; isActive?: boolean; firstName?: string; lastName?: string;
-  }) {
+  async updateUser(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      role?: string;
+      extension?: string;
+      isActive?: boolean;
+      firstName?: string;
+      lastName?: string;
+    },
+  ) {
     return this.authService.updateUser(id, body);
   }
 

@@ -28,4 +28,3 @@ export class ScriptsController {
     return this.scriptsService.create(body);
   }
 }
-

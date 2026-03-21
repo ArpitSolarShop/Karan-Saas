@@ -21,10 +21,28 @@ export class CommunicationsController {
    * Send WA/Email to a lead
    */
   @Post('send')
-  async send(@Body() body: { leadId: string; channel?: string; type?: string; message?: string; content?: string; userId?: string }) {
-    const type = (body.channel || body.type || 'WHATSAPP') as 'WHATSAPP' | 'EMAIL' | 'SMS';
+  async send(
+    @Body()
+    body: {
+      leadId: string;
+      channel?: string;
+      type?: string;
+      message?: string;
+      content?: string;
+      userId?: string;
+    },
+  ) {
+    const type = (body.channel || body.type || 'WHATSAPP') as
+      | 'WHATSAPP'
+      | 'EMAIL'
+      | 'SMS';
     const message = body.content || body.message || '';
-    return this.commsService.sendCommunication(body.leadId, type, message, body.userId || 'SYSTEM');
+    return this.commsService.sendCommunication(
+      body.leadId,
+      type,
+      message,
+      body.userId || 'SYSTEM',
+    );
   }
 
   /**
@@ -35,7 +53,11 @@ export class CommunicationsController {
   async getThreads() {
     const activities = (await this.prisma.activity.findMany({
       where: { activityType: { in: ['WHATSAPP', 'EMAIL', 'SMS'] } },
-      include: { lead: { select: { id: true, name: true, firstName: true, phone: true } } },
+      include: {
+        lead: {
+          select: { id: true, name: true, firstName: true, phone: true },
+        },
+      },
       orderBy: { createdAt: 'desc' },
       take: 500,
     })) as any[];
@@ -69,7 +91,7 @@ export class CommunicationsController {
       orderBy: { createdAt: 'asc' },
     })) as any[];
 
-    return activities.map(a => ({
+    return activities.map((a) => ({
       id: a.id,
       direction: 'OUTBOUND',
       channel: a.activityType,
@@ -80,7 +102,9 @@ export class CommunicationsController {
   }
 
   @Get('whatsapp/status')
-  getWhatsAppStatus() { return this.waClient.getSessionStatus(); }
+  getWhatsAppStatus() {
+    return this.waClient.getSessionStatus();
+  }
 
   @Get('whatsapp/qr-image')
   async getQrImage(@Res() res: Response) {
@@ -88,7 +112,10 @@ export class CommunicationsController {
     if (!status.qr) {
       return res.status(status.status === 'CONNECTED' ? 200 : 404).json({
         status: status.status,
-        message: status.status === 'CONNECTED' ? 'Already connected!' : 'QR not available yet.',
+        message:
+          status.status === 'CONNECTED'
+            ? 'Already connected!'
+            : 'QR not available yet.',
       });
     }
     const buffer = await QRCode.toBuffer(status.qr, { scale: 8 });
@@ -98,7 +125,13 @@ export class CommunicationsController {
   }
 
   @Post('broadcast')
-  async broadcast(@Body() body: { phones: string[]; message: string; delayMs?: number }) {
-    return this.waClient.broadcastMessage(body.phones, body.message, body.delayMs);
+  async broadcast(
+    @Body() body: { phones: string[]; message: string; delayMs?: number },
+  ) {
+    return this.waClient.broadcastMessage(
+      body.phones,
+      body.message,
+      body.delayMs,
+    );
   }
 }

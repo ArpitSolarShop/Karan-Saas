@@ -23,4 +23,3 @@ export class NotesController {
     return this.notesService.remove(id);
   }
 }
-

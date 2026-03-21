@@ -7,7 +7,9 @@ export class CampaignsService {
 
   async findAll() {
     return this.prisma.campaign.findMany({
-      include: { _count: { select: { leads: true, calls: true, campaignAgents: true } } },
+      include: {
+        _count: { select: { leads: true, calls: true, campaignAgents: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -17,7 +19,18 @@ export class CampaignsService {
       where: { id },
       include: {
         leads: { take: 50, orderBy: { createdAt: 'desc' } },
-        campaignAgents: { include: { agent: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        campaignAgents: {
+          include: {
+            agent: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
         calls: { take: 20, orderBy: { createdAt: 'desc' } },
         script: true,
         _count: { select: { leads: true, calls: true } },
@@ -51,7 +64,10 @@ export class CampaignsService {
   }
 
   async updateStatus(id: string, status: string) {
-    return this.prisma.campaign.update({ where: { id }, data: { status: status as any } });
+    return this.prisma.campaign.update({
+      where: { id },
+      data: { status: status as any },
+    });
   }
 
   async assignAgent(campaignId: string, agentId: string, dailyTarget?: number) {
@@ -67,13 +83,25 @@ export class CampaignsService {
   }
 
   async getStats(id: string) {
-    const [totalLeads, totalCalls, answeredCalls, convertedLeads] = await Promise.all([
-      this.prisma.lead.count({ where: { campaignId: id } }),
-      this.prisma.call.count({ where: { campaignId: id } }),
-      this.prisma.call.count({ where: { campaignId: id, status: 'COMPLETED' } }),
-      this.prisma.lead.count({ where: { campaignId: id, status: 'CONVERTED' } }),
-    ]);
-    return { totalLeads, totalCalls, answeredCalls, convertedLeads, conversionRate: totalLeads > 0 ? (convertedLeads / totalLeads * 100).toFixed(1) : '0' };
+    const [totalLeads, totalCalls, answeredCalls, convertedLeads] =
+      await Promise.all([
+        this.prisma.lead.count({ where: { campaignId: id } }),
+        this.prisma.call.count({ where: { campaignId: id } }),
+        this.prisma.call.count({
+          where: { campaignId: id, status: 'COMPLETED' },
+        }),
+        this.prisma.lead.count({
+          where: { campaignId: id, status: 'CONVERTED' },
+        }),
+      ]);
+    return {
+      totalLeads,
+      totalCalls,
+      answeredCalls,
+      convertedLeads,
+      conversionRate:
+        totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : '0',
+    };
   }
 
   async remove(id: string) {
@@ -82,7 +110,9 @@ export class CampaignsService {
 
   /** Clone a campaign — copies config as a new DRAFT */
   async clone(id: string) {
-    const original = await this.prisma.campaign.findUniqueOrThrow({ where: { id } });
+    const original = await this.prisma.campaign.findUniqueOrThrow({
+      where: { id },
+    });
     return this.prisma.campaign.create({
       data: {
         tenantId: original.tenantId,

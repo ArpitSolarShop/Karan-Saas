@@ -35,7 +35,9 @@ export class AuditService {
   async getRecent(tenantId: string) {
     return this.prisma.auditLog.findMany({
       where: { tenantId },
-      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+      include: {
+        user: { select: { firstName: true, lastName: true, email: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });

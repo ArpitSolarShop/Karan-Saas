@@ -24,7 +24,13 @@ export class ApprovalsService {
     });
   }
 
-  async resolveRequest(id: string, tenantId: string, approverId: string, status: 'APPROVED' | 'REJECTED', notes?: string) {
+  async resolveRequest(
+    id: string,
+    tenantId: string,
+    approverId: string,
+    status: 'APPROVED' | 'REJECTED',
+    notes?: string,
+  ) {
     const request = await this.prisma.approvalRequest.findFirst({
       where: { id, tenantId },
     });

@@ -20,7 +20,15 @@ export class NotificationsService {
     });
   }
 
-  async create(data: { recipientId: string; type: string; title: string; body?: string; entityType?: string; entityId?: string; tenantId?: string }) {
+  async create(data: {
+    recipientId: string;
+    type: string;
+    title: string;
+    body?: string;
+    entityType?: string;
+    entityId?: string;
+    tenantId?: string;
+  }) {
     return this.prisma.notification.create({
       data: {
         tenantId: data.tenantId || 'dev-tenant-001',
@@ -56,7 +64,13 @@ export class NotificationsService {
     });
   }
 
-  async addSuppression(data: { phoneE164: string; type: string; reason?: string; addedBy?: string; tenantId?: string }) {
+  async addSuppression(data: {
+    phoneE164: string;
+    type: string;
+    reason?: string;
+    addedBy?: string;
+    tenantId?: string;
+  }) {
     return this.prisma.suppression.create({
       data: {
         tenantId: data.tenantId || 'dev-tenant-001',
@@ -80,7 +94,15 @@ export class NotificationsService {
   }
 
   // ── Audit Logs ──
-  async logAction(data: { userId?: string; entityType: string; entityId: string; action: string; oldValues?: any; newValues?: any; tenantId?: string }) {
+  async logAction(data: {
+    userId?: string;
+    entityType: string;
+    entityId: string;
+    action: string;
+    oldValues?: any;
+    newValues?: any;
+    tenantId?: string;
+  }) {
     return this.prisma.auditLog.create({
       data: {
         tenantId: data.tenantId || 'dev-tenant-001',
@@ -100,7 +122,9 @@ export class NotificationsService {
         ...(entityType && { entityType }),
         ...(entityId && { entityId }),
       },
-      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+      include: {
+        user: { select: { firstName: true, lastName: true, email: true } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });

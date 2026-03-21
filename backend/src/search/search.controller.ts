@@ -17,7 +17,8 @@ export class SearchController {
     @Query('tenantId') tenantId?: string,
     @Query('limit') limit?: string,
   ) {
-    if (!q || q.trim().length < 2) return { leads: [], contacts: [], calls: [], query: q };
+    if (!q || q.trim().length < 2)
+      return { leads: [], contacts: [], calls: [], query: q };
     return this.searchService.search(q, {
       tenantId,
       limit: limit ? parseInt(limit) : 10,

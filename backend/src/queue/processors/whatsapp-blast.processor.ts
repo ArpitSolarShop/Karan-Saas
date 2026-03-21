@@ -13,7 +13,9 @@ export class WhatsAppBlastProcessor {
   @Process('blast')
   async handleBlast(job: any) {
     const { campaignId, leads, template, userId } = job.data;
-    this.logger.log(`[WhatsApp] Blasting ${leads.length} leads for campaign ${campaignId}`);
+    this.logger.log(
+      `[WhatsApp] Blasting ${leads.length} leads for campaign ${campaignId}`,
+    );
 
     let sent = 0;
     let failed = 0;
@@ -36,7 +38,9 @@ export class WhatsAppBlastProcessor {
         sent++;
         await job.progress(Math.round((sent / leads.length) * 100));
       } catch (e) {
-        this.logger.error(`[WhatsApp] Failed for lead ${lead.id}: ${(e as Error).message}`);
+        this.logger.error(
+          `[WhatsApp] Failed for lead ${lead.id}: ${(e as Error).message}`,
+        );
         failed++;
       }
     }

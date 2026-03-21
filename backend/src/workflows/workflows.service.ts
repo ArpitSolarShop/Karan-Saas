@@ -35,7 +35,7 @@ export class WorkflowsService {
     actionParams?: any;
     tenantId?: string;
   }) {
-    const tenantId = data.tenantId || await this.ensureDevTenant();
+    const tenantId = data.tenantId || (await this.ensureDevTenant());
     return this.prisma.workflowRule.create({
       data: {
         tenantId,
@@ -49,8 +49,20 @@ export class WorkflowsService {
     });
   }
 
-  async update(id: string, data: Partial<{ name: string; isActive: boolean; action: string; actionParams: any; condition: any }>) {
-    return this.prisma.workflowRule.update({ where: { id }, data: data as any });
+  async update(
+    id: string,
+    data: Partial<{
+      name: string;
+      isActive: boolean;
+      action: string;
+      actionParams: any;
+      condition: any;
+    }>,
+  ) {
+    return this.prisma.workflowRule.update({
+      where: { id },
+      data: data as any,
+    });
   }
 
   async delete(id: string) {
@@ -58,19 +70,22 @@ export class WorkflowsService {
   }
 
   // ── Engine: execute matching rules ────────────────────────────────────────
-  async executeRules(trigger: string, context: {
-    leadId?: string;
-    leadName?: string;
-    phone?: string;
-    email?: string;
-    agentId?: string;
-    disposition?: string;
-    status?: string;
-    tenantId?: string;
-  }) {
-    const rules = await this.prisma.workflowRule.findMany({
+  async executeRules(
+    trigger: string,
+    context: {
+      leadId?: string;
+      leadName?: string;
+      phone?: string;
+      email?: string;
+      agentId?: string;
+      disposition?: string;
+      status?: string;
+      tenantId?: string;
+    },
+  ) {
+    const rules = (await this.prisma.workflowRule.findMany({
       where: { trigger: trigger as any, isActive: true },
-    }) as any[];
+    })) as any[];
 
     for (const rule of rules) {
       try {
@@ -89,14 +104,18 @@ export class WorkflowsService {
     return template.replace(/\{\{(\w+(?:\.\w+)*)\}\}/g, (_, path) => {
       const parts = path.split('.');
       let val: any = context;
-      for (const p of parts) { val = val?.[p]; }
+      for (const p of parts) {
+        val = val?.[p];
+      }
       return String(val ?? '');
     });
   }
 
   private async executeAction(rule: any, context: Record<string, any>) {
     const params = rule.actionParams || {};
-    const message = params.message ? this.interpolate(params.message, context) : '';
+    const message = params.message
+      ? this.interpolate(params.message, context)
+      : '';
 
     switch (rule.action) {
       case 'SEND_WHATSAPP':
@@ -121,7 +140,10 @@ export class WorkflowsService {
 
       case 'UPDATE_LEAD_STATUS':
         if (context.leadId && params.status) {
-          await this.prisma.lead.update({ where: { id: context.leadId }, data: { status: params.status as any } });
+          await this.prisma.lead.update({
+            where: { id: context.leadId },
+            data: { status: params.status },
+          });
         }
         break;
 

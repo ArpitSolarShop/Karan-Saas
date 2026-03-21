@@ -28,4 +28,3 @@ export class DealsController {
     return this.dealsService.update(id, data);
   }
 }
-

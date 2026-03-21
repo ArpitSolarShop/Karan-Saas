@@ -21,9 +21,9 @@ export class NotesService {
       orderBy: { createdAt: 'desc' },
       include: {
         agent: {
-          select: { firstName: true, lastName: true }
-        }
-      }
+          select: { firstName: true, lastName: true },
+        },
+      },
     });
   }
 

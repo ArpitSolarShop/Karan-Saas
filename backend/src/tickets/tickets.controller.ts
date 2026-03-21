@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -23,7 +32,16 @@ export class TicketsController {
   }
 
   @Post(':id/messages')
-  async addMessage(@Param('id') id: string, @Req() req: any, @Body() body: any) {
-    return this.ticketsService.addMessage(id, req.user.id, body.body, body.isInternal);
+  async addMessage(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    return this.ticketsService.addMessage(
+      id,
+      req.user.id,
+      body.body,
+      body.isInternal,
+    );
   }
 }

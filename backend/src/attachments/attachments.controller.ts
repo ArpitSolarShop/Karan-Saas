@@ -1,6 +1,15 @@
 import {
-  Controller, Get, Post, Delete, Param, Body, UseGuards,
-  UseInterceptors, UploadedFile, BadRequestException, Query,
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AttachmentsService } from './attachments.service';
@@ -36,7 +45,10 @@ export class AttachmentsController {
     if (!file) throw new BadRequestException('No file uploaded');
 
     // Upload to MinIO and get the storage key
-    const key = this.storageService.getAttachmentKey(leadId || 'general', file.originalname);
+    const key = this.storageService.getAttachmentKey(
+      leadId || 'general',
+      file.originalname,
+    );
     await this.storageService.uploadFile(file.buffer, key, file.mimetype);
     const url = await this.storageService.getSignedUrl(key, 3600 * 24 * 365); // 1-year signed URL
 
@@ -71,8 +83,14 @@ export class AttachmentsController {
   async getSignedUrl(@Param('id') id: string, @Query('ttl') ttl?: string) {
     const att = await this.attachmentsService.findOne(id);
     // Extract key from URL or reconstruct it
-    const key = this.storageService.getAttachmentKey(att.leadId || 'general', att.name);
-    const url = await this.storageService.getSignedUrl(key, ttl ? parseInt(ttl) : 3600);
+    const key = this.storageService.getAttachmentKey(
+      att.leadId || 'general',
+      att.name,
+    );
+    const url = await this.storageService.getSignedUrl(
+      key,
+      ttl ? parseInt(ttl) : 3600,
+    );
     return { url };
   }
 
@@ -81,7 +99,10 @@ export class AttachmentsController {
     const att = await this.attachmentsService.findOne(id);
     // Delete from MinIO too
     try {
-      const key = this.storageService.getAttachmentKey(att.leadId || 'general', att.name);
+      const key = this.storageService.getAttachmentKey(
+        att.leadId || 'general',
+        att.name,
+      );
       await this.storageService.deleteFile(key);
     } catch {}
     return this.attachmentsService.remove(id);

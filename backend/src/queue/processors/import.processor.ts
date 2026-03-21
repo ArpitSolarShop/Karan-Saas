@@ -13,7 +13,9 @@ export class ImportProcessor {
   @Process('processImport')
   async handleImport(job: any) {
     const { sheetId, rows, tenantId } = job.data;
-    this.logger.log(`[Import] Starting import of ${rows.length} rows for sheet ${sheetId}`);
+    this.logger.log(
+      `[Import] Starting import of ${rows.length} rows for sheet ${sheetId}`,
+    );
 
     let inserted = 0;
     let skipped = 0;
@@ -33,7 +35,10 @@ export class ImportProcessor {
               ].filter(Boolean) as any,
             },
           });
-          if (existing) { skipped++; continue; }
+          if (existing) {
+            skipped++;
+            continue;
+          }
 
           await this.prisma.lead.create({
             data: {
@@ -57,7 +62,9 @@ export class ImportProcessor {
       await job.progress(Math.round(((i + batch.length) / rows.length) * 100));
     }
 
-    this.logger.log(`[Import] Completed: ${inserted} inserted, ${skipped} skipped`);
+    this.logger.log(
+      `[Import] Completed: ${inserted} inserted, ${skipped} skipped`,
+    );
     return { inserted, skipped };
   }
 }

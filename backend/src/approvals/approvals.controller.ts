@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { ApprovalsService } from './approvals.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -9,7 +18,11 @@ export class ApprovalsController {
 
   @Post()
   async create(@Req() req: any, @Body() body: any) {
-    return this.approvalsService.createRequest(req.user.tenantId, req.user.id, body);
+    return this.approvalsService.createRequest(
+      req.user.tenantId,
+      req.user.id,
+      body,
+    );
   }
 
   @Get('pending')
@@ -19,6 +32,12 @@ export class ApprovalsController {
 
   @Put(':id/resolve')
   async resolve(@Param('id') id: string, @Req() req: any, @Body() body: any) {
-    return this.approvalsService.resolveRequest(id, req.user.tenantId, req.user.id, body.status, body.notes);
+    return this.approvalsService.resolveRequest(
+      id,
+      req.user.tenantId,
+      req.user.id,
+      body.status,
+      body.notes,
+    );
   }
 }

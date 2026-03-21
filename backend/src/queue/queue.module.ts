@@ -13,10 +13,13 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
 
 const REDIS_CONFIG = {
-  host: (process.env.REDIS_URL || 'redis://localhost:6380').replace('redis://', '').split(':')[0],
-  port: parseInt((process.env.REDIS_URL || 'redis://localhost:6380').split(':')[2] || '6380'),
+  host: (process.env.REDIS_URL || 'redis://localhost:6380')
+    .replace('redis://', '')
+    .split(':')[0],
+  port: parseInt(
+    (process.env.REDIS_URL || 'redis://localhost:6380').split(':')[2] || '6380',
+  ),
 };
-
 
 @Global()
 @Module({

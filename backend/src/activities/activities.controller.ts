@@ -9,8 +9,21 @@ export class ActivitiesController {
   constructor(private readonly activitiesService: ActivitiesService) {}
 
   @Post()
-  log(@Body() body: { leadId: string; userId: string; type: string; description: string }) {
-    return this.activitiesService.log(body.leadId, body.userId, body.type, body.description);
+  log(
+    @Body()
+    body: {
+      leadId: string;
+      userId: string;
+      type: string;
+      description: string;
+    },
+  ) {
+    return this.activitiesService.log(
+      body.leadId,
+      body.userId,
+      body.type,
+      body.description,
+    );
   }
 
   @Get('lead/:leadId')
@@ -23,4 +36,3 @@ export class ActivitiesController {
     return this.activitiesService.findAll(tenantId);
   }
 }
-

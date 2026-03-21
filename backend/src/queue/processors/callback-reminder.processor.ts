@@ -28,7 +28,7 @@ export class CallbackReminderProcessor {
     // Create an in-app notification for the agent
     await this.prisma.notification.create({
       data: {
-        tenantId: callback.lead?.name ? 'dev-tenant-001' : 'dev-tenant-001', 
+        tenantId: callback.lead?.name ? 'dev-tenant-001' : 'dev-tenant-001',
         recipientId: agentId,
         type: 'CALLBACK_DUE',
         title: 'Callback Due',

@@ -37,7 +37,9 @@ export class MarketingService {
   }
 
   async submitForm(landingPageId: string, formData: any) {
-    const page = await this.prisma.landingPage.findUnique({ where: { id: landingPageId } });
+    const page = await this.prisma.landingPage.findUnique({
+      where: { id: landingPageId },
+    });
     if (!page) throw new NotFoundException('Page not found');
 
     // Save submission
@@ -83,7 +85,9 @@ export class MarketingService {
   }
 
   async startJourneyForLead(journeyId: string, leadId: string) {
-    const journey = await this.prisma.marketingJourney.findUnique({ where: { id: journeyId } });
+    const journey = await this.prisma.marketingJourney.findUnique({
+      where: { id: journeyId },
+    });
     if (!journey || !journey.isActive) return;
 
     // Add to BullMQ for processing steps

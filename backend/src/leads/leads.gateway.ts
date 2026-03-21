@@ -71,7 +71,10 @@ export class LeadsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   /** Client-to-server: allow a client to subscribe to a specific lead room */
   @SubscribeMessage('joinLead')
-  handleJoinLead(@MessageBody() data: { leadId: string }, @ConnectedSocket() client: Socket) {
+  handleJoinLead(
+    @MessageBody() data: { leadId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
     client.join(`lead:${data.leadId}`);
     return { event: 'joinedLead', data: { leadId: data.leadId } };
   }

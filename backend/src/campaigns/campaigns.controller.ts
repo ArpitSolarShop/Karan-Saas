@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { CampaignsService } from './campaigns.service';
 import { QueueService } from '../queue/queue.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -14,22 +23,35 @@ export class CampaignsController {
   ) {}
 
   @Get()
-  findAll() { return this.service.findAll(); }
+  findAll() {
+    return this.service.findAll();
+  }
 
   @Get(':id')
-  findOne(@Param('id') id: string) { return this.service.findOne(id); }
+  findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
+  }
 
   @Post()
-  create(@Body() body: any) { return this.service.create(body); }
+  create(@Body() body: any) {
+    return this.service.create(body);
+  }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: any) { return this.service.update(id, body); }
+  update(@Param('id') id: string, @Body() body: any) {
+    return this.service.update(id, body);
+  }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() body: { status: string }) { return this.service.updateStatus(id, body.status); }
+  updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
+    return this.service.updateStatus(id, body.status);
+  }
 
   @Post(':id/agents')
-  assignAgent(@Param('id') id: string, @Body() body: { agentId: string; dailyTarget?: number }) {
+  assignAgent(
+    @Param('id') id: string,
+    @Body() body: { agentId: string; dailyTarget?: number },
+  ) {
     return this.service.assignAgent(id, body.agentId, body.dailyTarget);
   }
 
@@ -39,10 +61,14 @@ export class CampaignsController {
   }
 
   @Get(':id/stats')
-  getStats(@Param('id') id: string) { return this.service.getStats(id); }
+  getStats(@Param('id') id: string) {
+    return this.service.getStats(id);
+  }
 
   @Delete(':id')
-  remove(@Param('id') id: string) { return this.service.remove(id); }
+  remove(@Param('id') id: string) {
+    return this.service.remove(id);
+  }
 
   // ── Dialer Control ──────────────────────────────────────────────────────────
 
@@ -89,13 +115,19 @@ export class CampaignsController {
 
   /** POST /campaigns/:id/clone — create a DRAFT copy of this campaign */
   @Post(':id/clone')
-  clone(@Param('id') id: string) { return this.service.clone(id); }
+  clone(@Param('id') id: string) {
+    return this.service.clone(id);
+  }
 
   /** GET /campaigns/import-history — all lead list imports */
   @Get('import-history')
-  importHistory() { return this.service.importHistory(); }
+  importHistory() {
+    return this.service.importHistory();
+  }
 
   /** GET /campaigns/:id/import-history — imports for specific campaign */
   @Get(':id/import-history')
-  campaignImportHistory(@Param('id') id: string) { return this.service.importHistory(id); }
+  campaignImportHistory(@Param('id') id: string) {
+    return this.service.importHistory(id);
+  }
 }

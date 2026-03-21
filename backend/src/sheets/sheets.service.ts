@@ -12,8 +12,6 @@ export class SheetsService {
     private formulaEngine: FormulaEngineService,
   ) {}
 
-
-
   // ── Workbooks ──
   async findAllWorkbooks(tenantId?: string) {
     return this.prisma.workbook.findMany({
@@ -49,7 +47,16 @@ export class SheetsService {
   }
 
   // ── Columns ──
-  async addColumn(sheetId: string, data: { key: string; name: string; dataType?: string; position?: number; width?: number }) {
+  async addColumn(
+    sheetId: string,
+    data: {
+      key: string;
+      name: string;
+      dataType?: string;
+      position?: number;
+      width?: number;
+    },
+  ) {
     const maxPos = await this.prisma.sheetColumn.aggregate({
       where: { sheetId },
       _max: { position: true },
@@ -60,7 +67,7 @@ export class SheetsService {
         key: data.key,
         name: data.name,
         dataType: (data.dataType as any) || 'TEXT',
-        position: data.position ?? ((maxPos._max.position || 0) + 1),
+        position: data.position ?? (maxPos._max.position || 0) + 1,
         width: data.width || 120,
       },
     });
@@ -90,22 +97,23 @@ export class SheetsService {
 
     if (!sheet) return rows;
 
-    return rows.map(row => this.formulaEngine.processRow(row, sheet.columns));
+    return rows.map((row) => this.formulaEngine.processRow(row, sheet.columns));
   }
-
 
   async addRow(sheetId: string, data: Record<string, any>) {
     await this.ensureColumnsExist(sheetId, Object.keys(data));
-    
+
     // Enterprise Enforcement: Duplicate & DNC Check for Leads Sheets
     const phone = data.phone || data.phone_primary || data.phone_number;
     if (phone) {
       // 1. DNC Check
       const isDnc = await this.prisma.suppression.findFirst({
-        where: { phoneE164: String(phone) }
+        where: { phoneE164: String(phone) },
       });
       if (isDnc) {
-        throw new Error(`CRITICAL: Number ${phone} is on the Do-Not-Call (DNC) list.`);
+        throw new Error(
+          `CRITICAL: Number ${phone} is on the Do-Not-Call (DNC) list.`,
+        );
       }
 
       // 2. Duplicate Check within this sheet/campaign
@@ -119,7 +127,9 @@ export class SheetsService {
         },
       });
       if (existing) {
-        throw new Error(`Duplicate blocked: Number ${phone} already exists in this sheet.`);
+        throw new Error(
+          `Duplicate blocked: Number ${phone} already exists in this sheet.`,
+        );
       }
     }
 
@@ -140,14 +150,16 @@ export class SheetsService {
 
   async bulkAddRows(sheetId: string, payload: Record<string, any>[]) {
     // Extract all unique keys from all rows in the payload
-    const allKeys = Array.from(new Set(payload.flatMap(row => Object.keys(row))));
+    const allKeys = Array.from(
+      new Set(payload.flatMap((row) => Object.keys(row))),
+    );
     await this.ensureColumnsExist(sheetId, allKeys);
 
     const maxRow = await this.prisma.sheetRow.aggregate({
       where: { sheetId },
       _max: { rowIndex: true },
     });
-    let startIdx = (maxRow._max.rowIndex || 0) + 1;
+    const startIdx = (maxRow._max.rowIndex || 0) + 1;
 
     const data = payload.map((d, i) => ({
       sheetId,
@@ -159,22 +171,28 @@ export class SheetsService {
       data,
       skipDuplicates: true,
     });
-    
+
     this.sheetsGateway.broadcastUpdate('sheetUpdated', { sheetId });
     return result;
   }
 
   private async ensureColumnsExist(sheetId: string, keys: string[]) {
-    const log = (msg: string) => fs.appendFileSync('debug-schema.log', `[${new Date().toISOString()}] ${msg}\n`);
+    const log = (msg: string) =>
+      fs.appendFileSync(
+        'debug-schema.log',
+        `[${new Date().toISOString()}] ${msg}\n`,
+      );
     log(`Checking keys for sheet ${sheetId}: ${JSON.stringify(keys)}`);
-    
+
     const existingColumns = await this.prisma.sheetColumn.findMany({
       where: { sheetId },
-      select: { key: true }
+      select: { key: true },
     });
-    
-    const existingKeys = new Set(existingColumns.map(c => c.key));
-    const newKeys = keys.filter(k => !existingKeys.has(k) && k !== 'id' && k !== 'rowIndex');
+
+    const existingKeys = new Set(existingColumns.map((c) => c.key));
+    const newKeys = keys.filter(
+      (k) => !existingKeys.has(k) && k !== 'id' && k !== 'rowIndex',
+    );
     log(`New keys detected: ${JSON.stringify(newKeys)}`);
 
     if (newKeys.length > 0) {
@@ -182,8 +200,10 @@ export class SheetsService {
         where: { sheetId },
         _max: { position: true },
       });
-      let startPos = (maxPos._max.position || 0) + 1;
-      log(`Creating ${newKeys.length} new columns starting at position ${startPos}`);
+      const startPos = (maxPos._max.position || 0) + 1;
+      log(
+        `Creating ${newKeys.length} new columns starting at position ${startPos}`,
+      );
 
       await this.prisma.sheetColumn.createMany({
         data: newKeys.map((key, i) => ({
@@ -192,14 +212,13 @@ export class SheetsService {
           name: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
           dataType: 'TEXT',
           position: startPos + i,
-          width: 150
-        }))
+          width: 150,
+        })),
       });
       log(`Successfully created new columns: ${JSON.stringify(newKeys)}`);
       this.sheetsGateway.broadcastUpdate('sheetUpdated', { sheetId });
     }
   }
-
 
   async updateCell(rowId: string, columnKey: string, value: any) {
     // Partial JSONB update: only change one key
@@ -215,7 +234,6 @@ export class SheetsService {
     return result;
   }
 
-
   async updateRow(rowId: string, data: Record<string, any>) {
     const result = await this.prisma.sheetRow.update({
       where: { id: rowId },
@@ -225,13 +243,15 @@ export class SheetsService {
     return result;
   }
 
-
   async deleteRow(rowId: string) {
     return this.prisma.sheetRow.delete({ where: { id: rowId } });
   }
 
   // ── Views ──
-  async createView(sheetId: string, data: { name: string; filters?: any; sorts?: any; hiddenColumns?: any }) {
+  async createView(
+    sheetId: string,
+    data: { name: string; filters?: any; sorts?: any; hiddenColumns?: any },
+  ) {
     return this.prisma.sheetView.create({
       data: {
         sheetId,

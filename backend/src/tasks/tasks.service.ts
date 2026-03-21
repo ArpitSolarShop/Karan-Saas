@@ -5,7 +5,13 @@ import { PrismaService } from '../prisma/prisma.service';
 export class TasksService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: { leadId?: string; assignedTo: string; title: string; dueDate: Date; notes?: string }) {
+  async create(data: {
+    leadId?: string;
+    assignedTo: string;
+    title: string;
+    dueDate: Date;
+    notes?: string;
+  }) {
     return this.prisma.task.create({
       data: {
         leadId: data.leadId,

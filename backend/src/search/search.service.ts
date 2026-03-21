@@ -17,10 +17,33 @@ export class SearchService implements OnModuleInit {
     try {
       // Configure leads index
       await this.client.index('leads').updateSettings({
-        searchableAttributes: ['name', 'firstName', 'phone', 'email', 'city', 'company', 'source', 'notes'],
-        filterableAttributes: ['status', 'score', 'tenantId', 'source', 'campaignId', 'assignedTo'],
+        searchableAttributes: [
+          'name',
+          'firstName',
+          'phone',
+          'email',
+          'city',
+          'company',
+          'source',
+          'notes',
+        ],
+        filterableAttributes: [
+          'status',
+          'score',
+          'tenantId',
+          'source',
+          'campaignId',
+          'assignedTo',
+        ],
         sortableAttributes: ['createdAt', 'score', 'name'],
-        rankingRules: ['words', 'typo', 'proximity', 'attribute', 'sort', 'exactness'],
+        rankingRules: [
+          'words',
+          'typo',
+          'proximity',
+          'attribute',
+          'sort',
+          'exactness',
+        ],
       });
 
       // Configure contacts index
@@ -38,32 +61,46 @@ export class SearchService implements OnModuleInit {
 
       this.logger.log('[Search] Meilisearch indices configured');
     } catch (e) {
-      this.logger.warn('[Search] Meilisearch not ready — will retry on next operation');
+      this.logger.warn(
+        '[Search] Meilisearch not ready — will retry on next operation',
+      );
     }
   }
 
   // ── Leads ──
   async indexLead(lead: any) {
     try {
-      return this.client.index('leads').addDocuments([{ ...lead, id: lead.id }]);
-    } catch { return null; }
+      return this.client
+        .index('leads')
+        .addDocuments([{ ...lead, id: lead.id }]);
+    } catch {
+      return null;
+    }
   }
 
   async updateLeadIndex(lead: any) {
     try {
-      return this.client.index('leads').updateDocuments([{ ...lead, id: lead.id }]);
-    } catch { return null; }
+      return this.client
+        .index('leads')
+        .updateDocuments([{ ...lead, id: lead.id }]);
+    } catch {
+      return null;
+    }
   }
 
   async deleteLeadFromIndex(leadId: string) {
     try {
       return this.client.index('leads').deleteDocument(leadId);
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   // ── Universal search ──
   async search(query: string, options?: { tenantId?: string; limit?: number }) {
-    const filter = options?.tenantId ? `tenantId = '${options.tenantId}'` : undefined;
+    const filter = options?.tenantId
+      ? `tenantId = '${options.tenantId}'`
+      : undefined;
     const limit = options?.limit || 10;
 
     const [leads, contacts, calls] = await Promise.allSettled([
@@ -80,7 +117,10 @@ export class SearchService implements OnModuleInit {
     };
   }
 
-  async searchLeads(query: string, filters?: { status?: string; tenantId?: string }) {
+  async searchLeads(
+    query: string,
+    filters?: { status?: string; tenantId?: string },
+  ) {
     const filterParts: string[] = [];
     if (filters?.status) filterParts.push(`status = '${filters.status}'`);
     if (filters?.tenantId) filterParts.push(`tenantId = '${filters.tenantId}'`);
@@ -92,9 +132,19 @@ export class SearchService implements OnModuleInit {
   }
 
   // ── Index a call transcript ──
-  async indexCallTranscript(call: { id: string; leadName: string; agentName: string; notes: string; transcript: string; tenantId: string; campaignId?: string }) {
+  async indexCallTranscript(call: {
+    id: string;
+    leadName: string;
+    agentName: string;
+    notes: string;
+    transcript: string;
+    tenantId: string;
+    campaignId?: string;
+  }) {
     try {
       return this.client.index('calls').addDocuments([call]);
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 }

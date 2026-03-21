@@ -10,27 +10,41 @@ export class DialerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
-    @InjectQueue('dialer') private readonly dialerQueue: Queue
+    @InjectQueue('dialer') private readonly dialerQueue: Queue,
   ) {}
 
   /** Trigger Auto-Dialer campaign logic pushing thousands of leads to Redis/BullMQ */
-  async startCampaign(campaignId: string, type: 'predictive' | 'progressive' = 'predictive') {
-    const leads = await this.prisma.lead.findMany({ 
-      where: { campaignId, status: 'NEW', isDnc: false } 
+  async startCampaign(
+    campaignId: string,
+    type: 'predictive' | 'progressive' = 'predictive',
+  ) {
+    const leads = await this.prisma.lead.findMany({
+      where: { campaignId, status: 'NEW', isDnc: false },
     });
-    
+
     // Fire-and-forget push to Redis-backed job queue
     for (const lead of leads) {
       if (type === 'predictive') {
-        await this.dialerQueue.add('predictive_dial', { leadId: lead.id, campaignId, tenantId: lead.tenantId });
+        await this.dialerQueue.add('predictive_dial', {
+          leadId: lead.id,
+          campaignId,
+          tenantId: lead.tenantId,
+        });
       } else {
-        const agent = await this.prisma.user.findFirst({ where: { tenantId: lead.tenantId, agentStatus: 'AVAILABLE' } });
+        const agent = await this.prisma.user.findFirst({
+          where: { tenantId: lead.tenantId, agentStatus: 'AVAILABLE' },
+        });
         if (agent) {
-          await this.dialerQueue.add('progressive_dial', { leadId: lead.id, agentId: agent.id, campaignId, tenantId: lead.tenantId });
+          await this.dialerQueue.add('progressive_dial', {
+            leadId: lead.id,
+            agentId: agent.id,
+            campaignId,
+            tenantId: lead.tenantId,
+          });
         }
       }
     }
-    
+
     return { status: 'DIALING', queued: leads.length };
   }
 
@@ -79,7 +93,10 @@ export class DialerService {
 
     await this.prisma.lead.update({
       where: { id: leadId },
-      data: { status: isAmd ? 'NEW' : 'CONTACTED', lastContactedAt: new Date() },
+      data: {
+        status: isAmd ? 'NEW' : 'CONTACTED',
+        lastContactedAt: new Date(),
+      },
     });
 
     return { call, isAmd };
@@ -90,7 +107,9 @@ export class DialerService {
     if (!call) throw new NotFoundException('Call not found');
 
     const endedAt = new Date();
-    const duration = call.startedAt ? Math.floor((endedAt.getTime() - call.startedAt.getTime()) / 1000) : 0;
+    const duration = call.startedAt
+      ? Math.floor((endedAt.getTime() - call.startedAt.getTime()) / 1000)
+      : 0;
 
     return this.prisma.call.update({
       where: { id: callId },

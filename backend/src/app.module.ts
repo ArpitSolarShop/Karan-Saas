@@ -33,6 +33,7 @@ import { TicketsModule } from './tickets/tickets.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { MarketingModule } from './marketing/marketing.module';
 import { ApprovalsModule } from './approvals/approvals.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { BullModule as BullMQModule } from '@nestjs/bullmq';
 
 @Module({
@@ -40,12 +41,17 @@ import { BullModule as BullMQModule } from '@nestjs/bullmq';
     PrismaModule,
     BullMQModule.forRoot({
       connection: {
-        host: (process.env.REDIS_URL || 'redis://localhost:6380').replace('redis://', '').split(':')[0],
-        port: parseInt((process.env.REDIS_URL || 'redis://localhost:6380').split(':')[2] || '6380'),
-      }
+        host: (process.env.REDIS_URL || 'redis://localhost:6380')
+          .replace('redis://', '')
+          .split(':')[0],
+        port: parseInt(
+          (process.env.REDIS_URL || 'redis://localhost:6380').split(':')[2] ||
+            '6380',
+        ),
+      },
     }),
-    QueueModule,      // Global — Bull (v3/4) queues
-    StorageModule,    // Global — MinIO file storage
+    QueueModule, // Global — Bull (v3/4) queues
+    StorageModule, // Global — MinIO file storage
     AuthModule,
     LeadsModule,
     CampaignsModule,
@@ -71,6 +77,7 @@ import { BullModule as BullMQModule } from '@nestjs/bullmq';
     KnowledgeModule,
     MarketingModule,
     ApprovalsModule,
+    WhatsappModule,
   ],
   controllers: [AppController, ScriptsController],
   providers: [AppService, PrismaService, ScriptsService],

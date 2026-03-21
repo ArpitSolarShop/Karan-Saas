@@ -19,13 +19,27 @@ export class TelephonyService {
 
   // ── Call Management ─────────────────────────────────────────────────────
 
-  async initiateCall({ toNumber, leadId, agentId, campaignId }: { toNumber: string; leadId: string; agentId: string; campaignId?: string }) {
+  async initiateCall({
+    toNumber,
+    leadId,
+    agentId,
+    campaignId,
+  }: {
+    toNumber: string;
+    leadId: string;
+    agentId: string;
+    campaignId?: string;
+  }) {
     const agent = await this.prisma.user.findUnique({ where: { id: agentId } });
-    if (!agent || !agent.extension) throw new Error('Agent extension not found');
-    
+    if (!agent || !agent.extension)
+      throw new Error('Agent extension not found');
+
     // Commands FreeSWITCH to dial agent string, then bridge to customer
-    const callUUID = await this.freeswitch.originateCall(agent.extension, toNumber);
-    
+    const callUUID = await this.freeswitch.originateCall(
+      agent.extension,
+      toNumber,
+    );
+
     await this.prisma.call.create({
       data: {
         tenantId: agent.tenantId,
@@ -39,7 +53,7 @@ export class TelephonyService {
         durationSeconds: 0,
       } as any,
     });
-    
+
     return callUUID;
   }
 
@@ -98,7 +112,11 @@ export class TelephonyService {
   }
 
   async getTurnCredentials(agentId: string) {
-    return { username: 'turnuser', credential: 'turnpassword', urls: ['turn:127.0.0.1:3478'] };
+    return {
+      username: 'turnuser',
+      credential: 'turnpassword',
+      urls: ['turn:127.0.0.1:3478'],
+    };
   }
 
   // ── Voicemail Drop ────────────────────────────────────────────────────────
@@ -107,7 +125,10 @@ export class TelephonyService {
     await this.freeswitch.dropVoicemail(callUUID, filePath);
   }
 
-  async saveLocation(agentId: string, data: { lat: number; lng: number; accuracy?: number; battery?: number }) {
+  async saveLocation(
+    agentId: string,
+    data: { lat: number; lng: number; accuracy?: number; battery?: number },
+  ) {
     return (this.prisma as any).agentLocation.create({
       data: {
         agentId,

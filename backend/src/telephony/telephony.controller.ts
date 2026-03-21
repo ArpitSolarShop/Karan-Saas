@@ -1,4 +1,14 @@
-import { Controller, Post, Get, Body, Query, UseGuards, Param, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  UseGuards,
+  Param,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { TelephonyService } from './telephony.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -14,7 +24,15 @@ export class TelephonyController {
   /** Initiate outbound call — agent clicks "Call" in CRM */
   @Post('call')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  async initiateCall(@Body() body: { toNumber: string; leadId: string; agentId: string; campaignId?: string }) {
+  async initiateCall(
+    @Body()
+    body: {
+      toNumber: string;
+      leadId: string;
+      agentId: string;
+      campaignId?: string;
+    },
+  ) {
     const callUUID = await this.telephonyService.initiateCall(body);
     return { callUUID, message: 'Call initiated via FreeSWITCH' };
   }
@@ -23,7 +41,10 @@ export class TelephonyController {
   @Post('transfer')
   @UseGuards(JwtAuthGuard)
   async transfer(@Body() body: { callUUID: string; targetExtension: string }) {
-    await this.telephonyService.transferCall(body.callUUID, body.targetExtension);
+    await this.telephonyService.transferCall(
+      body.callUUID,
+      body.targetExtension,
+    );
     return { success: true };
   }
 
@@ -49,8 +70,13 @@ export class TelephonyController {
   @Post('whisper')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'MANAGER', 'SUPERVISOR')
-  async whisper(@Body() body: { callUUID: string; supervisorExtension: string }) {
-    await this.telephonyService.whisperToAgent(body.callUUID, body.supervisorExtension);
+  async whisper(
+    @Body() body: { callUUID: string; supervisorExtension: string },
+  ) {
+    await this.telephonyService.whisperToAgent(
+      body.callUUID,
+      body.supervisorExtension,
+    );
     return { success: true, message: 'Whisper mode activated' };
   }
 
@@ -59,7 +85,10 @@ export class TelephonyController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'MANAGER', 'SUPERVISOR')
   async barge(@Body() body: { callUUID: string; supervisorExtension: string }) {
-    await this.telephonyService.bargeIn(body.callUUID, body.supervisorExtension);
+    await this.telephonyService.bargeIn(
+      body.callUUID,
+      body.supervisorExtension,
+    );
     return { success: true, message: 'Barged into call' };
   }
 
@@ -105,8 +134,12 @@ export class TelephonyController {
   @UseGuards(JwtAuthGuard)
   getStatus() {
     return {
-      freeSWITCH: this.telephonyService.isConnected ? 'connected' : 'disconnected',
-      mode: this.telephonyService.isConnected ? 'freesWITCH-webrtc' : 'sim-based-fallback',
+      freeSWITCH: this.telephonyService.isConnected
+        ? 'connected'
+        : 'disconnected',
+      mode: this.telephonyService.isConnected
+        ? 'freesWITCH-webrtc'
+        : 'sim-based-fallback',
     };
   }
 
@@ -123,13 +156,20 @@ export class TelephonyController {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const storage = multer.diskStorage({
       destination: (_req: any, _file: any, cb: any) => cb(null, dir),
-      filename: (_req: any, file: any, cb: any) => cb(null, `${Date.now()}-${file.originalname}`),
+      filename: (_req: any, file: any, cb: any) =>
+        cb(null, `${Date.now()}-${file.originalname}`),
     });
     const upload = multer({ storage }).single('file');
     upload(req, res, (err: any) => {
-      if (err) { res.status(400).json({ error: err.message }); return; }
+      if (err) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
       const filePath = req.file?.path;
-      if (!filePath) { res.status(400).json({ error: 'No file uploaded' }); return; }
+      if (!filePath) {
+        res.status(400).json({ error: 'No file uploaded' });
+        return;
+      }
       res.json({ path: filePath, filename: req.file.filename });
     });
   }
@@ -145,7 +185,11 @@ export class TelephonyController {
   /** Record Agent GPS Location (for Field Agents) */
   @Post('location')
   @UseGuards(JwtAuthGuard)
-  async recordLocation(@Req() req: any, @Body() body: { lat: number; lng: number; accuracy?: number; battery?: number }) {
+  async recordLocation(
+    @Req() req: any,
+    @Body()
+    body: { lat: number; lng: number; accuracy?: number; battery?: number },
+  ) {
     return this.telephonyService.saveLocation(req.user.id, body);
   }
 }

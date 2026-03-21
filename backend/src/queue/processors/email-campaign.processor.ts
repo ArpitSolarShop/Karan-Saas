@@ -13,12 +13,14 @@ export class EmailCampaignProcessor {
   @Process('send')
   async handleEmailSend(job: any) {
     const { campaignId, leadId, stepIndex, templateId, userId } = job.data;
-    this.logger.log(`[Email] Sending step ${stepIndex} for lead ${leadId} in campaign ${campaignId}`);
+    this.logger.log(
+      `[Email] Sending step ${stepIndex} for lead ${leadId} in campaign ${campaignId}`,
+    );
 
-    const lead = await this.prisma.lead.findUnique({
+    const lead = (await this.prisma.lead.findUnique({
       where: { id: leadId },
       select: { email: true, name: true, firstName: true } as any,
-    }) as any;
+    })) as any;
 
     if (!lead?.email) {
       this.logger.log(`[Email] Lead ${leadId} has no email — skipping`);

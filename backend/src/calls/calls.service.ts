@@ -9,7 +9,11 @@ export class CallsService {
     private leadsGateway: LeadsGateway,
   ) {}
 
-  async findAll(filters?: { agentId?: string; leadId?: string; campaignId?: string }) {
+  async findAll(filters?: {
+    agentId?: string;
+    leadId?: string;
+    campaignId?: string;
+  }) {
     return this.prisma.call.findMany({
       where: {
         ...(filters?.agentId && { agentId: filters.agentId }),
@@ -18,7 +22,9 @@ export class CallsService {
       },
       include: {
         disposition: true,
-        lead: { select: { id: true, firstName: true, name: true, phone: true } },
+        lead: {
+          select: { id: true, firstName: true, name: true, phone: true },
+        },
         agent: { select: { id: true, firstName: true, lastName: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -52,7 +58,10 @@ export class CallsService {
     return call;
   }
 
-  async setDisposition(callId: string, data: { dispositionId: string; notes?: string }) {
+  async setDisposition(
+    callId: string,
+    data: { dispositionId: string; notes?: string },
+  ) {
     return this.prisma.call.update({
       where: { id: callId },
       data: {
@@ -64,7 +73,14 @@ export class CallsService {
     });
   }
 
-  async endCall(callId: string, data: { durationSeconds: number; talkTimeSeconds?: number; recordingUrl?: string }) {
+  async endCall(
+    callId: string,
+    data: {
+      durationSeconds: number;
+      talkTimeSeconds?: number;
+      recordingUrl?: string;
+    },
+  ) {
     const call = await this.prisma.call.update({
       where: { id: callId },
       data: {
@@ -76,7 +92,11 @@ export class CallsService {
       },
     });
     // Emit real-time event — supervisor page and reports page will invalidate their caches
-    this.leadsGateway.notifyCallEnded(call.leadId, call.agentId, data.durationSeconds);
+    this.leadsGateway.notifyCallEnded(
+      call.leadId,
+      call.agentId,
+      data.durationSeconds,
+    );
     return call;
   }
 
@@ -108,7 +128,9 @@ export class CallsService {
     return this.prisma.callback.findMany({
       where: { status: 'PENDING', scheduledAt: { lte: thirtyMinutesFromNow } },
       include: {
-        lead: { select: { id: true, firstName: true, name: true, phone: true } },
+        lead: {
+          select: { id: true, firstName: true, name: true, phone: true },
+        },
         agent: { select: { id: true, firstName: true, lastName: true } },
       },
       orderBy: { scheduledAt: 'asc' },
@@ -143,12 +165,37 @@ export class CallsService {
       dayEnd.setDate(dayEnd.getDate() + 1);
 
       const [callsMade, callsAnswered, totalTalkTime] = await Promise.all([
-        this.prisma.call.count({ where: { agentId, createdAt: { gte: dayStart, lt: dayEnd } } }),
-        this.prisma.call.count({ where: { agentId, status: 'COMPLETED', createdAt: { gte: dayStart, lt: dayEnd } } }),
-        this.prisma.call.aggregate({ where: { agentId, createdAt: { gte: dayStart, lt: dayEnd } }, _sum: { talkTimeSeconds: true } }),
+        this.prisma.call.count({
+          where: { agentId, createdAt: { gte: dayStart, lt: dayEnd } },
+        }),
+        this.prisma.call.count({
+          where: {
+            agentId,
+            status: 'COMPLETED',
+            createdAt: { gte: dayStart, lt: dayEnd },
+          },
+        }),
+        this.prisma.call.aggregate({
+          where: { agentId, createdAt: { gte: dayStart, lt: dayEnd } },
+          _sum: { talkTimeSeconds: true },
+        }),
       ]);
 
-      stats = { id: 'computed', agentId, statDate, callsMade, callsAnswered, callsConverted: 0, totalTalkTime: totalTalkTime._sum.talkTimeSeconds || 0, avgHandleTime: 0, totalBreakTime: 0, loginTime: null, logoutTime: null, callbacksScheduled: 0, callbacksCompleted: 0 } as any;
+      stats = {
+        id: 'computed',
+        agentId,
+        statDate,
+        callsMade,
+        callsAnswered,
+        callsConverted: 0,
+        totalTalkTime: totalTalkTime._sum.talkTimeSeconds || 0,
+        avgHandleTime: 0,
+        totalBreakTime: 0,
+        loginTime: null,
+        logoutTime: null,
+        callbacksScheduled: 0,
+        callbacksCompleted: 0,
+      } as any;
     }
 
     return stats;

@@ -19,10 +19,18 @@ export class LeadsService {
   ) {}
 
   private async ensureDevTenant(): Promise<string> {
-    const existing = await this.prisma.tenant.findUnique({ where: { id: DEV_TENANT_ID } });
+    const existing = await this.prisma.tenant.findUnique({
+      where: { id: DEV_TENANT_ID },
+    });
     if (!existing) {
       await this.prisma.tenant.create({
-        data: { id: DEV_TENANT_ID, name: 'Alpha Development', subdomain: 'dev', plan: 'STARTER', maxAgents: 100 },
+        data: {
+          id: DEV_TENANT_ID,
+          name: 'Alpha Development',
+          subdomain: 'dev',
+          plan: 'STARTER',
+          maxAgents: 100,
+        },
       });
     }
     return DEV_TENANT_ID;
@@ -73,26 +81,57 @@ export class LeadsService {
       },
     });
     this.leadsGateway.broadcastUpdate('leadCreated', lead);
-    await this.activities.log(lead.id, 'SYSTEM', 'LEAD_CREATED', `Lead ${lead.name} was created.`);
+    await this.activities.log(
+      lead.id,
+      'SYSTEM',
+      'LEAD_CREATED',
+      `Lead ${lead.name} was created.`,
+    );
     await this.search.indexLead(lead);
-    await this.audit.record({ tenantId: lead.tenantId, entityType: 'LEAD', entityId: lead.id, action: 'CREATE', newValues: lead });
+    await this.audit.record({
+      tenantId: lead.tenantId,
+      entityType: 'LEAD',
+      entityId: lead.id,
+      action: 'CREATE',
+      newValues: lead,
+    });
     return lead;
   }
 
   async update(id: string, data: any) {
     const lead = await this.prisma.lead.update({ where: { id }, data });
     this.leadsGateway.broadcastUpdate('leadUpdated', lead);
-    await this.activities.log(id, 'SYSTEM', 'LEAD_UPDATED', `Lead updated. Status: ${lead.status}`);
+    await this.activities.log(
+      id,
+      'SYSTEM',
+      'LEAD_UPDATED',
+      `Lead updated. Status: ${lead.status}`,
+    );
     await this.search.indexLead(lead);
-    await this.audit.record({ tenantId: lead.tenantId, entityType: 'LEAD', entityId: lead.id, action: 'UPDATE', newValues: lead });
+    await this.audit.record({
+      tenantId: lead.tenantId,
+      entityType: 'LEAD',
+      entityId: lead.id,
+      action: 'UPDATE',
+      newValues: lead,
+    });
     return lead;
   }
 
   async remove(id: string) {
-    const lead = await this.prisma.lead.update({ where: { id }, data: { deletedAt: new Date() } });
+    const lead = await this.prisma.lead.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     this.leadsGateway.broadcastUpdate('leadDeleted', { id });
     await this.search.deleteLeadFromIndex(id);
-    await this.audit.record({ tenantId: lead.tenantId, entityType: 'LEAD', entityId: id, action: 'DELETE', oldValues: lead });
+    await this.audit.record({
+      tenantId: lead.tenantId,
+      entityType: 'LEAD',
+      entityId: id,
+      action: 'DELETE',
+      oldValues: lead,
+    });
     return lead;
   }
 
@@ -104,14 +143,24 @@ export class LeadsService {
 
     if (filename.endsWith('.md')) {
       const content = buffer.toString('utf8');
-      const tableRows = content.split('\n').filter(line => line.trim().startsWith('|'));
+      const tableRows = content
+        .split('\n')
+        .filter((line) => line.trim().startsWith('|'));
       if (tableRows.length > 2) {
-        const headers = tableRows[0].split('|').map(h => h.trim().toLowerCase()).filter(h => h);
+        const headers = tableRows[0]
+          .split('|')
+          .map((h) => h.trim().toLowerCase())
+          .filter((h) => h);
         for (let i = 2; i < tableRows.length; i++) {
-          const cells = tableRows[i].split('|').map(c => c.trim()).filter((_, index, arr) => index > 0 && index < arr.length - 1);
+          const cells = tableRows[i]
+            .split('|')
+            .map((c) => c.trim())
+            .filter((_, index, arr) => index > 0 && index < arr.length - 1);
           if (cells.length === headers.length) {
             const rowObj: any = {};
-            headers.forEach((h, idx) => { rowObj[h] = cells[idx]; });
+            headers.forEach((h, idx) => {
+              rowObj[h] = cells[idx];
+            });
             rawData.push(rowObj);
           }
         }
@@ -122,31 +171,60 @@ export class LeadsService {
         const workbook = xlsx.read(buffer, { type: 'buffer' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         rawData = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
-      } catch { throw new Error('Failed to parse Excel/CSV file.'); }
+      } catch {
+        throw new Error('Failed to parse Excel/CSV file.');
+      }
     }
 
     const leadsToInsert: any[] = [];
     let skipped = 0;
     for (const row of rawData) {
-      const nameKey = Object.keys(row).find(k => k.toLowerCase().includes('name'));
+      const nameKey = Object.keys(row).find((k) =>
+        k.toLowerCase().includes('name'),
+      );
       const name = nameKey ? row[nameKey] : null;
-      const phoneKey = Object.keys(row).find(k => k.toLowerCase().includes('phone') || k.toLowerCase().includes('mobile'));
+      const phoneKey = Object.keys(row).find(
+        (k) =>
+          k.toLowerCase().includes('phone') ||
+          k.toLowerCase().includes('mobile'),
+      );
       const phone = phoneKey ? String(row[phoneKey]) : null;
-      if (!name || !phone) { skipped++; continue; }
-      const emailKey = Object.keys(row).find(k => k.toLowerCase().includes('email'));
-      const sourceKey = Object.keys(row).find(k => k.toLowerCase().includes('source'));
+      if (!name || !phone) {
+        skipped++;
+        continue;
+      }
+      const emailKey = Object.keys(row).find((k) =>
+        k.toLowerCase().includes('email'),
+      );
+      const sourceKey = Object.keys(row).find((k) =>
+        k.toLowerCase().includes('source'),
+      );
       leadsToInsert.push({
-        tenantId, firstName: name, name, phone,
+        tenantId,
+        firstName: name,
+        name,
+        phone,
         email: emailKey ? String(row[emailKey]) : null,
         source: sourceKey ? String(row[sourceKey]) : 'File Import',
-        status: LeadStatus.NEW, priority: 1,
+        status: LeadStatus.NEW,
+        priority: 1,
       });
     }
 
-    if (leadsToInsert.length === 0) return { success: false, message: 'No valid leads found.' };
-    await this.prisma.lead.createMany({ data: leadsToInsert, skipDuplicates: true });
-    this.leadsGateway.broadcastUpdate('leadsImported', { count: leadsToInsert.length });
-    return { success: true, message: `Imported ${leadsToInsert.length} leads.`, skipped };
+    if (leadsToInsert.length === 0)
+      return { success: false, message: 'No valid leads found.' };
+    await this.prisma.lead.createMany({
+      data: leadsToInsert,
+      skipDuplicates: true,
+    });
+    this.leadsGateway.broadcastUpdate('leadsImported', {
+      count: leadsToInsert.length,
+    });
+    return {
+      success: true,
+      message: `Imported ${leadsToInsert.length} leads.`,
+      skipped,
+    };
   }
 
   async getImportHistory() {
@@ -158,46 +236,90 @@ export class LeadsService {
 
   // ── Export CSV ─────────────────────────────────────────────────────────────
 
-  async exportCsv(filters?: { status?: string; assignedTo?: string; tags?: string[] }): Promise<string> {
+  async exportCsv(filters?: {
+    status?: string;
+    assignedTo?: string;
+    tags?: string[];
+  }): Promise<string> {
     const where: any = { deletedAt: null };
     if (filters?.status) where.status = filters.status;
     if (filters?.assignedTo) where.assignedTo = filters.assignedTo;
     if (filters?.tags?.length) where.tags = { hasSome: filters.tags };
 
-    const leads = await this.prisma.lead.findMany({ where, orderBy: { createdAt: 'desc' }, take: 50_000 });
-    const header = 'id,name,phone,email,company,status,source,score,tags,city,state,assignedTo,createdAt';
-    const lines = leads.map(l => [
-      l.id, l.name || `${l.firstName} ${l.lastName || ''}`.trim(), l.phone,
-      l.email || '', l.company || '', l.status, l.source || '', l.score,
-      (l.tags || []).join(';'), l.city || '', l.state || '', l.assignedTo || '',
-      l.createdAt.toISOString(),
-    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+    const leads = await this.prisma.lead.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 50_000,
+    });
+    const header =
+      'id,name,phone,email,company,status,source,score,tags,city,state,assignedTo,createdAt';
+    const lines = leads.map((l) =>
+      [
+        l.id,
+        l.name || `${l.firstName} ${l.lastName || ''}`.trim(),
+        l.phone,
+        l.email || '',
+        l.company || '',
+        l.status,
+        l.source || '',
+        l.score,
+        (l.tags || []).join(';'),
+        l.city || '',
+        l.state || '',
+        l.assignedTo || '',
+        l.createdAt.toISOString(),
+      ]
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+        .join(','),
+    );
     return [header, ...lines].join('\n');
   }
 
   // ── Bulk Actions ──────────────────────────────────────────────────────────
 
-  async bulkAction(action: 'assign' | 'tag' | 'delete' | 'status', ids: string[], value?: any) {
+  async bulkAction(
+    action: 'assign' | 'tag' | 'delete' | 'status',
+    ids: string[],
+    value?: any,
+  ) {
     if (action === 'assign') {
-      await this.prisma.lead.updateMany({ where: { id: { in: ids } }, data: { assignedTo: value } });
+      await this.prisma.lead.updateMany({
+        where: { id: { in: ids } },
+        data: { assignedTo: value },
+      });
       return { updated: ids.length };
     }
     if (action === 'status') {
-      await this.prisma.lead.updateMany({ where: { id: { in: ids } }, data: { status: value } });
+      await this.prisma.lead.updateMany({
+        where: { id: { in: ids } },
+        data: { status: value },
+      });
       return { updated: ids.length };
     }
     if (action === 'tag') {
       for (const id of ids) {
         const lead = await this.prisma.lead.findUnique({ where: { id } });
         if (!lead) continue;
-        const merged = Array.from(new Set([...(lead.tags || []), ...((value as string[]) || [])]));
-        await this.prisma.lead.update({ where: { id }, data: { tags: merged } });
+        const merged = Array.from(
+          new Set([...(lead.tags || []), ...((value as string[]) || [])]),
+        );
+        await this.prisma.lead.update({
+          where: { id },
+          data: { tags: merged },
+        });
       }
       return { updated: ids.length };
     }
     if (action === 'delete') {
-      await this.prisma.lead.updateMany({ where: { id: { in: ids } }, data: { deletedAt: new Date() } });
-      for (const id of ids) { try { await this.search.deleteLeadFromIndex(id); } catch {} }
+      await this.prisma.lead.updateMany({
+        where: { id: { in: ids } },
+        data: { deletedAt: new Date() },
+      });
+      for (const id of ids) {
+        try {
+          await this.search.deleteLeadFromIndex(id);
+        } catch {}
+      }
       return { deleted: ids.length };
     }
     throw new Error(`Unknown bulk action: ${action}`);
@@ -215,7 +337,7 @@ export class LeadsService {
   async removeTag(id: string, tag: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
     if (!lead) throw new Error('Lead not found');
-    const tags = (lead.tags || []).filter(t => t !== tag);
+    const tags = (lead.tags || []).filter((t) => t !== tag);
     return this.prisma.lead.update({ where: { id }, data: { tags } });
   }
 }

@@ -20,7 +20,20 @@ import { GoogleStrategy } from './google.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard, CaslAbilityFactory, GoogleStrategy],
-  exports: [AuthService, JwtAuthGuard, RolesGuard, CaslAbilityFactory, JwtModule],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    JwtAuthGuard,
+    RolesGuard,
+    CaslAbilityFactory,
+    GoogleStrategy,
+  ],
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    RolesGuard,
+    CaslAbilityFactory,
+    JwtModule,
+  ],
 })
 export class AuthModule {}

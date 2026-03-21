@@ -1,6 +1,15 @@
 ﻿import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { SheetsService } from './sheets.service';
 
 @UseGuards(JwtAuthGuard)
@@ -10,17 +19,26 @@ export class SheetsController {
 
   // â”€â”€ Workbooks â”€â”€
   @Get('workbooks')
-  findAllWorkbooks() { return this.service.findAllWorkbooks(); }
+  findAllWorkbooks() {
+    return this.service.findAllWorkbooks();
+  }
 
   @Post('workbooks')
-  createWorkbook(@Body() body: { name: string }) { return this.service.createWorkbook(body); }
+  createWorkbook(@Body() body: { name: string }) {
+    return this.service.createWorkbook(body);
+  }
 
   // â”€â”€ Sheets â”€â”€
   @Get('sheets/:id')
-  findSheet(@Param('id') id: string) { return this.service.findSheet(id); }
+  findSheet(@Param('id') id: string) {
+    return this.service.findSheet(id);
+  }
 
   @Post('workbooks/:workbookId/sheets')
-  createSheet(@Param('workbookId') workbookId: string, @Body() body: { name: string }) {
+  createSheet(
+    @Param('workbookId') workbookId: string,
+    @Body() body: { name: string },
+  ) {
     return this.service.createSheet(workbookId, body);
   }
 
@@ -36,12 +54,22 @@ export class SheetsController {
   }
 
   @Delete('columns/:id')
-  deleteColumn(@Param('id') id: string) { return this.service.deleteColumn(id); }
+  deleteColumn(@Param('id') id: string) {
+    return this.service.deleteColumn(id);
+  }
 
   // â”€â”€ Rows â”€â”€
   @Get('sheets/:sheetId/rows')
-  getRows(@Param('sheetId') sheetId: string, @Query('skip') skip?: string, @Query('take') take?: string) {
-    return this.service.getRows(sheetId, Number(skip) || 0, Number(take) || 200);
+  getRows(
+    @Param('sheetId') sheetId: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.service.getRows(
+      sheetId,
+      Number(skip) || 0,
+      Number(take) || 200,
+    );
   }
 
   @Post('sheets/:sheetId/rows')
@@ -50,12 +78,18 @@ export class SheetsController {
   }
 
   @Post('sheets/:sheetId/import')
-  bulkAddRows(@Param('sheetId') sheetId: string, @Body() body: Record<string, any>[]) {
+  bulkAddRows(
+    @Param('sheetId') sheetId: string,
+    @Body() body: Record<string, any>[],
+  ) {
     return this.service.bulkAddRows(sheetId, body);
   }
 
   @Patch('rows/:rowId/cell')
-  updateCell(@Param('rowId') rowId: string, @Body() body: { column: string; value: any }) {
+  updateCell(
+    @Param('rowId') rowId: string,
+    @Body() body: { column: string; value: any },
+  ) {
     return this.service.updateCell(rowId, body.column, body.value);
   }
 
@@ -65,11 +99,15 @@ export class SheetsController {
   }
 
   @Delete('rows/:rowId')
-  deleteRow(@Param('rowId') rowId: string) { return this.service.deleteRow(rowId); }
+  deleteRow(@Param('rowId') rowId: string) {
+    return this.service.deleteRow(rowId);
+  }
 
   // â”€â”€ Views â”€â”€
   @Get('sheets/:sheetId/views')
-  getViews(@Param('sheetId') sheetId: string) { return this.service.getViews(sheetId); }
+  getViews(@Param('sheetId') sheetId: string) {
+    return this.service.getViews(sheetId);
+  }
 
   @Post('sheets/:sheetId/views')
   createView(@Param('sheetId') sheetId: string, @Body() body: any) {
@@ -77,9 +115,12 @@ export class SheetsController {
   }
 
   @Patch('views/:id')
-  updateView(@Param('id') id: string, @Body() body: any) { return this.service.updateView(id, body); }
+  updateView(@Param('id') id: string, @Body() body: any) {
+    return this.service.updateView(id, body);
+  }
 
   @Delete('views/:id')
-  deleteView(@Param('id') id: string) { return this.service.deleteView(id); }
+  deleteView(@Param('id') id: string) {
+    return this.service.deleteView(id);
+  }
 }
-

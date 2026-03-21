@@ -37,7 +37,9 @@ export class StorageService {
         await this.s3.send(new CreateBucketCommand({ Bucket: this.bucket }));
         this.logger.log(`[Storage] Bucket '${this.bucket}' created`);
       } catch (err) {
-        this.logger.error(`[Storage] Could not create bucket: ${(err as Error).message}`);
+        this.logger.error(
+          `[Storage] Could not create bucket: ${(err as Error).message}`,
+        );
       }
     }
   }
@@ -46,13 +48,19 @@ export class StorageService {
    * Upload a file buffer to MinIO/S3.
    * @param key - storage path e.g. 'recordings/call-123.mp3'
    */
-  async uploadFile(buffer: Buffer, key: string, mimetype: string): Promise<string> {
-    await this.s3.send(new PutObjectCommand({
-      Bucket: this.bucket,
-      Key: key,
-      Body: buffer,
-      ContentType: mimetype,
-    }));
+  async uploadFile(
+    buffer: Buffer,
+    key: string,
+    mimetype: string,
+  ): Promise<string> {
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: mimetype,
+      }),
+    );
     this.logger.log(`[Storage] Uploaded: ${key}`);
     return `${process.env.MINIO_ENDPOINT}/${this.bucket}/${key}`;
   }
@@ -70,7 +78,9 @@ export class StorageService {
    * Delete a file from storage.
    */
   async deleteFile(key: string): Promise<void> {
-    await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+    await this.s3.send(
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
     this.logger.log(`[Storage] Deleted: ${key}`);
   }
 

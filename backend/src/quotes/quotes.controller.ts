@@ -23,7 +23,10 @@ export class QuotesController {
   async getPdf(@Param('id') id: string, @Res() res: Response) {
     const pdfBuffer = await this.quotesService.generatePdf(id);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=quote-${id}.pdf`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=quote-${id}.pdf`,
+    );
     res.send(pdfBuffer);
   }
 
@@ -31,7 +34,10 @@ export class QuotesController {
   async postPdf(@Param('id') id: string, @Res() res: Response) {
     const pdfBuffer = await this.quotesService.generatePdf(id);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=quote-${id}.pdf`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=quote-${id}.pdf`,
+    );
     res.send(pdfBuffer);
   }
 
@@ -45,4 +51,3 @@ export class QuotesController {
     return this.quotesService.update(id, data);
   }
 }
-

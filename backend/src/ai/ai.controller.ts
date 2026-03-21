@@ -11,7 +11,10 @@ export class AiController {
   @Post('transcribe')
   @Public()
   async transcribe(@Body() body: { callId: string; recordingUrl: string }) {
-    const result = await this.aiService.transcribeCall(body.callId, body.recordingUrl);
+    const result = await this.aiService.transcribeCall(
+      body.callId,
+      body.recordingUrl,
+    );
     return { success: true, transcriptId: result?.id };
   }
 

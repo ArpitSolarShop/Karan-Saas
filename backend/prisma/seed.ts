@@ -1,13 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
+import * as path from 'path';
 import * as dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const prisma = new PrismaClient();
 
 function hash(password: string): string {
   const salt = process.env.PASSWORD_SALT || 'alpha-salt';
-  return crypto.createHash('sha256').update(password + salt).digest('hex');
+  const hashed = crypto.createHash('sha256').update(password + salt).digest('hex');
+  console.log(`[SeedDebug] Hashing with salt length ${salt.length}, prefix ${salt.substring(0, 5)}... -> ${hashed.substring(0, 8)}...`);
+  return hashed;
 }
 
 async function main() {
@@ -36,7 +39,7 @@ async function main() {
   for (const u of users) {
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: {},
+      update: { passwordHash: hash(u.password) },
       create: { tenantId: tenant.id, email: u.email, passwordHash: hash(u.password), firstName: u.firstName, lastName: u.lastName, role: u.role },
     });
     createdUsers.push(user);

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
@@ -26,27 +27,40 @@ async function bootstrap() {
     await Promise.all([pubClient.connect(), subClient.connect()]);
 
     const httpAdapter = app.getHttpAdapter();
-    const ioServer = (httpAdapter.getInstance() as any)?.io;
+    const ioServer = httpAdapter.getInstance()?.io;
 
     if (ioServer) {
       // If the underlying http server already has socket.io attached (e.g. by NestJS gateway), wire the adapter
       ioServer.adapter(createAdapter(pubClient, subClient));
-      console.log('[Socket.io] Redis adapter wired — multi-node broadcasting enabled.');
+      console.log(
+        '[Socket.io] Redis adapter wired — multi-node broadcasting enabled.',
+      );
     } else {
       // Attach adapter via IoAdapter before the server starts listening
       app.useWebSocketAdapter(new IoAdapter(app));
-      console.log('[Socket.io] Redis adapter will be attached at gateway init.');
+      console.log(
+        '[Socket.io] Redis adapter will be attached at gateway init.',
+      );
     }
 
-    pubClient.on('error', (err: any) => console.error('[Redis pubClient]', err));
-    subClient.on('error', (err: any) => console.error('[Redis subClient]', err));
+    pubClient.on('error', (err: any) =>
+      console.error('[Redis pubClient]', err),
+    );
+    subClient.on('error', (err: any) =>
+      console.error('[Redis subClient]', err),
+    );
   } catch (err) {
     // If Redis is unavailable, log a warning but continue — single-node mode
-    console.warn('[Socket.io] Redis adapter unavailable — running in single-node mode:', (err as Error).message);
+    console.warn(
+      '[Socket.io] Redis adapter unavailable — running in single-node mode:',
+      (err as Error).message,
+    );
   }
   // ─────────────────────────────────────────────────────────────────────────
 
   await app.listen(process.env.PORT ?? 3001);
-  console.log(`[Bootstrap] Server listening on port ${process.env.PORT ?? 3001}`);
+  console.log(
+    `[Bootstrap] Server listening on port ${process.env.PORT ?? 3001}`,
+  );
 }
 bootstrap();

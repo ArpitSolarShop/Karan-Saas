@@ -13,7 +13,9 @@ export class CallRetryProcessor {
   @Process('retry')
   async handleRetry(job: any) {
     const { leadId, campaignId, reason } = job.data;
-    this.logger.log(`[Retry] Retrying call for lead ${leadId} (reason: ${reason})`);
+    this.logger.log(
+      `[Retry] Retrying call for lead ${leadId} (reason: ${reason})`,
+    );
 
     const lead = await this.prisma.lead.findUnique({ where: { id: leadId } });
     if (!lead || lead.status === 'DNC' || lead.status === 'CONVERTED') {
@@ -32,11 +34,16 @@ export class CallRetryProcessor {
 
     if (todayAttempts >= 3) {
       this.logger.log(`[Retry] Max daily attempts reached for lead ${leadId}`);
-      await this.prisma.lead.update({ where: { id: leadId }, data: { status: 'FOLLOW_UP' } });
+      await this.prisma.lead.update({
+        where: { id: leadId },
+        data: { status: 'FOLLOW_UP' },
+      });
       return;
     }
 
     // TODO Sprint 3: TelephonyService.initiateCall(lead.phone, undefined, campaignId)
-    this.logger.log(`[Retry] Re-queued call for lead ${leadId} (attempt ${todayAttempts + 1})`);
+    this.logger.log(
+      `[Retry] Re-queued call for lead ${leadId} (attempt ${todayAttempts + 1})`,
+    );
   }
 }

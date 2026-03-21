@@ -11,7 +11,12 @@ import { PrismaModule } from '../prisma/prisma.module';
 @Module({
   imports: [LeadsModule, ActivitiesModule, PrismaModule],
   controllers: [CommunicationsController],
-  providers: [CommunicationsService, WhatsAppService, EmailService, WhatsAppClientService],
+  providers: [
+    CommunicationsService,
+    WhatsAppService,
+    EmailService,
+    WhatsAppClientService,
+  ],
   exports: [CommunicationsService, WhatsAppClientService],
 })
 export class CommunicationsModule {}

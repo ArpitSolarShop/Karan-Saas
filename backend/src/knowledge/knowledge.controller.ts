@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { KnowledgeService } from './knowledge.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -9,7 +19,11 @@ export class KnowledgeController {
 
   @Post()
   async create(@Req() req: any, @Body() body: any) {
-    return this.knowledgeService.createArticle(req.user.tenantId, req.user.id, body);
+    return this.knowledgeService.createArticle(
+      req.user.tenantId,
+      req.user.id,
+      body,
+    );
   }
 
   @Get()

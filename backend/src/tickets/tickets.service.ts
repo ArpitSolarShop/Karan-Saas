@@ -21,13 +21,17 @@ export class TicketsService {
   async getTickets(tenantId: string) {
     return this.prisma.ticket.findMany({
       where: { tenantId },
-      include: { agent: { select: { id: true, firstName: true, lastName: true } } },
+      include: {
+        agent: { select: { id: true, firstName: true, lastName: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async updateTicket(id: string, tenantId: string, data: any) {
-    const ticket = await this.prisma.ticket.findFirst({ where: { id, tenantId } });
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { id, tenantId },
+    });
     if (!ticket) throw new NotFoundException('Ticket not found');
 
     const updateData: any = { ...data };
@@ -41,7 +45,12 @@ export class TicketsService {
     });
   }
 
-  async addMessage(ticketId: string, senderId: string | null, body: string, isInternal: boolean) {
+  async addMessage(
+    ticketId: string,
+    senderId: string | null,
+    body: string,
+    isInternal: boolean,
+  ) {
     return this.prisma.ticketMessage.create({
       data: { ticketId, senderId, body, isInternal },
     });

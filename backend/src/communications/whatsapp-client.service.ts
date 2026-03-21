@@ -1,4 +1,9 @@
-import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+  Logger,
+} from '@nestjs/common';
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
@@ -14,7 +19,12 @@ import * as path from 'path';
 
 const qrcode = require('qrcode-terminal');
 
-export type WaSessionStatus = 'CONNECTING' | 'QR' | 'CONNECTED' | 'DISCONNECTED' | 'LOGGED_OUT';
+export type WaSessionStatus =
+  | 'CONNECTING'
+  | 'QR'
+  | 'CONNECTED'
+  | 'DISCONNECTED'
+  | 'LOGGED_OUT';
 
 export interface WaSession {
   socket: any;
@@ -46,7 +56,7 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
     this.ensureAuthDir();
     // Use a small delay to ensure NestJS has finished its internal setup
     setTimeout(() => {
-      this.connectSession(this.DEFAULT_SESSION).catch(err => {
+      this.connectSession(this.DEFAULT_SESSION).catch((err) => {
         this.logger.error(`Initial WhatsApp session failed: ${err.message}`);
       });
     }, 1000);
@@ -122,7 +132,9 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
       if (qr) {
         session.status = 'QR';
         session.qr = qr;
-        this.logger.warn(`[${sessionId}] SCAN QR CODE IN WHATSAPP > LINKED DEVICES:`);
+        this.logger.warn(
+          `[${sessionId}] SCAN QR CODE IN WHATSAPP > LINKED DEVICES:`,
+        );
         qrcode.generate(qr, { small: true });
       }
 
@@ -131,16 +143,21 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
         session.qr = undefined;
         session.retryCount = 0;
         session.connectedName = sock.user?.name || sock.user?.id?.split(':')[0];
-        this.logger.log(`[${sessionId}] WhatsApp Connected as: ${session.connectedName}`);
+        this.logger.log(
+          `[${sessionId}] WhatsApp Connected as: ${session.connectedName}`,
+        );
       }
 
       if (connection === 'close') {
         const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-        const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
+        const isLoggedOut =
+          statusCode === DisconnectReason.loggedOut || statusCode === 401;
 
         if (isLoggedOut) {
           session.status = 'LOGGED_OUT';
-          this.logger.error(`[${sessionId}] Logged out! Deleting session data.`);
+          this.logger.error(
+            `[${sessionId}] Logged out! Deleting session data.`,
+          );
           fs.rmSync(sessionDir, { recursive: true, force: true });
         } else {
           session.status = 'DISCONNECTED';
@@ -148,10 +165,14 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
           // Exponential backoff with max 5 retries (from Super-Light)
           if (session.retryCount <= 5) {
             const delay = Math.min(5000 * session.retryCount, 30000);
-            this.logger.log(`[${sessionId}] Reconnecting in ${delay / 1000}s (attempt ${session.retryCount})...`);
+            this.logger.log(
+              `[${sessionId}] Reconnecting in ${delay / 1000}s (attempt ${session.retryCount})...`,
+            );
             setTimeout(() => this.connectSession(sessionId), delay);
           } else {
-            this.logger.error(`[${sessionId}] Max reconnection attempts reached.`);
+            this.logger.error(
+              `[${sessionId}] Max reconnection attempts reached.`,
+            );
           }
         }
       }
@@ -175,7 +196,8 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
     if (!from || from.includes('@g.us')) return; // Skip group messages
 
     const phone = from.split('@')[0];
-    const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
+    const text =
+      msg.message?.conversation || msg.message?.extendedTextMessage?.text;
     if (!text) return;
 
     this.logger.log(`[${sessionId}] Incoming from ${phone}: ${text}`);
@@ -194,15 +216,23 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
           description: `[INCOMING] ${text}`,
         },
       });
-      this.logger.log(`[${sessionId}] Logged incoming message for lead: ${lead.name || lead.id}`);
+      this.logger.log(
+        `[${sessionId}] Logged incoming message for lead: ${lead.name || lead.id}`,
+      );
     }
   }
 
   // ── Send Text (core feature) ──
-  async sendMessage(phone: string, message: string, sessionId = this.DEFAULT_SESSION): Promise<boolean> {
+  async sendMessage(
+    phone: string,
+    message: string,
+    sessionId = this.DEFAULT_SESSION,
+  ): Promise<boolean> {
     const session = this.sessions.get(sessionId);
     if (!session || session.status !== 'CONNECTED') {
-      this.logger.error(`[${sessionId}] Socket not connected. Cannot send message.`);
+      this.logger.error(
+        `[${sessionId}] Socket not connected. Cannot send message.`,
+      );
       return false;
     }
 
@@ -218,7 +248,12 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── Send Image (from WPPConnect sendFile pattern) ──
-  async sendImage(phone: string, imageUrl: string, caption?: string, sessionId = this.DEFAULT_SESSION): Promise<boolean> {
+  async sendImage(
+    phone: string,
+    imageUrl: string,
+    caption?: string,
+    sessionId = this.DEFAULT_SESSION,
+  ): Promise<boolean> {
     const session = this.sessions.get(sessionId);
     if (!session || session.status !== 'CONNECTED') return false;
 
@@ -236,7 +271,12 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── Send Document ──
-  async sendDocument(phone: string, fileUrl: string, fileName: string, sessionId = this.DEFAULT_SESSION): Promise<boolean> {
+  async sendDocument(
+    phone: string,
+    fileUrl: string,
+    fileName: string,
+    sessionId = this.DEFAULT_SESSION,
+  ): Promise<boolean> {
     const session = this.sessions.get(sessionId);
     if (!session || session.status !== 'CONNECTED') return false;
 
@@ -255,14 +295,19 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── Bulk broadcast (from Super-Light campaign-sender.js pattern) ──
-  async broadcastMessage(phones: string[], message: string, delayMs = 1500, sessionId = this.DEFAULT_SESSION): Promise<{ sent: number; failed: number }> {
+  async broadcastMessage(
+    phones: string[],
+    message: string,
+    delayMs = 1500,
+    sessionId = this.DEFAULT_SESSION,
+  ): Promise<{ sent: number; failed: number }> {
     let sent = 0;
     let failed = 0;
     for (const phone of phones) {
       const ok = await this.sendMessage(phone, message, sessionId);
       ok ? sent++ : failed++;
       if (phones.indexOf(phone) < phones.length - 1) {
-        await new Promise(r => setTimeout(r, delayMs)); // Rate limiting delay
+        await new Promise((r) => setTimeout(r, delayMs)); // Rate limiting delay
       }
     }
     this.logger.log(`Broadcast complete: ${sent} sent, ${failed} failed`);

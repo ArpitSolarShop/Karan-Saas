@@ -9,15 +9,49 @@ export class AiService {
   private deepgram: DeepgramClient;
 
   // Sentiment keyword dictionaries
-  private readonly POSITIVE_WORDS = ['interested', 'yes', 'great', 'sure', 'love', 'perfect', 'excellent', 'definitely', 'buy', 'purchase'];
-  private readonly NEGATIVE_WORDS = ['no', 'not interested', 'busy', 'expensive', 'competitor', 'cancel', 'refund', 'unhappy', 'bad', 'terrible'];
-  private readonly ALERT_KEYWORDS = ['competitor', 'price', 'refund', 'cancel', 'escalate', 'manager', 'complaint', 'legal', 'lawsuit'];
+  private readonly POSITIVE_WORDS = [
+    'interested',
+    'yes',
+    'great',
+    'sure',
+    'love',
+    'perfect',
+    'excellent',
+    'definitely',
+    'buy',
+    'purchase',
+  ];
+  private readonly NEGATIVE_WORDS = [
+    'no',
+    'not interested',
+    'busy',
+    'expensive',
+    'competitor',
+    'cancel',
+    'refund',
+    'unhappy',
+    'bad',
+    'terrible',
+  ];
+  private readonly ALERT_KEYWORDS = [
+    'competitor',
+    'price',
+    'refund',
+    'cancel',
+    'escalate',
+    'manager',
+    'complaint',
+    'legal',
+    'lawsuit',
+  ];
 
   constructor(
     private prisma: PrismaService,
     private searchService: SearchService,
   ) {
-    this.deepgram = new DeepgramClient(process.env.DEEPGRAM_API_KEY as any) as any;
+    this.deepgram = new DeepgramClient(
+      process.env.DEEPGRAM_API_KEY as any,
+    ) as any;
   }
 
   /**
@@ -28,7 +62,9 @@ export class AiService {
     this.logger.log(`[AI] Transcribing call ${callId}`);
 
     try {
-      const { result, error }: any = await (this.deepgram as any).listen.prerecorded.transcribeUrl(
+      const { result, error }: any = await (
+        this.deepgram as any
+      ).listen.prerecorded.transcribeUrl(
         { url: recordingUrl },
         {
           model: 'nova-2',
@@ -47,18 +83,28 @@ export class AiService {
       // Calculate talk ratio
       const agentWords = words.filter((w: any) => w.speaker === 0).length;
       const customerWords = words.filter((w: any) => w.speaker === 1).length;
-      const talkRatio = words.length > 0 ? Math.round((agentWords / words.length) * 100) : 50;
+      const talkRatio =
+        words.length > 0 ? Math.round((agentWords / words.length) * 100) : 50;
 
       // Sentiment analysis
       const sentiment = this.analyzeSentiment(transcript);
       const keywordsFound = this.extractKeywords(transcript);
 
       // Store transcript
-      const transcriptRecord = await (this.prisma as any).callTranscript.upsert({
-        where: { callId },
-        create: { callId, text: transcript, sentiment, keywordsFound, talkRatio, rawResult: result },
-        update: { text: transcript, sentiment, keywordsFound, talkRatio },
-      });
+      const transcriptRecord = await (this.prisma as any).callTranscript.upsert(
+        {
+          where: { callId },
+          create: {
+            callId,
+            text: transcript,
+            sentiment,
+            keywordsFound,
+            talkRatio,
+            rawResult: result,
+          },
+          update: { text: transcript, sentiment, keywordsFound, talkRatio },
+        },
+      );
 
       // Index in Meilisearch for search
       const call = await this.prisma.call.findUnique({
@@ -80,10 +126,14 @@ export class AiService {
         });
       }
 
-      this.logger.log(`[AI] Transcript stored for call ${callId} | sentiment: ${sentiment} | keywords: ${keywordsFound.join(', ')}`);
+      this.logger.log(
+        `[AI] Transcript stored for call ${callId} | sentiment: ${sentiment} | keywords: ${keywordsFound.join(', ')}`,
+      );
       return transcriptRecord;
     } catch (err) {
-      this.logger.error(`[AI] Transcription failed for call ${callId}: ${(err as Error).message}`);
+      this.logger.error(
+        `[AI] Transcription failed for call ${callId}: ${(err as Error).message}`,
+      );
       throw err;
     }
   }
@@ -91,8 +141,12 @@ export class AiService {
   /** Simple rule-based sentiment analysis */
   private analyzeSentiment(text: string): 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' {
     const lower = text.toLowerCase();
-    const positive = this.POSITIVE_WORDS.filter(w => lower.includes(w)).length;
-    const negative = this.NEGATIVE_WORDS.filter(w => lower.includes(w)).length;
+    const positive = this.POSITIVE_WORDS.filter((w) =>
+      lower.includes(w),
+    ).length;
+    const negative = this.NEGATIVE_WORDS.filter((w) =>
+      lower.includes(w),
+    ).length;
 
     if (positive > negative + 1) return 'POSITIVE';
     if (negative > positive + 1) return 'NEGATIVE';
@@ -102,14 +156,16 @@ export class AiService {
   /** Extract alert keywords from transcript */
   private extractKeywords(text: string): string[] {
     const lower = text.toLowerCase();
-    return this.ALERT_KEYWORDS.filter(kw => lower.includes(kw));
+    return this.ALERT_KEYWORDS.filter((kw) => lower.includes(kw));
   }
 
   /**
    * Get transcript for a specific call.
    */
   async getTranscript(callId: string) {
-    return (this.prisma as any).callTranscript.findUnique({ where: { callId } });
+    return (this.prisma as any).callTranscript.findUnique({
+      where: { callId },
+    });
   }
 
   /**
@@ -133,7 +189,10 @@ export class AiService {
     score += Math.min(calls.length * 5, 20);
 
     // Longer talk time = more interest
-    const totalTalk = calls.reduce((acc: number, c: any) => acc + (c.talkTimeSeconds || 0), 0);
+    const totalTalk = calls.reduce(
+      (acc: number, c: any) => acc + (c.talkTimeSeconds || 0),
+      0,
+    );
     if (totalTalk > 300) score += 10;
     if (totalTalk > 600) score += 10;
 
