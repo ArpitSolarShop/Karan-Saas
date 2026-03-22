@@ -7,7 +7,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import { usePrismaAuthState } from './prisma-auth-store';
-import * as pino from 'pino';
+import pino from 'pino';
 import { WhatsappGateway } from './whatsapp.gateway';
 
 @Injectable()
@@ -68,7 +68,7 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
       // Self-Sufficient mapping of cryptography -> PostgreSQL
       const { state, saveCreds } = await usePrismaAuthState(this.prisma, instanceId);
 
-      const pinoLogger = pino.default({ level: 'silent' });
+      const pinoLogger = pino({ level: 'silent' });
 
       const sock = makeWASocket({
         version,
@@ -100,13 +100,15 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
             
           this.logger.warn(`[${instanceId}] Connection closed. Reconnect = ${shouldReconnect}`);
 
+          // Always remove the dead socket from the map first so startSession can re-create it
+          this.sessions.delete(instanceId);
+
           if (shouldReconnect) {
-             // Delay reconnect by 2 seconds
+             // Delay reconnect by 2 seconds to avoid tight reconnect storms
              setTimeout(() => this.startSession(instanceId), 2000);
           } else {
-             // Logged out permanently
+             // Logged out permanently — clean up DB state
              this.logger.log(`[${instanceId}] Logged out. Removing from memory and DB.`);
-             this.sessions.delete(instanceId);
              await this.prisma.whatsAppInstance.update({
                where: { id: instanceId },
                data: { connectionStatus: 'disconnected' },

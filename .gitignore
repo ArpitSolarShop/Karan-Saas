@@ -20,3 +20,6 @@ prisma/dev.db-journal
 .agent/
 .antigravity/
 
+# WhatsApp session data
+backend/wa_auth/
+

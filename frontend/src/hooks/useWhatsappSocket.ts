@@ -16,12 +16,15 @@ export function useWhatsappSocket(instanceId: string | null) {
     if (!instanceId) return;
 
     // Connect to the NestJS Namespace
-    const socket: Socket = io(process.env.NEXT_PUBLIC_API_URL + '/whatsapp', {
-      transports: ['websocket'],
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    
+    const socket: Socket = io(baseUrl + '/whatsapp', {
+      transports: ['websocket', 'polling'], // Fallback to polling if websocket fails
+      reconnectionAttempts: 5,
     });
 
     socket.on('connect', () => {
-      console.log('Connected to WhatsApp Gateway natively');
+      console.log(`✅ Connected to WhatsApp Gateway [${instanceId}]`);
     });
 
     // Listen for Base64 QR code emissions from Baileys
