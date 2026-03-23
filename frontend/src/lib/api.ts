@@ -15,6 +15,8 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+let isRedirecting = false;
+
 // ── Response interceptor — handle token expiry ─────────────────────────────
 api.interceptors.response.use(
   (response) => response,
@@ -22,7 +24,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       // Token expired or invalid → clear and redirect to login
       const pathname = window.location.pathname;
-      if (pathname !== '/login') {
+      if (pathname !== '/login' && !isRedirecting) {
+        isRedirecting = true; // Prevent rapid-fire redirects from concurrent failed requests
         localStorage.removeItem('crm_token');
         localStorage.removeItem('crm_user');
         window.location.href = '/login';

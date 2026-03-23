@@ -98,21 +98,22 @@ export default function WhatsAppSettingsPage() {
   };
 
   // ── BAILEYS INSTANCE CREATION ──
-  const handleCreatePrompt = async () => {
-    const name = prompt('Enter a name for this WhatsApp Number (e.g., Sales Team Alpha)');
-    if (!name) return;
+  const handleCreateBaileys = async () => {
+    // Automatically generate a sleek name without annoying the user with browser prompts!
+    const nextNumber = instances.filter(i => i.connectionType === 'BAILEYS_NATIVE').length + 1;
+    const name = `WhatsApp Device 0${nextNumber}`;
+    
     try {
       const { data } = await api.post('/whatsapp/instances', {
         tenantId,
         name,
         connectionType: 'BAILEYS_NATIVE'
       });
-      loadInstances(tenantId);
-      setCreateMode(null);
-      // Instantly start connection flow
+      await loadInstances(tenantId);
+      // Skip all the intermediate modes and instantly trigger the connection flow!
       handleConnect(data.id);
     } catch (error) {
-      console.error('Failed to create Baileys instance');
+      console.error('Failed to create Baileys instance', error);
     }
   };
 
@@ -171,12 +172,18 @@ export default function WhatsAppSettingsPage() {
 
   const handleConnect = async (id: string) => {
     setActiveInstance(id);
-    try {
-      await api.post(`/whatsapp/instances/${id}/connect`);
-    } catch (error) {
-      console.error('Failed to initialize connection');
-      setActiveInstance(null);
-    }
+    
+    // Give the frontend Socket.io client time to establish the connection 
+    // before asking the backend to boot Baileys, avoiding a race condition
+    // where the QR code is generated and emitted before the client is listening.
+    setTimeout(async () => {
+      try {
+        await api.post(`/whatsapp/instances/${id}/connect`);
+      } catch (error) {
+        console.error('Failed to initialize connection');
+        setActiveInstance(null);
+      }
+    }, 1500);
   };
 
   const handleDisconnect = async (id: string) => {
@@ -228,14 +235,16 @@ export default function WhatsAppSettingsPage() {
             Dual-Engine System: Official Cloud API + Native Baileys Engine. 
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" size="lg" onClick={() => setCreateMode('baileys')} className="border-green-200 hover:bg-green-50">
-            <Wifi className="mr-2 h-5 w-5 text-green-600" /> Add Baileys (QR)
-          </Button>
-          <Button size="lg" onClick={() => setCreateMode('cloud_api')} className="bg-blue-600 hover:bg-blue-700">
-            <Cloud className="mr-2 h-5 w-5" /> Add Cloud API
-          </Button>
-        </div>
+        {instances.length > 0 && (
+          <div className="flex gap-3">
+            <Button variant="outline" size="lg" onClick={handleCreateBaileys} className="border-green-200 hover:bg-green-50">
+              <Wifi className="mr-2 h-5 w-5 text-green-600" /> Add Baileys (QR)
+            </Button>
+            <Button size="lg" onClick={() => setCreateMode('cloud_api')} className="bg-blue-600 hover:bg-blue-700">
+              <Cloud className="mr-2 h-5 w-5" /> Add Cloud API
+            </Button>
+          </div>
+        )}
       </div>
 
       {createMode === 'cloud_api' && (
@@ -291,20 +300,7 @@ export default function WhatsAppSettingsPage() {
         </Card>
       )}
 
-      {createMode === 'baileys' && (
-        <Card className="border-2 border-green-500 bg-green-50/20 shadow-xl animate-in fade-in slide-in-from-top-4">
-          <CardHeader>
-            <CardTitle>Register Native Baileys Device</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-gray-600 font-medium">This will initialize a native WhatsApp WebSocket on your server. Scan a QR code in the next step to link your personal or business phone.</p>
-            <div className="flex gap-2">
-              <Button onClick={handleCreatePrompt} className="bg-green-600 hover:bg-green-700 px-8">Start Registration</Button>
-              <Button variant="ghost" onClick={() => setCreateMode(null)}>Cancel</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {instances.map((instance) => (
@@ -404,8 +400,12 @@ export default function WhatsAppSettingsPage() {
               Unlock multi-channel communication by connecting your official Meta account or scanning a personal QR code.
             </p>
             <div className="mt-10 flex gap-4">
-               <Button size="lg" onClick={() => setCreateMode('baileys')} className="bg-white text-gray-900 border-2 border-gray-100 hover:bg-gray-50">Add Baileys</Button>
-               <Button size="lg" onClick={() => setCreateMode('cloud_api')} className="bg-blue-600">Add Cloud API</Button>
+               <Button size="lg" onClick={handleCreateBaileys} className="bg-white text-gray-900 border-2 border-gray-100 hover:bg-gray-50 flex items-center shadow-sm">
+                 <Wifi className="mr-2 h-5 w-5 text-green-600" /> Start Baileys Engine
+               </Button>
+               <Button size="lg" onClick={() => setCreateMode('cloud_api')} className="bg-blue-600 hover:bg-blue-700 border-2 border-transparent shadow-md flex items-center">
+                 <ShieldCheck className="mr-2 h-5 w-5 text-blue-100" /> Setup Cloud API
+               </Button>
             </div>
           </div>
         )}

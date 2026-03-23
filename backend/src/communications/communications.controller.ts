@@ -3,7 +3,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Controller, Post, Get, Body, Res, Param, Query } from '@nestjs/common';
 import type { Response } from 'express';
 import { CommunicationsService } from './communications.service';
-import { WhatsAppClientService } from './whatsapp-client.service';
+import { BaileysEngineService } from '../whatsapp/baileys.service';
 import { PrismaService } from '../prisma/prisma.service';
 import * as QRCode from 'qrcode';
 
@@ -12,7 +12,7 @@ import * as QRCode from 'qrcode';
 export class CommunicationsController {
   constructor(
     private readonly commsService: CommunicationsService,
-    private readonly waClient: WhatsAppClientService,
+    private readonly baileysEngine: BaileysEngineService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -103,35 +103,21 @@ export class CommunicationsController {
 
   @Get('whatsapp/status')
   getWhatsAppStatus() {
-    return this.waClient.getSessionStatus();
-  }
-
-  @Get('whatsapp/qr-image')
-  async getQrImage(@Res() res: Response) {
-    const status = this.waClient.getSessionStatus();
-    if (!status.qr) {
-      return res.status(status.status === 'CONNECTED' ? 200 : 404).json({
-        status: status.status,
-        message:
-          status.status === 'CONNECTED'
-            ? 'Already connected!'
-            : 'QR not available yet.',
-      });
-    }
-    const buffer = await QRCode.toBuffer(status.qr, { scale: 8 });
-    res.set('Content-Type', 'image/png');
-    res.set('Cache-Control', 'no-cache, no-store');
-    res.end(buffer);
+    const sessions = this.baileysEngine.getActiveSessions();
+    return { activeSessions: sessions, connected: sessions.length > 0 };
   }
 
   @Post('broadcast')
   async broadcast(
     @Body() body: { phones: string[]; message: string; delayMs?: number },
   ) {
-    return this.waClient.broadcastMessage(
-      body.phones,
-      body.message,
-      body.delayMs,
-    );
+    const results = [];
+    for (const phone of body.phones) {
+      const ok = await this.baileysEngine.sendMessage(phone, body.message);
+      results.push({ phone, sent: ok });
+      if (body.delayMs) await new Promise(r => setTimeout(r, body.delayMs));
+    }
+    const sent = results.filter(r => r.sent).length;
+    return { sent, failed: results.length - sent, results };
   }
 }

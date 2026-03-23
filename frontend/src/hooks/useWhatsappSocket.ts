@@ -15,12 +15,12 @@ export function useWhatsappSocket(instanceId: string | null) {
   useEffect(() => {
     if (!instanceId) return;
 
-    // Connect to the NestJS Namespace
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    // Connect to the NestJS Namespace (must strip /api/v1 from REST API URL)
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:3001';
     
     const socket: Socket = io(baseUrl + '/whatsapp', {
       transports: ['websocket', 'polling'], // Fallback to polling if websocket fails
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 25, // Give it more chances
     });
 
     socket.on('connect', () => {

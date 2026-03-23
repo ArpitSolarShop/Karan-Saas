@@ -5,7 +5,6 @@ import { LeadsModule } from '../leads/leads.module';
 import { ActivitiesModule } from '../activities/activities.module';
 import { WhatsAppService } from './providers/whatsapp.service';
 import { EmailService } from './providers/email.service';
-import { WhatsAppClientService } from './whatsapp-client.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
@@ -15,8 +14,9 @@ import { PrismaModule } from '../prisma/prisma.module';
     CommunicationsService,
     WhatsAppService,
     EmailService,
-    WhatsAppClientService,
+    // WhatsAppClientService is no longer here — BaileysEngineService is @Global()
+    // and is injected automatically via WhatsappModule
   ],
-  exports: [CommunicationsService, WhatsAppClientService],
+  exports: [CommunicationsService],
 })
 export class CommunicationsModule {}

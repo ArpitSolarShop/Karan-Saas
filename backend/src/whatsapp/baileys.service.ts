@@ -18,6 +18,9 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
   // This achieves 100% self-sufficiency without Docker containers
   private readonly sessions = new Map<string, WASocket>();
 
+  // Stores the latest QR code strings waiting to be scanned
+  private readonly latestQrs = new Map<string, string>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly gateway: WhatsappGateway,
@@ -58,6 +61,11 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
   public async startSession(instanceId: string) {
     if (this.sessions.has(instanceId)) {
       this.logger.warn(`Session ${instanceId} is already running.`);
+      const cachedQr = this.latestQrs.get(instanceId);
+      if (cachedQr) {
+         this.logger.log(`[${instanceId}] Re-emitting cached QR code to frontend...`);
+         this.gateway.emitQrCode(instanceId, cachedQr);
+      }
       return;
     }
 
@@ -89,12 +97,14 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
         const { connection, lastDisconnect, qr } = update;
 
         if (qr) {
+          this.latestQrs.set(instanceId, qr);
           this.logger.debug(`[${instanceId}] New QR Code Generated. Emit to Socket.io GUI -> ${qr.substring(0, 25)}...`);
           // Intercept and emit `qr` to NestJS WebSocket Gateway (Frontend Modal)
           this.gateway.emitQrCode(instanceId, qr);
         }
 
         if (connection === 'close') {
+          this.latestQrs.delete(instanceId);
           const shouldReconnect =
             (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
             
@@ -120,6 +130,7 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
         }
 
         if (connection === 'open') {
+          this.latestQrs.delete(instanceId);
           this.logger.log(`[${instanceId}] Native WhatsApp Socket Connected Successfully!`);
           await this.prisma.whatsAppInstance.update({
              where: { id: instanceId },
@@ -192,5 +203,55 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
       throw new Error(`WhatsApp Instance ${instanceId} is not connected.`);
     }
     return socket;
+  }
+
+  /**
+   * Sends a WhatsApp text message via the first available connected session.
+   * If instanceId is provided, it uses that specific session.
+   */
+  public async sendMessage(phone: string, message: string, instanceId?: string): Promise<boolean> {
+    // Use the provided instanceId or fall back to first available connected session
+    let targetId = instanceId;
+    if (!targetId) {
+      for (const [id, sock] of this.sessions.entries()) {
+        if (sock.user) { // sock.user is set when connected
+          targetId = id;
+          break;
+        }
+      }
+    }
+
+    if (!targetId) {
+      this.logger.error('No connected Baileys sessions available to send message.');
+      return false;
+    }
+
+    const sock = this.sessions.get(targetId);
+    if (!sock) {
+      this.logger.error(`Session ${targetId} socket not found.`);
+      return false;
+    }
+
+    try {
+      // Format the JID — WhatsApp requires countrycode+number@s.whatsapp.net
+      const jid = `${phone.replace(/\D/g, '')}@s.whatsapp.net`;
+      await sock.sendMessage(jid, { text: message });
+      this.logger.log(`[${targetId}] Sent WhatsApp to ${phone}: "${message.slice(0, 40)}..."`);
+      return true;
+    } catch (err: any) {
+      this.logger.error(`[${targetId}] Failed to send to ${phone}: ${err.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Returns all currently active (connected) sessions with their IDs.
+   */
+  public getActiveSessions(): string[] {
+    const active: string[] = [];
+    for (const [id, sock] of this.sessions.entries()) {
+      if (sock.user) active.push(id);
+    }
+    return active;
   }
 }
