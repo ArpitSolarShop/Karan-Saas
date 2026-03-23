@@ -17,7 +17,6 @@ prisma/dev.db
 prisma/dev.db-journal
 *.log
 .gemini/
-.agent/
 .antigravity/
 
 # WhatsApp session data
