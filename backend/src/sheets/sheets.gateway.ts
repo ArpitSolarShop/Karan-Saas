@@ -18,7 +18,14 @@ import { Server } from 'socket.io';
  *   - "rowUpdated"    → single row data changed ({ rowIndex })
  */
 @WebSocketGateway({
-  cors: { origin: process.env.FRONTEND_URL || 'http://localhost:3000' },
+  cors: {
+    origin: [
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+    ],
+    credentials: true,
+  },
   namespace: '/sheets',
 })
 export class SheetsGateway implements OnGatewayConnection, OnGatewayDisconnect {
