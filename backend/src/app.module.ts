@@ -42,15 +42,13 @@ import { BullModule as BullMQModule } from '@nestjs/bullmq';
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     BullMQModule.forRoot({
-      connection: {
-        host: (process.env.REDIS_URL || 'redis://localhost:6380')
-          .replace('redis://', '')
-          .split(':')[0],
-        port: parseInt(
-          (process.env.REDIS_URL || 'redis://localhost:6380').split(':')[2] ||
-            '6380',
-        ),
-      },
+      connection: (() => {
+        const url = new URL(process.env.REDIS_URL || 'redis://127.0.0.1:6380');
+        return {
+          host: url.hostname,
+          port: parseInt(url.port) || 6380,
+        };
+      })(),
     }),
     QueueModule, // Global — Bull (v3/4) queues
     StorageModule, // Global — MinIO file storage

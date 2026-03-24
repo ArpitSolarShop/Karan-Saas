@@ -194,9 +194,6 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Retrieves an active socket or throws if disconnected.
-   */
   public getSocket(instanceId: string): WASocket {
     const socket = this.sessions.get(instanceId);
     if (!socket) {
