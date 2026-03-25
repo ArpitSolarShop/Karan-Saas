@@ -9,6 +9,7 @@ import { Boom } from '@hapi/boom';
 import { usePrismaAuthState } from './prisma-auth-store';
 import pino from 'pino';
 import { WhatsappGateway } from './whatsapp.gateway';
+import { MetricsService } from './metrics.service';
 
 @Injectable()
 export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
@@ -24,6 +25,7 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gateway: WhatsappGateway,
+    private readonly metrics: MetricsService,
   ) {}
 
   async onModuleInit() {
@@ -206,7 +208,7 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
    * Sends a WhatsApp text message via the first available connected session.
    * If instanceId is provided, it uses that specific session.
    */
-  public async sendMessage(phone: string, message: string, instanceId?: string): Promise<boolean> {
+  public async sendMessage(phone: string, message: string, instanceId?: string): Promise<{ success: boolean; messageId?: string }> {
     // Use the provided instanceId or fall back to first available connected session
     let targetId = instanceId;
     if (!targetId) {
@@ -220,24 +222,31 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
 
     if (!targetId) {
       this.logger.error('No connected Baileys sessions available to send message.');
-      return false;
+      return { success: false };
     }
 
     const sock = this.sessions.get(targetId);
     if (!sock) {
       this.logger.error(`Session ${targetId} socket not found.`);
-      return false;
+      return { success: false };
     }
 
     try {
       // Format the JID — WhatsApp requires countrycode+number@s.whatsapp.net
-      const jid = `${phone.replace(/\D/g, '')}@s.whatsapp.net`;
-      await sock.sendMessage(jid, { text: message });
+      let cleanPhone = phone.replace(/\D/g, '');
+      // If it's 10 digits, assume it's an Indian number and prepend 91
+      if (cleanPhone.length === 10) {
+        cleanPhone = `91${cleanPhone}`;
+      }
+      const jid = `${cleanPhone}@s.whatsapp.net`;
+      const result = await sock.sendMessage(jid, { text: message });
+      this.metrics.incrementSent(targetId, 'text');
       this.logger.log(`[${targetId}] Sent WhatsApp to ${phone}: "${message.slice(0, 40)}..."`);
-      return true;
+      return { success: true, messageId: result?.key.id };
     } catch (err: any) {
+      this.metrics.incrementError(targetId || 'unknown', err.message);
       this.logger.error(`[${targetId}] Failed to send to ${phone}: ${err.message}`);
-      return false;
+      return { success: false };
     }
   }
 

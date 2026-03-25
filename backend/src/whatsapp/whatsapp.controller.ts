@@ -201,14 +201,8 @@ export class WhatsappController {
       return result;
     }
 
-    // ── BAILEYS PATH (existing) ──
-    const socket = this.baileysEngine.getSocket(data.instanceId);
-    let targetJid = data.jid;
-    if (!targetJid.includes('@')) {
-      targetJid = `${targetJid}@s.whatsapp.net`;
-    }
-    const sentMsg = await socket.sendMessage(targetJid, { text: data.text });
-    return { success: true, messageId: sentMsg?.key.id };
+    // ── BAILEYS PATH (instrumented) ──
+    return this.baileysEngine.sendMessage(data.jid, data.text, data.instanceId);
   }
 
   @Post('send/template')

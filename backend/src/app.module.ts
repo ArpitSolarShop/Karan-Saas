@@ -36,9 +36,11 @@ import { MarketingModule } from './marketing/marketing.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { BullModule as BullMQModule } from '@nestjs/bullmq';
+import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 
 @Module({
   imports: [
+    PrometheusModule.register(),
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     BullMQModule.forRoot({
