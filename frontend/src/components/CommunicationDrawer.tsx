@@ -107,28 +107,26 @@ export default function CommunicationDrawer({ isOpen, onClose, activeLead }: Com
       </div>
 
       {/* Message History */}
-      <div className="h-[280px] overflow-y-auto p-4 space-y-3 custom-scrollbar">
+      <div className="h-[280px] overflow-y-auto px-3 py-3 space-y-2 custom-scrollbar" style={{ background: "#0d1117" }}>
         {history.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-text-muted space-y-3 opacity-40">
             <MessageSquare size={40} />
-            <span className="text-[10px] uppercase font-bold tracking-widest text-center">Awaiting Transmission History</span>
+            <span className="text-[10px] uppercase font-bold tracking-widest text-center">No messages yet</span>
           </div>
         ) : (
           history.map(msg => (
-            <div key={msg.id} className="bg-surface-2 border border-border rounded-xl p-3 pointer-events-auto">
-              <div className="flex justify-between items-start mb-2">
-                <span className={cn(
-                  "text-[8px] font-black px-2 py-0.5 uppercase rounded border",
-                  TAB_CONFIG[msg.type]?.bg || "bg-surface-2 border-border"
-                )}>
-                  {msg.type}
-                </span>
-                <span className="text-[8px] font-bold text-text-muted">{msg.timestamp}</span>
-              </div>
-              <p className="text-xs font-medium leading-relaxed">{msg.content}</p>
-              <div className="mt-2 flex items-center gap-1.5">
-                <span className="w-1 h-1 bg-success rounded-full animate-pulse" />
-                <span className="text-[8px] font-black uppercase tracking-widest text-success">{msg.status}</span>
+            <div key={msg.id} className="flex justify-end pointer-events-auto">
+              <div className="max-w-[80%] rounded-2xl rounded-tr-sm px-3 py-2 shadow-md" style={{ background: "#005C4B" }}>
+                <div className="flex items-center gap-1 mb-1" style={{ color: TAB_CONFIG[msg.type]?.color?.replace("text-", "") || "#25D366" }}>
+                  <span className={cn("text-[9px] font-bold uppercase tracking-wider", TAB_CONFIG[msg.type]?.color || "text-success")}>
+                    {msg.type}
+                  </span>
+                </div>
+                <p className="text-white text-[13px] leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                <div className="flex items-center gap-1 mt-1 justify-end">
+                  <span className="text-[10px] text-white/40">{msg.timestamp}</span>
+                  <Send size={10} className="text-[#53BDEB]" />
+                </div>
               </div>
             </div>
           ))

@@ -16,7 +16,7 @@ export class LeadsService {
     private activities: ActivitiesService,
     private search: SearchService,
     private audit: AuditService,
-  ) {}
+  ) { }
 
   private async ensureDevTenant(): Promise<string> {
     const existing = await this.prisma.tenant.findUnique({
@@ -318,7 +318,7 @@ export class LeadsService {
       for (const id of ids) {
         try {
           await this.search.deleteLeadFromIndex(id);
-        } catch {}
+        } catch { }
       }
       return { deleted: ids.length };
     }

@@ -18,11 +18,25 @@ import {
   Activity
 } from "lucide-react";
 
+interface MarketingStep {
+  type: 'EMAIL' | 'SMS' | 'WAIT';
+  durationMs?: number;
+  content?: string;
+}
+
+interface MarketingJourney {
+  id: string;
+  name: string;
+  isActive: boolean;
+  trigger: string;
+  steps: MarketingStep[];
+}
+
 export default function MarketingPage() {
   const [activeTab, setActiveTab] = useState<"journeys" | "pages">("journeys");
-  const [journeys, setJourneys] = useState<any[]>([]);
+  const [journeys, setJourneys] = useState<MarketingJourney[]>([]);
   const [pages, setPages] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchData();
@@ -40,7 +54,7 @@ export default function MarketingPage() {
     } catch (err) {
       console.error("Failed to fetch marketing data", err);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -87,7 +101,7 @@ export default function MarketingPage() {
 
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto px-8 py-10 custom-scrollbar bg-background">
-        {loading ? (
+        {isLoading ? (
           <div className="flex flex-col items-center justify-center h-64">
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-primary mb-4" />
             <p className="text-muted-foreground font-mono text-xs uppercase tracking-widest">Waking up the engine...</p>
@@ -121,7 +135,7 @@ export default function MarketingPage() {
                    </div>
 
                    <div className="space-y-4 mb-8">
-                      {(j.steps || []).slice(0, 3).map((step, idx) => (
+                      {(j.steps || []).slice(0, 3).map((step: MarketingStep, idx: number) => (
                         <div key={idx} className="flex items-center gap-3">
                            <div className="w-8 h-8 rounded-full bg-surface-2 border border-border flex items-center justify-center shrink-0">
                               {step.type === 'EMAIL' ? <Mail size={14} /> : step.type === 'WAIT' ? <Clock size={14} /> : <ChevronRight size={14} />}

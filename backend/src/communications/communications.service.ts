@@ -76,7 +76,8 @@ export class CommunicationsService {
     switch (type) {
       case 'WHATSAPP':
         target = lead.phone;
-        success = await this.whatsapp.sendMessage(target, message);
+        const waResult = await this.whatsapp.sendMessage(target, message);
+        success = waResult.success;
         break;
       case 'EMAIL':
         target = lead.email || '';
@@ -89,7 +90,8 @@ export class CommunicationsService {
         break;
       case 'SMS':
         target = lead.phone;
-        success = await this.whatsapp.sendMessage(target, `[SMS] ${message}`);
+        const smsResult = await this.whatsapp.sendMessage(target, `[SMS] ${message}`);
+        success = smsResult.success;
         break;
     }
 

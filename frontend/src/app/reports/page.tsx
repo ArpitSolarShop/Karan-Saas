@@ -158,7 +158,16 @@ export default function ReportsPage() {
               <div className="flex flex-col md:flex-row gap-6 items-center">
                 <ResponsiveContainer width="100%" height={280}>
                   <RechartsPie>
-                    <Pie data={disposition as any[]} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={110} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine>
+                    <Pie 
+                      data={disposition as any[]} 
+                      dataKey="count" 
+                      nameKey="name" 
+                      cx="50%" 
+                      cy="50%" 
+                      outerRadius={110} 
+                      label={(props: any) => `${props.name} ${((props.percent || 0) * 100).toFixed(0)}%`} 
+                      labelLine
+                    >
                       {(disposition as any[]).map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                     </Pie>
                     <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid #2a2a4e", borderRadius: 8, fontSize: 11 }} />

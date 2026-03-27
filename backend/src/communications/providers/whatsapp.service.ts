@@ -7,13 +7,13 @@ export class WhatsAppService {
 
   constructor(private readonly baileysEngine: BaileysEngineService) {}
 
-  async sendMessage(phone: string, message: string): Promise<boolean> {
+  async sendMessage(phone: string, message: string): Promise<{ success: boolean; messageId?: string }> {
     const activeSessions = this.baileysEngine.getActiveSessions();
     if (activeSessions.length === 0) {
       this.logger.error(
         'No active Baileys sessions. Connect a WhatsApp device in Settings first.',
       );
-      return false;
+      return { success: false };
     }
     // Route via the primary (first connected) session
     this.logger.log(`Routing WhatsApp message to ${phone} via Baileys Engine`);

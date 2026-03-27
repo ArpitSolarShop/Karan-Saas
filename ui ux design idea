@@ -1,0 +1,960 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    Search, MoreVertical, MessageCircle, MessageSquare, Mail,
+    Inbox, Archive, Phone, Video, Paperclip, Smile, Mic,
+    Send, ArrowLeft, Check, CheckCheck, Image as ImageIcon,
+    Settings, Info, X, Play, ChevronDown, Star, Trash2,
+    CornerUpLeft, CornerUpRight, Clock, User
+} from 'lucide-react';
+
+// --- GLOBAL STYLES ---
+const GlobalStyles = () => (
+    <style dangerouslySetInnerHTML={{
+        __html: `
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(161, 161, 170, 0.4); border-radius: 20px; }
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(82, 82, 91, 0.4); }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgba(161, 161, 170, 0.7); }
+    
+    @keyframes slideInUp {
+      from { transform: translateY(10px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .msg-animate { animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    
+    .fade-in { animation: fadeIn 0.2s ease-in-out forwards; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  `}} />
+);
+
+// --- MOCK DATA (UNIFIED INBOX) ---
+const currentUser = { name: "You", avatar: "https://i.pravatar.cc/150?u=me", email: "you@omnired.com" };
+
+const mockThreads = [
+    { id: 1, channel: 'whatsapp', name: "Emma Watson", avatar: "https://i.pravatar.cc/150?u=1", lastMessage: "Let's catch up later!", time: "10:42 AM", unread: 3, online: true, phone: "+1 234 567 8900" },
+    { id: 2, channel: 'email', name: "Design Team", avatar: "https://i.pravatar.cc/150?u=2", subject: "Q3 Roadmap & Figma Updates", lastMessage: "Please review the attached links before our sync.", time: "09:15 AM", unread: 1, email: "design@company.com" },
+    { id: 3, channel: 'sms', name: "Amazon Delivery", avatar: "https://ui-avatars.com/api/?name=Amazon&background=e11d48&color=fff", lastMessage: "Your package has been delivered to the front porch.", time: "Yesterday", unread: 0, phone: "262-966" },
+    { id: 4, channel: 'whatsapp', name: "Liam Smith", avatar: "https://i.pravatar.cc/150?u=3", lastMessage: "Check out this shot", time: "Yesterday", unread: 0, online: false },
+    { id: 5, channel: 'email', name: "Dribbble Digest", avatar: "https://ui-avatars.com/api/?name=Dribbble&background=ea4c89&color=fff", subject: "Top shots of the week", lastMessage: "See what's trending in the design community today.", time: "Tuesday", unread: 0, email: "digest@dribbble.com" },
+];
+
+const mockMessages = {
+    1: [ // WhatsApp
+        { id: 1, type: "text", text: "Hey Emma, how have you been?", sender: "me", time: "10:30 AM", status: "read" },
+        { id: 2, type: "text", text: "I've been good! Just wrapped up a big project. 🚀", sender: "them", time: "10:35 AM" },
+        { id: 3, type: "text", text: "Definitely! Let's catch up later!", sender: "them", time: "10:42 AM" },
+    ],
+    2: [ // Email
+        { id: 1, type: "email", subject: "Q3 Roadmap & Figma Updates", text: "Hi Team,\n\nI've updated the master Figma file with the new Q3 roadmap components. Please take a look at the 'Unified Inbox' page specifically.\n\nBest,\nJohn", sender: "them", time: "09:15 AM", date: "Today, Sep 24" }
+    ],
+    3: [ // SMS
+        { id: 1, type: "text", text: "Amazon: Your package is 10 stops away.", sender: "them", time: "Yesterday, 2:00 PM" },
+        { id: 2, type: "text", text: "Your package has been delivered to the front porch.", sender: "them", time: "Yesterday, 4:30 PM" }
+    ]
+};
+
+// --- COMPONENTS ---
+const IconButton = ({ icon: Icon, onClick, className = "", active = false, title }) => (
+    <button
+        title={title}
+        onClick={onClick}
+        className={`group relative inline-flex items-center justify-center rounded-xl p-2.5 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 
+      ${active
+                ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400'
+                : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
+            } ${className}`}
+    >
+        <Icon className="h-5 w-5" strokeWidth={2} />
+    </button>
+);
+
+const Avatar = ({ src, alt, online, size = "md", className = "" }) => {
+    const sizes = { sm: "h-8 w-8", md: "h-10 w-10", lg: "h-12 w-12" };
+    return (
+        <div className={`relative shrink-0 ${sizes[size]} ${className}`}>
+            <img src={src} alt={alt} className="h-full w-full rounded-full object-cover ring-1 ring-zinc-200 dark:ring-zinc-800" />
+            {online && <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full ring-2 ring-white dark:ring-zinc-950 bg-green-500" />}
+        </div>
+    );
+};
+
+// Helper to render the correct channel icon
+const ChannelIcon = ({ channel, className = "" }) => {
+    if (channel === 'email') return <Mail className={`h-3.5 w-3.5 ${className}`} />;
+    if (channel === 'whatsapp') return <MessageCircle className={`h-3.5 w-3.5 ${className}`} />;
+    if (channel === 'sms') return <MessageSquare className={`h-3.5 w-3.5 ${className}`} />;
+    return null;
+};
+
+// --- MAIN APP ---
+export default function OmniRedHub() {
+    const [activeTab, setActiveTab] = useState('all'); // all, email, whatsapp, sms
+    const [activeThreadId, setActiveThreadId] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [messages, setMessages] = useState(mockMessages);
+    const [inputText, setInputText] = useState('');
+    const [isMobileView, setIsMobileView] = useState(false);
+
+    const messagesEndRef = useRef(null);
+    const activeThread = mockThreads.find(t => t.id === activeThreadId);
+    const currentMessages = activeThreadId ? (messages[activeThreadId] || []) : [];
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [currentMessages]);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobileView(window.innerWidth < 768);
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const handleSend = (e) => {
+        e.preventDefault();
+        if (!inputText.trim() || !activeThreadId) return;
+
+        const newMsg = {
+            id: Date.now(),
+            type: activeThread.channel === 'email' ? 'email' : 'text',
+            text: inputText,
+            sender: "me",
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: "sent",
+            subject: activeThread.channel === 'email' ? `Re: ${activeThread.subject}` : undefined
+        };
+
+        setMessages(prev => ({ ...prev, [activeThreadId]: [...(prev[activeThreadId] || []), newMsg] }));
+        setInputText('');
+    };
+
+    const filteredThreads = mockThreads.filter(t => {
+        const matchesTab = activeTab === 'all' || t.channel === activeTab;
+        const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (t.subject && t.subject.toLowerCase().includes(searchQuery.toLowerCase()));
+        return matchesTab && matchesSearch;
+    });
+
+    // Layout Booleans
+    const showList = !isMobileView || !activeThreadId;
+    const showDetail = activeThreadId && !isMobileView || activeThreadId && isMobileView;
+
+    return (
+        <div className="flex h-screen w-full overflow-hidden bg-zinc-100 font-sans text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+            <GlobalStyles />
+
+            {/* --- 1. APP RAIL (Leftmost Navigation) --- */}
+            {!isMobileView && (
+                <div className="flex w-[72px] shrink-0 flex-col items-center border-r border-zinc-200 bg-zinc-50 py-4 dark:border-zinc-800 dark:bg-zinc-950 z-20">
+                    <Avatar src={currentUser.avatar} size="md" className="mb-6 shadow-sm cursor-pointer hover:opacity-80" />
+                    <div className="flex flex-1 flex-col gap-3">
+                        <IconButton icon={Inbox} title="Unified Inbox" active={activeTab === 'all'} onClick={() => setActiveTab('all')} />
+                        <div className="w-8 h-px bg-zinc-200 dark:bg-zinc-800 mx-auto my-1" />
+                        <IconButton icon={Mail} title="Emails" active={activeTab === 'email'} onClick={() => setActiveTab('email')} className="text-blue-500 hover:text-blue-600 dark:text-blue-400" />
+                        <IconButton icon={MessageCircle} title="RedApp (WhatsApp)" active={activeTab === 'whatsapp'} onClick={() => setActiveTab('whatsapp')} className="text-green-600 hover:text-green-700 dark:text-green-500" />
+                        <IconButton icon={MessageSquare} title="SMS" active={activeTab === 'sms'} onClick={() => setActiveTab('sms')} className="text-purple-500 hover:text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div className="flex flex-col gap-3 mt-auto">
+                        <IconButton icon={Archive} title="Archive" />
+                        <IconButton icon={Settings} title="Settings" />
+                    </div>
+                </div>
+            )}
+
+            {/* --- 2. THREAD LIST PANE --- */}
+            {showList && (
+                <div className={`flex flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 z-10 ${isMobileView ? 'w-full' : 'w-[360px] shrink-0'}`}>
+                    {/* List Header */}
+                    <div className="flex h-[70px] shrink-0 items-center justify-between px-5 border-b border-zinc-200 dark:border-zinc-800">
+                        <h1 className="text-xl font-semibold tracking-tight capitalize">
+                            {activeTab === 'all' ? 'Inbox' : activeTab === 'whatsapp' ? 'RedApp' : activeTab}
+                        </h1>
+                        <IconButton icon={Search} className="md:hidden" />
+                    </div>
+
+                    {/* Search Bar */}
+                    <div className="p-3 border-b border-zinc-200 dark:border-zinc-800/50">
+                        <div className="relative group">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                            <input
+                                placeholder="Search messages..."
+                                className="w-full h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800/50 pl-9 pr-4 text-sm outline-none border border-transparent focus:border-rose-500 focus:bg-white dark:focus:bg-zinc-900 transition-all"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    {/* The List */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        {filteredThreads.map((thread) => (
+                            <div
+                                key={thread.id}
+                                onClick={() => setActiveThreadId(thread.id)}
+                                className={`group cursor-pointer border-b border-zinc-100 dark:border-zinc-800/50 p-3.5 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60 relative ${activeThreadId === thread.id ? 'bg-rose-50/50 dark:bg-rose-900/10' : ''}`}
+                            >
+                                <div className="flex gap-3">
+                                    <div className="relative">
+                                        <Avatar src={thread.avatar} alt={thread.name} online={thread.online} size="lg" />
+                                        <div className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white dark:border-zinc-900 shadow-sm
+                      ${thread.channel === 'email' ? 'bg-blue-500 text-white' : thread.channel === 'whatsapp' ? 'bg-green-500 text-white' : 'bg-purple-500 text-white'}`}>
+                                            <ChannelIcon channel={thread.channel} className="h-2.5 w-2.5" />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 overflow-hidden">
+                                        <div className="flex items-center justify-between mb-0.5">
+                                            <h3 className={`truncate text-[15px] ${activeThreadId === thread.id || thread.unread > 0 ? 'font-semibold text-zinc-900 dark:text-zinc-100' : 'font-medium text-zinc-800 dark:text-zinc-200'}`}>
+                                                {thread.name}
+                                            </h3>
+                                            <span className={`text-[11px] shrink-0 ${thread.unread > 0 ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-zinc-500'}`}>
+                                                {thread.time}
+                                            </span>
+                                        </div>
+
+                                        {thread.channel === 'email' && (
+                                            <p className="truncate text-[13px] font-medium text-zinc-700 dark:text-zinc-300 mb-0.5">
+                                                {thread.subject}
+                                            </p>
+                                        )}
+
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className={`truncate text-[13px] ${thread.unread > 0 ? 'text-zinc-700 dark:text-zinc-300 font-medium' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                                                {thread.lastMessage}
+                                            </p>
+                                            {thread.unread > 0 && (
+                                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">
+                                                    {thread.unread}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* --- 3. DETAIL PANE (Dynamic based on channel) --- */}
+            {showDetail ? (
+                <div className="flex flex-1 flex-col relative bg-[#f8fafc] dark:bg-[#0f1115] z-0">
+
+                    {/* Dynamic Header */}
+                    <header className="flex h-[70px] shrink-0 items-center justify-between border-b border-zinc-200 bg-white/90 backdrop-blur-md px-4 dark:border-zinc-800 dark:bg-zinc-900/90 shadow-sm z-10">
+                        <div className="flex items-center gap-3">
+                            {isMobileView && (
+                                <IconButton icon={ArrowLeft} onClick={() => setActiveThreadId(null)} className="-ml-2 mr-1" />
+                            )}
+                            <Avatar src={activeThread.avatar} alt={activeThread.name} size="md" />
+                            <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-[16px] font-semibold text-zinc-900 dark:text-zinc-100">{activeThread.name}</h2>
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
+                    ${activeThread.channel === 'email' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                            activeThread.channel === 'whatsapp' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'}`}>
+                                        {activeThread.channel}
+                                    </span>
+                                </div>
+                                <span className="text-[12px] text-zinc-500 dark:text-zinc-400">
+                                    {activeThread.channel === 'email' ? activeThread.email : activeThread.phone || 'Online'}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            {activeThread.channel !== 'email' && <IconButton icon={Phone} />}
+                            {activeThread.channel !== 'email' && <IconButton icon={Video} />}
+                            {activeThread.channel === 'email' && <IconButton icon={Archive} title="Archive" />}
+                            <IconButton icon={MoreVertical} />
+                        </div>
+                    </header>
+
+                    {/* Dynamic Content Area */}
+                    <div className="relative flex-1 overflow-y-auto custom-scrollbar flex flex-col p-4 sm:p-6">
+
+                        {/* Background for Chats only */}
+                        {activeThread.channel !== 'email' && (
+                            <div
+                                className="absolute inset-0 opacity-[0.03] dark:opacity-[0.02] pointer-events-none z-0"
+                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e11d48' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}
+                            />
+                        )}
+
+                        <div className="flex-1 relative z-10 flex flex-col justify-end">
+
+                            {/* --- EMAIL VIEW --- */}
+                            {activeThread.channel === 'email' && (
+                                <div className="flex-1 flex flex-col gap-4 mt-4 h-full justify-start">
+                                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 px-2">{activeThread.subject}</h1>
+
+                                    {currentMessages.map((msg) => (
+                                        <div key={msg.id} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm msg-animate">
+                                            <div className="flex justify-between items-start mb-6">
+                                                <div className="flex gap-3">
+                                                    <Avatar src={msg.sender === 'me' ? currentUser.avatar : activeThread.avatar} size="md" />
+                                                    <div>
+                                                        <p className="font-semibold text-[15px] text-zinc-900 dark:text-zinc-100">
+                                                            {msg.sender === 'me' ? currentUser.name : activeThread.name}
+                                                        </p>
+                                                        <p className="text-[12px] text-zinc-500">to {msg.sender === 'me' ? activeThread.email : 'me'}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4 text-zinc-500 text-[12px]">
+                                                    <span>{msg.date || msg.time}</span>
+                                                    <div className="flex gap-1">
+                                                        <IconButton icon={CornerUpLeft} className="h-8 w-8 p-1.5" title="Reply" />
+                                                        <IconButton icon={MoreVertical} className="h-8 w-8 p-1.5" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="text-[15px] text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                                                {msg.text}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* --- CHAT/SMS VIEW --- */}
+                            {activeThread.channel !== 'email' && currentMessages.map((msg, index) => {
+                                const isMe = msg.sender === 'me';
+                                const prevMsg = index > 0 ? currentMessages[index - 1] : null;
+                                const isFirstInGroup = !prevMsg || prevMsg.sender !== msg.sender;
+
+                                // Bubble colors based on channel
+                                const meBubbleColor = activeThread.channel === 'whatsapp' ? 'bg-rose-600 text-white' : 'bg-purple-600 text-white';
+
+                                return (
+                                    <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-3' : 'mt-1'} msg-animate`}>
+                                        <div
+                                            className={`relative max-w-[85%] sm:max-w-[70%] px-3.5 py-2 shadow-sm
+                        ${isMe
+                                                    ? `${meBubbleColor} rounded-l-2xl rounded-tr-2xl ${isFirstInGroup ? 'rounded-br-sm' : 'rounded-br-2xl'}`
+                                                    : `bg-white text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 rounded-r-2xl rounded-tl-2xl border border-zinc-100 dark:border-zinc-800 ${isFirstInGroup ? 'rounded-bl-sm' : 'rounded-bl-2xl'}`
+                                                }`}
+                                        >
+                                            <p className="text-[15px] leading-relaxed break-words pr-12">{msg.text}</p>
+
+                                            <div className={`absolute bottom-1 right-2 flex items-center gap-1 text-[10px] font-medium ${isMe ? 'text-white/80' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                                                <span>{msg.time}</span>
+                                                {isMe && activeThread.channel === 'whatsapp' && (
+                                                    msg.status === 'read' ? <CheckCheck className="h-3.5 w-3.5 text-blue-300" /> : <Check className="h-3.5 w-3.5" />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div ref={messagesEndRef} className="h-4" />
+                        </div>
+                    </div>
+
+                    {/* Dynamic Input Area */}
+                    <footer className="relative z-10 bg-white/90 backdrop-blur-md px-4 py-3 dark:bg-zinc-900/90 border-t border-zinc-200 dark:border-zinc-800">
+                        <form onSubmit={handleSend} className="flex items-end gap-2 max-w-5xl mx-auto">
+
+                            {activeThread.channel !== 'email' && (
+                                <div className="flex items-center gap-1 pb-1">
+                                    <IconButton icon={Smile} className="text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400" />
+                                    <IconButton icon={Paperclip} className="text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 hidden sm:inline-flex" />
+                                </div>
+                            )}
+
+                            <div className="flex-1 relative">
+                                <textarea
+                                    value={inputText}
+                                    onChange={(e) => setInputText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSend(e);
+                                        }
+                                    }}
+                                    placeholder={activeThread.channel === 'email' ? "Write a reply..." : activeThread.channel === 'whatsapp' ? "Type a message..." : "Text message..."}
+                                    className={`w-full resize-none border border-zinc-200 bg-zinc-50 px-4 py-3 text-[15px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 custom-scrollbar ${activeThread.channel === 'email' ? 'rounded-xl min-h-[100px]' : 'rounded-full pr-12 h-[46px] pt-3.5'}`}
+                                    rows={activeThread.channel === 'email' ? "4" : "1"}
+                                    style={{ maxHeight: activeThread.channel === 'email' ? '300px' : '120px' }}
+                                />
+                            </div>
+
+                            <div className={`pb-1 ${activeThread.channel === 'email' ? 'absolute bottom-5 right-6' : ''}`}>
+                                <button
+                                    type="submit"
+                                    disabled={!inputText.trim()}
+                                    className={`flex items-center justify-center rounded-full text-white shadow-md transition-transform active:scale-95 disabled:opacity-50 disabled:scale-100
+                    ${activeThread.channel === 'email' ? 'bg-blue-600 hover:bg-blue-700 h-9 px-4 rounded-md gap-2 font-medium' :
+                                            activeThread.channel === 'whatsapp' ? 'bg-rose-600 hover:bg-rose-700 h-[42px] w-[42px]' :
+                                                'bg-purple-600 hover:bg-purple-700 h-[42px] w-[42px]'}`}
+                                >
+                                    {activeThread.channel === 'email' ? (
+                                        <>Send <Send className="h-4 w-4" /></>
+                                    ) : (
+                                        <Send className="h-5 w-5 ml-0.5" />
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </footer>
+                </div>
+            ) : (
+                /* Empty State */
+                <div className="hidden md:flex flex-1 flex-col items-center justify-center bg-[#f8fafc] dark:bg-[#0f1115] z-0">
+                    <div className="mb-6 rounded-full bg-zinc-100 p-8 dark:bg-zinc-900 shadow-inner">
+                        <Inbox className="h-16 w-16 text-zinc-400 dark:text-zinc-500" strokeWidth={1} />
+                    </div>
+                    <h2 className="text-2xl font-semibold text-zinc-800 dark:text-zinc-200">Omni Red Hub</h2>
+                    <p className="mt-2 max-w-md text-center text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                        Select a thread to view your emails, texts, and RedApp messages all in one place.
+                    </p>
+                </div>
+            )}
+
+            {/* Mobile Bottom Navigation (Visible only on mobile when not in a chat) */}
+            {isMobileView && !activeThreadId && (
+                <div className="absolute bottom-0 left-0 right-0 h-16 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-around px-2 z-50">
+                    <IconButton icon={Inbox} active={activeTab === 'all'} onClick={() => setActiveTab('all')} className="flex-col gap-1 w-16 !rounded-lg" />
+                    <IconButton icon={Mail} active={activeTab === 'email'} onClick={() => setActiveTab('email')} className="flex-col gap-1 w-16 !rounded-lg text-blue-500" />
+                    <IconButton icon={MessageCircle} active={activeTab === 'whatsapp'} onClick={() => setActiveTab('whatsapp')} className="flex-col gap-1 w-16 !rounded-lg text-green-500" />
+                    <IconButton icon={MessageSquare} active={activeTab === 'sms'} onClick={() => setActiveTab('sms')} className="flex-col gap-1 w-16 !rounded-lg text-purple-500" />
+                </div>
+            )}
+        </div>
+    );
+}
+
+
+
+
+
+
+< !DOCTYPE html >
+    <html lang="en" class="dark">
+        <head>
+            <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>RedLink • Email + WhatsApp + SMS</title>
+                    <script src="https://cdn.tailwindcss.com"></script>
+                    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+                        <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+                        <style>
+                            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+                            :root {
+                                --primary: 225 29 72; /* reddish rose-600 */
+        }
+
+                            body {
+                                font - family: 'Inter', system_ui, sans-serif;
+        }
+
+                            .chat-bg {
+                                background: linear-gradient(rgba(15,23,42,0.94), rgba(15,23,42,0.94)),
+                            url('https://picsum.photos/id/1015/1920/1080') center/cover no-repeat;
+        }
+
+                            .message-received {
+                                border - radius: 20px 20px 20px 6px;
+                            background: #1e2937;
+        }
+
+                            .message-sent {
+                                border - radius: 20px 20px 6px 20px;
+                            background: rgb(225 29 72);
+        }
+
+                            .chat-scroll::-webkit-scrollbar {
+                                width: 5px;
+        }
+
+                            .chat-scroll::-webkit-scrollbar-thumb {
+                                background: rgb(225 29 72);
+                            border-radius: 20px;
+        }
+
+                            .sidebar-item {
+                                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+                            .sidebar-item.active {
+                                background - color: #1e2937;
+                            border-left: 4px solid rgb(225 29 72);
+        }
+
+                            .platform-badge {
+                                font - size: 10px;
+                            padding: 2px 6px;
+                            border-radius: 9999px;
+        }
+                        </style>
+                    </head>
+                    <body class="bg-slate-950 text-slate-200 h-screen flex flex-col overflow-hidden">
+
+                        <!-- Top Bar -->
+                        <div class="h-14 bg-slate-900 border-b border-slate-700 flex items-center px-5 z-50">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 bg-gradient-to-br from-rose-600 to-red-500 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-inner">🔗</div>
+                                <span class="font-semibold tracking-tighter text-3xl">RedLink</span>
+                            </div>
+
+                            <div class="ml-auto flex items-center gap-8 text-slate-400">
+                                <!-- Unified Mode Indicator -->
+                                <div onclick="switchMode('unified')" id="mode-unified"
+                                    class="flex items-center gap-2 cursor-pointer hover:text-white transition-colors active-mode">
+                                    <i class="fa-solid fa-inbox"></i>
+                                    <span class="text-sm font-medium">Unified</span>
+                                </div>
+                                <div onclick="switchMode('whatsapp')" id="mode-whatsapp" class="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+                                    <i class="fa-brands fa-whatsapp text-emerald-400"></i>
+                                    <span class="text-sm font-medium">WhatsApp</span>
+                                </div>
+                                <div onclick="switchMode('email')" id="mode-email" class="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+                                    <i class="fa-solid fa-envelope"></i>
+                                    <span class="text-sm font-medium">Email</span>
+                                </div>
+                                <div onclick="switchMode('sms')" id="mode-sms" class="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+                                    <i class="fa-solid fa-mobile-screen-button"></i>
+                                    <span class="text-sm font-medium">SMS</span>
+                                </div>
+
+                                <div class="flex items-center gap-3 pl-6 border-l border-slate-700">
+                                    <img src="https://i.pravatar.cc/128?u=arpit" alt="Arpit" class="w-8 h-8 rounded-2xl ring-2 ring-rose-500/30">
+                                        <div>
+                                            <p class="font-semibold text-sm">Arpit</p>
+                                            <p class="text-emerald-400 text-xs">online</p>
+                                        </div>
+                                        <button onclick="showUserMenu()" class="ml-2 text-slate-400 hover:text-white">
+                                            <i class="fa-solid fa-ellipsis-vertical"></i>
+                                        </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-1 overflow-hidden">
+
+                            <!-- Left Sidebar: Conversations -->
+                            <div class="w-96 bg-slate-900 border-r border-slate-700 flex flex-col">
+
+                                <!-- Search -->
+                                <div class="p-4 border-b border-slate-700">
+                                    <div class="relative">
+                                        <input id="search-input"
+                                            type="text"
+                                            placeholder="Search across Email, WhatsApp & SMS..."
+                                            onkeyup="filterConversations()"
+                                            class="w-full bg-slate-800 border border-slate-700 focus:border-rose-600 rounded-3xl py-3 px-5 pl-12 text-sm outline-none">
+                                            <i class="fa-solid fa-magnifying-glass absolute left-5 top-3.5 text-slate-400"></i>
+                                    </div>
+                                </div>
+
+                                <!-- Conversations List -->
+                                <div id="conversation-list" class="flex-1 overflow-y-auto chat-scroll"></div>
+                            </div>
+
+                            <!-- Main Content Area -->
+                            <div class="flex-1 flex flex-col" id="main-content">
+
+                                <!-- Dynamic Header -->
+                                <div id="dynamic-header" class="h-16 bg-slate-900 border-b border-slate-700 px-6 flex items-center justify-between"></div>
+
+                                <!-- Messages / Email Thread Area -->
+                                <div id="messages-area" class="flex-1 chat-bg p-8 overflow-y-auto chat-scroll flex flex-col gap-7"></div>
+
+                                <!-- Dynamic Input Area -->
+                                <div id="input-area" class="h-auto bg-slate-900 border-t border-slate-700 px-6 py-4"></div>
+                            </div>
+
+                            <!-- Empty State -->
+                            <div id="empty-state" class="flex-1 hidden flex-col items-center justify-center bg-slate-950 gap-8">
+                                <div class="w-56 h-56 bg-gradient-to-br from-rose-600 via-red-500 to-pink-600 rounded-3xl flex items-center justify-center shadow-2xl rotate-12">
+                                    <i class="fa-solid fa-link text-white text-9xl opacity-90"></i>
+                                </div>
+                                <h1 class="text-5xl font-bold tracking-tighter text-center">RedLink</h1>
+                                <p class="text-slate-400 max-w-md text-center">One beautiful inbox for Email • WhatsApp • SMS<br>All in one place. End-to-end encrypted.</p>
+                                <button onclick="switchMode('unified')"
+                                    class="bg-rose-600 hover:bg-rose-700 px-8 py-4 rounded-3xl font-semibold flex items-center gap-3">
+                                    <i class="fa-solid fa-inbox"></i>
+                                    Open Unified Inbox
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Toast -->
+                        <div id="toast" class="hidden fixed bottom-8 right-8 bg-rose-600 text-white px-8 py-4 rounded-3xl shadow-2xl flex items-center gap-3 text-sm font-medium z-50"></div>
+
+                        <script>
+        // ==================== DATA ====================
+                            let currentMode = 'unified'; // unified | whatsapp | email | sms
+                            let currentConversationId = null;
+
+                            // Fake conversations (mixed across platforms)
+                            let conversations = [
+                            {
+                                id: 1,
+                            platform: 'whatsapp',
+                            name: "Priya Sharma",
+                            avatar: "https://i.pravatar.cc/128?u=priya",
+                            lastMessage: "Meeting at 5 PM today?",
+                            time: "14:32",
+                            unread: 3,
+                            online: true,
+                            subject: null // only for email
+            },
+                            {
+                                id: 2,
+                            platform: 'email',
+                            name: "Rahul Verma",
+                            avatar: "https://i.pravatar.cc/128?u=rahul",
+                            lastMessage: "Please review the attached proposal",
+                            time: "13:45",
+                            unread: 1,
+                            online: false,
+                            subject: "Q2 Marketing Proposal - Review Needed"
+            },
+                            {
+                                id: 3,
+                            platform: 'sms',
+                            name: "+91 98765 43210",
+                            avatar: "https://i.pravatar.cc/128?u=sms",
+                            lastMessage: "Your OTP is 784392",
+                            time: "12:10",
+                            unread: 0,
+                            online: false,
+                            subject: null
+            },
+                            {
+                                id: 4,
+                            platform: 'whatsapp',
+                            name: "Team xAI",
+                            avatar: "https://i.pravatar.cc/128?u=xai",
+                            lastMessage: "Grok 4 just dropped 🔥",
+                            time: "11:22",
+                            unread: 7,
+                            online: false,
+                            subject: null
+            },
+                            {
+                                id: 5,
+                            platform: 'email',
+                            name: "Neha Kapoor",
+                            avatar: "https://i.pravatar.cc/128?u=neha",
+                            lastMessage: "Invoice for March services attached",
+                            time: "09:15",
+                            unread: 2,
+                            online: false,
+                            subject: "Invoice #INV-39281"
+            }
+                            ];
+
+                            // Messages per conversation (different structure per platform)
+                            let messagesStore = {
+                                1: {platform: 'whatsapp', msgs: [
+                            {sender: "them", text: "Hey Arpit! Are you free for the meeting today?", time: "14:20"},
+                            {sender: "me", text: "Yes, 5 PM works perfectly", time: "14:25"}
+            ]},
+                            2: {platform: 'email', msgs: [
+                            {sender: "them", text: "Hi Arpit,\n\nPlease find the Q2 proposal attached. Let me know your thoughts by EOD.", time: "13:45", subject: "Q2 Marketing Proposal - Review Needed"},
+                            {sender: "me", text: "Thanks Rahul! Will review and revert shortly.", time: "13:50"}
+            ]},
+                            3: {platform: 'sms', msgs: [
+                            {sender: "them", text: "Your OTP is 784392. Valid for 10 minutes.", time: "12:10"},
+                            {sender: "me", text: "Received, thank you.", time: "12:11"}
+            ]},
+                            4: {platform: 'whatsapp', msgs: [
+                            {sender: "them", text: "Grok 4 just dropped 🔥", time: "11:22"}
+            ]},
+                            5: {platform: 'email', msgs: [
+                            {sender: "them", text: "Hi Arpit,\nInvoice for March services is attached.", time: "09:15", subject: "Invoice #INV-39281"}
+            ]}
+        };
+
+                            // ==================== RENDER FUNCTIONS ====================
+                            function renderConversations(filteredConversations = conversations) {
+            const container = document.getElementById('conversation-list');
+                            let html = `<div class="px-4 py-3 text-xs font-semibold text-slate-400 tracking-widest">${currentMode === 'unified' ? 'ALL MESSAGES' : currentMode.toUpperCase()}</div>`;
+
+            filteredConversations.forEach(conv => {
+                const isActive = conv.id === currentConversationId;
+                            const platformIcon = conv.platform === 'whatsapp' ? 'fa-whatsapp text-emerald-400' :
+                            conv.platform === 'email' ? 'fa-envelope text-blue-400' : 'fa-mobile-screen-button text-purple-400';
+
+                            html += `
+                            <div onclick="openConversation(${conv.id})" class="sidebar-item flex items-center gap-4 px-5 py-4 cursor-pointer ${isActive ? 'active' : ''}">
+                                <div class="relative flex-shrink-0">
+                                    <img src="${conv.avatar}" class="w-12 h-12 rounded-2xl object-cover">
+                                        ${conv.platform === 'whatsapp' && conv.online ? `<div class="absolute -bottom-px -right-px w-4 h-4 bg-emerald-400 rounded-full border-2 border-slate-900"></div>` : ''}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex justify-between">
+                                        <p class="font-semibold truncate">${conv.name}</p>
+                                        <span class="text-xs text-slate-400">${conv.time}</span>
+                                    </div>
+                                    ${conv.subject ? `<p class="text-xs text-rose-400 font-medium">${conv.subject}</p>` : ''}
+                                    <p class="text-sm text-slate-400 truncate flex items-center gap-2">
+                                        <i class="fa-solid ${platformIcon}"></i>
+                                        ${conv.lastMessage}
+                                    </p>
+                                </div>
+                                ${conv.unread > 0 ? `<div class="bg-rose-600 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">${conv.unread}</div>` : ''}
+                            </div>`;
+            });
+
+                            container.innerHTML = html || `<div class="p-8 text-center text-slate-400">No messages yet</div>`;
+        }
+
+                            function openConversation(id) {
+                                currentConversationId = id;
+                            renderConversations();
+            
+            const conv = conversations.find(c => c.id === id);
+                            if (!conv) return;
+
+                            const store = messagesStore[id] || {platform: conv.platform, msgs: [] };
+
+                            // Dynamic Header
+                            let headerHTML = `
+                            <div class="flex items-center gap-4">
+                                <img src="${conv.avatar}" class="w-10 h-10 rounded-2xl">
+                                    <div>
+                                        <p class="font-semibold">${conv.name}</p>
+                                        ${conv.subject ? `<p class="text-xs text-rose-400">${conv.subject}</p>` : ''}
+                                    </div>
+                            </div>
+                            `;
+
+                            if (store.platform === 'whatsapp') {
+                                headerHTML += `<div class="text-emerald-400 text-xs flex items-center"><i class="fa-brands fa-whatsapp mr-1"></i> WhatsApp • online</div>`;
+            } else if (store.platform === 'email') {
+                                headerHTML += `<div class="text-blue-400 text-xs flex items-center"><i class="fa-solid fa-envelope mr-1"></i> Email</div>`;
+            } else {
+                                headerHTML += `<div class="text-purple-400 text-xs flex items-center"><i class="fa-solid fa-mobile-screen-button mr-1"></i> SMS</div>`;
+            }
+
+                            document.getElementById('dynamic-header').innerHTML = headerHTML;
+
+                            // Render Messages
+                            renderMessages(store);
+
+                            // Dynamic Input
+                            renderInputArea(store.platform);
+        }
+
+                            function renderMessages(store) {
+            const container = document.getElementById('messages-area');
+                            let html = '';
+
+            store.msgs.forEach(msg => {
+                if (msg.sender === 'me') {
+                                html += `
+                    <div class="flex justify-end">
+                        <div class="max-w-[70%]">
+                            <div class="message-sent text-white px-6 py-3 text-[15.5px] leading-relaxed">
+                                ${msg.text.replace(/\n/g, '<br>')}
+                            </div>
+                            <div class="text-[10px] text-right text-emerald-300 mt-1">${msg.time} ✓✓</div>
+                        </div>
+                    </div>`;
+                } else {
+                                html += `
+                    <div class="flex justify-start">
+                        <div class="max-w-[70%]">
+                            <div class="message-received text-slate-100 px-6 py-3 text-[15.5px] leading-relaxed">
+                                ${msg.text.replace(/\n/g, '<br>')}
+                            </div>
+                            <div class="text-[10px] text-slate-400 mt-1">${msg.time}</div>
+                        </div>
+                    </div>`;
+                }
+            });
+
+                            container.innerHTML = html || `<div class="flex-1 flex items-center justify-center text-slate-400">No messages yet</div>`;
+                            container.scrollTop = container.scrollHeight;
+        }
+
+                            function renderInputArea(platform) {
+            const container = document.getElementById('input-area');
+
+                            if (platform === 'email') {
+                                container.innerHTML = `
+                <div class="max-w-2xl mx-auto">
+                    <input id="email-subject" type="text" placeholder="Subject" value="Re: Previous conversation" 
+                         class="w-full mb-3 bg-slate-800 border border-slate-700 rounded-2xl px-5 py-3 text-sm outline-none focus:border-rose-600">
+                    <div class="flex gap-3">
+                        <input id="message-input" type="text" placeholder="Write your reply..." 
+                               onkeydown="if(event.key === 'Enter') sendMessage()" 
+                               class="flex-1 bg-slate-800 border border-slate-700 rounded-3xl px-7 py-4 outline-none focus:border-rose-600">
+                        <button onclick="sendMessage()" class="bg-rose-600 hover:bg-rose-700 px-8 rounded-3xl font-medium">Send Email</button>
+                    </div>
+                    <div class="text-xs text-slate-400 mt-2 flex gap-4">
+                        <span class="flex items-center"><i class="fa-solid fa-paperclip mr-1"></i> Attach</span>
+                        <span class="flex items-center"><i class="fa-solid fa-image mr-1"></i> Image</span>
+                    </div>
+                </div>`;
+            } else if (platform === 'sms') {
+                                container.innerHTML = `
+                <div class="max-w-2xl mx-auto flex items-center gap-3">
+                    <input id="message-input" type="text" maxlength="160" placeholder="Type SMS (max 160 chars)..." 
+                           onkeydown="if(event.key === 'Enter') sendMessage()" 
+                           class="flex-1 bg-slate-800 border border-slate-700 rounded-3xl px-7 py-4 outline-none focus:border-rose-600">
+                    <button onclick="sendMessage()" class="w-12 h-12 bg-purple-600 hover:bg-purple-700 rounded-3xl flex items-center justify-center">
+                        <i class="fa-solid fa-paper-plane text-white"></i>
+                    </button>
+                    <span class="text-xs text-slate-400">SMS</span>
+                </div>`;
+            } else {
+                                // WhatsApp style
+                                container.innerHTML = `
+                <div class="max-w-2xl mx-auto flex items-center gap-4">
+                    <button onclick="showToast('Emoji picker opened')" class="text-3xl hover:scale-110">😀</button>
+                    <button onclick="showToast('Attachment menu opened')" class="text-slate-400 hover:text-white">
+                        <i class="fa-solid fa-paperclip text-2xl"></i>
+                    </button>
+                    <input id="message-input" type="text" placeholder="Type a message..." 
+                           onkeydown="if(event.key === 'Enter') sendMessage()" 
+                           class="flex-1 bg-slate-800 border border-slate-700 focus:border-rose-600 rounded-3xl px-7 py-4 outline-none">
+                    <button onclick="sendMessage()" class="w-12 h-12 bg-rose-600 hover:bg-rose-700 rounded-3xl flex items-center justify-center">
+                        <i class="fa-solid fa-paper-plane text-white"></i>
+                    </button>
+                </div>`;
+            }
+        }
+
+                            function sendMessage() {
+            if (!currentConversationId) return;
+
+                            const input = document.getElementById('message-input');
+                            if (!input) return;
+
+                            const text = input.value.trim();
+                            if (!text) return;
+
+                            const store = messagesStore[currentConversationId];
+                            if (!store) return;
+
+                            const newMsg = {
+                                sender: "me",
+                            text: text,
+                            time: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}).replace(/^0/, '')
+            };
+
+                            store.msgs.push(newMsg);
+                            renderMessages(store);
+
+            // Update last message in list
+            const conv = conversations.find(c => c.id === currentConversationId);
+                            if (conv) {
+                                conv.lastMessage = text.length > 35 ? text.substring(0, 32) + '...' : text;
+                            conv.time = newMsg.time;
+                            renderConversations();
+            }
+
+                            input.value = '';
+
+            // Simulate reply
+            setTimeout(() => {
+                if (!currentConversationId) return;
+                            const replies = ["Got it!", "Thanks!", "On it 👍", "Received", "Perfect"];
+                            const replyText = replies[Math.floor(Math.random() * replies.length)];
+
+                            store.msgs.push({
+                                sender: "them",
+                            text: replyText,
+                            time: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}).replace(/^0/, '')
+                });
+                            renderMessages(store);
+
+                            if (conv) {
+                                conv.lastMessage = replyText;
+                            renderConversations();
+                }
+            }, 900);
+        }
+
+                            function switchMode(mode) {
+                                currentMode = mode;
+                            currentConversationId = null;
+
+            // Update top nav active state
+            document.querySelectorAll('#mode-unified, #mode-whatsapp, #mode-email, #mode-sms').forEach(el => {
+                                el.classList.toggle('active-mode', el.id === `mode-${mode}`);
+            });
+
+                            // Filter conversations based on mode
+                            let filtered = conversations;
+                            if (mode !== 'unified') {
+                                filtered = conversations.filter(c => c.platform === mode);
+            }
+
+                            document.getElementById('empty-state').classList.add('hidden');
+                            renderConversations(filtered);
+
+                            // Show empty if no convos
+                            if (filtered.length === 0) {
+                                document.getElementById('messages-area').innerHTML = `<div class="flex-1 flex items-center justify-center text-2xl text-slate-400">No ${mode} messages yet</div>`;
+            }
+        }
+
+                            function filterConversations() {
+            const term = document.getElementById('search-input').value.toLowerCase().trim();
+                            let filtered = conversations;
+
+                            if (currentMode !== 'unified') {
+                                filtered = filtered.filter(c => c.platform === currentMode);
+            }
+
+                            if (term) {
+                                filtered = filtered.filter(c =>
+                                    c.name.toLowerCase().includes(term) ||
+                                    (c.lastMessage && c.lastMessage.toLowerCase().includes(term)) ||
+                                    (c.subject && c.subject.toLowerCase().includes(term))
+                                );
+            }
+
+                            renderConversations(filtered);
+        }
+
+                            function showToast(message) {
+            const toast = document.getElementById('toast');
+                            toast.textContent = message;
+                            toast.style.display = 'flex';
+                            toast.classList.remove('hidden');
+            
+            setTimeout(() => {
+                                toast.classList.add('hidden');
+                            toast.style.display = 'none';
+            }, 2800);
+        }
+
+                            function showUserMenu() {
+                                showToast('Settings • Profile • Sign out (RedLink menu)');
+        }
+
+        // ==================== INITIALIZE ====================
+        window.onload = () => {
+                                lucide.createIcons();
+
+                            // Default to Unified Inbox
+                            renderConversations();
+
+            // Open first conversation automatically
+            setTimeout(() => {
+                                openConversation(1);
+            }, 300);
+
+                            console.log('%c✅ RedLink – Email + WhatsApp + SMS Combined UI Loaded!',
+                            'color:#e11d48; font-size:15px; font-weight:bold');
+                            console.log('→ Fully interactive demo with platform switching, adaptive inputs, and beautiful reddish theme.');
+        };
+                        </script>
+                    </body>
+                </html>
+
+
+
+
+
+
+
+
+

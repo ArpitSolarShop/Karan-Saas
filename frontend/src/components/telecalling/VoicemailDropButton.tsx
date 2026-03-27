@@ -30,9 +30,9 @@ export function VoicemailDropButton({ callUUID, className }: Props) {
       const res = await api.post("/telephony/voicemail/upload", form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      const path = res.data?.path || res.path;
+      const path = res.data?.path || (res as any).path;
       setUploadedPath(path);
-      setPresets(p => [...p, { name: file.name.replace(/\.wav$/i, ""), path }]);
+      setPresets((p: { name: string; path: string }[]) => [...p, { name: file.name.replace(/\.wav$/i, ""), path }]);
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";

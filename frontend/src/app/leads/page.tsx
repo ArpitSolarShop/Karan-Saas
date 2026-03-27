@@ -107,12 +107,14 @@ export default function LeadsTerminal() {
     };
   }, []);
 
-  const selectCell = useCallback((cellId: string) => {
+  const selectCell = useCallback((cellId: string, row?: any) => {
     setActiveCell(cellId);
     const col = cellId.charAt(0);
-    const rowIdx = parseInt(cellId.substring(1)) - 1;
     const field = COLUMN_MAP[col];
-    const rowData = rows[rowIdx]?.data || {};
+    
+    // Use the passed row directly if available, otherwise find it from synthetic ID (legacy/arrows)
+    const activeRow = row || rows.find(r => (`${col}${r.rowIndex || (rows.indexOf(r) + 1)}`) === cellId);
+    const rowData = activeRow?.data || {};
     setFormulaValue(String(rowData[field] || ""));
     
     requestAnimationFrame(() => {
@@ -123,8 +125,8 @@ export default function LeadsTerminal() {
         highlightRef.current.style.left = `${cell.offsetLeft - 2}px`;
         highlightRef.current.style.top = `${cell.offsetTop - 2}px`;
         
-        if (rows[rowIdx]) {
-          setActiveLead({ ...rows[rowIdx].data, id: rows[rowIdx].id });
+        if (activeRow) {
+          setActiveLead({ ...activeRow.data, id: activeRow.id });
           setIsCommDrawerOpen(true);
         }
       }
@@ -219,7 +221,7 @@ export default function LeadsTerminal() {
               <div 
                 key={cellId} id={`cell-${cellId}`}
                 onDoubleClick={() => startEditing(cellId)}
-                onClick={() => selectCell(cellId)}
+                onClick={() => selectCell(cellId, row)}
                 className={cn(
                   "w-[160px] border-r border-border px-2 flex items-center text-[10px] font-mono cursor-cell shrink-0 h-full transition-colors",
                   isEditing ? "bg-background ring-1 ring-primary z-40" : "bg-surface group-hover:bg-surface-2"

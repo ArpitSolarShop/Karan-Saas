@@ -93,9 +93,11 @@ export class CommunicationsController {
 
     return activities.map((a) => ({
       id: a.id,
-      direction: 'OUTBOUND',
+      direction: (a.description || '').startsWith('[INCOMING]') ? 'INBOUND' : 'OUTBOUND',
       channel: a.activityType,
-      content: a.description,
+      content: (a.description || '')
+        .replace(/^\[INCOMING\]\s*/, '')
+        .replace(/^Sent (WHATSAPP|SMS|EMAIL)(?: to [^:]+)?: /, ''),
       status: 'DELIVERED',
       createdAt: a.createdAt,
     }));
@@ -113,8 +115,8 @@ export class CommunicationsController {
   ) {
     const results = [];
     for (const phone of body.phones) {
-      const ok = await this.baileysEngine.sendMessage(phone, body.message);
-      results.push({ phone, sent: ok });
+      const result = await this.baileysEngine.sendMessage(phone, body.message);
+      results.push({ phone, sent: result.success, messageId: result.messageId });
       if (body.delayMs) await new Promise(r => setTimeout(r, body.delayMs));
     }
     const sent = results.filter(r => r.sent).length;

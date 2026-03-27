@@ -117,7 +117,13 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
 
           if (shouldReconnect) {
              // Delay reconnect by 2 seconds to avoid tight reconnect storms
-             setTimeout(() => this.startSession(instanceId), 2000);
+             setTimeout(async () => {
+               try {
+                 await this.startSession(instanceId);
+               } catch (err) {
+                 this.logger.error(`[${instanceId}] Critical: Failed to auto-reconnect:`, err);
+               }
+             }, 2000);
           } else {
              // Logged out permanently — clean up DB state
              this.logger.log(`[${instanceId}] Logged out. Removing from memory and DB.`);
@@ -242,7 +248,7 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
       const result = await sock.sendMessage(jid, { text: message });
       this.metrics.incrementSent(targetId, 'text');
       this.logger.log(`[${targetId}] Sent WhatsApp to ${phone}: "${message.slice(0, 40)}..."`);
-      return { success: true, messageId: result?.key.id };
+      return { success: true, messageId: result?.key.id || undefined };
     } catch (err: any) {
       this.metrics.incrementError(targetId || 'unknown', err.message);
       this.logger.error(`[${targetId}] Failed to send to ${phone}: ${err.message}`);

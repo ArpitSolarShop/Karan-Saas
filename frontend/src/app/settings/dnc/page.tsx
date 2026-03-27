@@ -54,7 +54,7 @@ export default function DncManagerPage() {
     setChecking(true);
     try {
       const res = await api.get(`/notifications/dnc-check?phone=${encodeURIComponent(phone.trim())}`);
-      const isDnc = res?.data?.isDnc ?? res?.isDnc ?? false;
+      const isDnc: boolean = res?.data?.isDnc ?? (res as any)?.isDnc ?? false;
       setCheckResult({ isDnc, phone: phone.trim() });
     } finally { setChecking(false); }
   }
