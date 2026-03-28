@@ -183,6 +183,95 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
                 });
             }
 
+            // ── Save as Activity so the REST /communications/thread API shows it ──
+            if (jid) {
+              // Skip group chats, broadcast, and status messages — inbox is for 1-on-1 only
+              const isGroup = jid.endsWith('@g.us') || jid === 'status@broadcast';
+              if (!isGroup) {
+                try {
+                  // Determine if this is a LID JID (linked device) or a standard phone JID
+                  const isLidJid = jid.endsWith('@lid');
+                  const isPhoneJid = jid.endsWith('@s.whatsapp.net');
+
+                  // Extract text content from the Baileys message object
+                  const msgData = msg.message as any;
+                  const textContent =
+                    msgData?.conversation ||
+                    msgData?.extendedTextMessage?.text ||
+                    msgData?.imageMessage?.caption ||
+                    (msgData?.imageMessage ? '[Photo]' : null) ||
+                    (msgData?.videoMessage ? '[Video]' : null) ||
+                    (msgData?.audioMessage ? '[Voice message]' : null) ||
+                    (msgData?.documentMessage ? `[Document: ${msgData.documentMessage.fileName || 'file'}]` : null) ||
+                    '[Media message]';
+
+                  let lead: { id: string; tenantId: string } | null = null;
+
+                  // Strategy 1: Standard phone JID — match by phone number
+                  if (isPhoneJid) {
+                    const rawPhone = jid.replace(/@s\.whatsapp\.net$/, '');
+                    const phone10 = rawPhone.replace(/^91/, '').slice(-10);
+                    lead = await this.prisma.lead.findFirst({
+                      where: {
+                        OR: [
+                          { phone: rawPhone },
+                          { phone: phone10 },
+                          { phone: { endsWith: phone10 } },
+                          { phone: { endsWith: rawPhone } },
+                        ],
+                      },
+                      select: { id: true, tenantId: true },
+                    });
+                  }
+
+                  // Strategy 2: LID JID or phone match failed — use pushName to find the lead
+                  if (!lead && msg.pushName) {
+                    const name = msg.pushName.trim();
+                    lead = await this.prisma.lead.findFirst({
+                      where: {
+                        OR: [
+                          { name: { contains: name, mode: 'insensitive' } },
+                          { firstName: { contains: name, mode: 'insensitive' } },
+                        ],
+                      },
+                      select: { id: true, tenantId: true },
+                    });
+                    if (lead) {
+                      this.logger.log(`[${instanceId}] Matched lead by pushName "${name}" for LID JID ${jid}`);
+                    }
+                  }
+
+                  if (lead) {
+                    // Get any user to satisfy the FK (system user fallback)
+                    const systemUser = await this.prisma.user.findFirst({
+                      where: { tenantId: lead.tenantId },
+                      select: { id: true },
+                    });
+
+                    if (systemUser) {
+                      await this.prisma.activity.create({
+                        data: {
+                          leadId: lead.id,
+                          userId: systemUser.id,
+                          activityType: 'WHATSAPP',
+                          description: `[INCOMING] ${textContent}`,
+                        },
+                      });
+                      this.logger.log(`[${instanceId}] ✅ Saved inbound message as Activity for lead ${lead.id} | "${textContent.slice(0, 40)}"`);
+                    }
+                  } else {
+                    this.logger.warn(`[${instanceId}] ⚠️ No lead found for JID ${jid} (pushName: "${msg.pushName}") — message not linked`);
+                  }
+                } catch (err) {
+                  this.logger.error(`[${instanceId}] Failed to save inbound message as Activity:`, err);
+                }
+              } else {
+                this.logger.debug(`[${instanceId}] Skipping group/broadcast message from ${jid}`);
+              }
+            }
+            // ────────────────────────────────────────────────────────────────────
+
+
             // Emit to WebSocket Gateway so the Next.js UI auto-refreshes
             this.gateway.emitMessageUpsert(instanceId, {
                id: msgId,
@@ -195,6 +284,7 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
           }
         }
       });
+
 
     } catch (error) {
       this.logger.error(`Error starting Baileys Session for ${instanceId}:`, error);

@@ -1,0 +1,17 @@
+cd frontend; npm run dev
+cd backend; npm run start:dev
+docker-compose up -d
+
+
+
+
+
+
+ Default Login Credentials
+Role	Email	Password
+Admin	admin@alpha.dev 	admin123
+Manager	manager@alpha.dev	 manager123
+Supervisor	supervisor@alpha.dev	super123
+Team Lead	teamlead@alpha.dev	lead123
+Agent	agent1@alpha.dev	agent123
+QA	qa@alpha.dev	qa123

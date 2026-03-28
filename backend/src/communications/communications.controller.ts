@@ -82,26 +82,130 @@ export class CommunicationsController {
 
   /**
    * GET /communications/thread/:leadId
-   * All messages in a conversation
+   * All messages — merges Activity table (CRM-sent/received) +
+   * WhatsAppMessage table (raw Baileys history) for complete conversation.
    */
   @Get('thread/:leadId')
   async getThread(@Param('leadId') leadId: string) {
+    // ── 1. Activity-based messages (outbound CRM sends + newly-logged inbound) ──
     const activities = (await this.prisma.activity.findMany({
       where: { leadId, activityType: { in: ['WHATSAPP', 'EMAIL', 'SMS'] } },
       orderBy: { createdAt: 'asc' },
     })) as any[];
 
-    return activities.map((a) => ({
-      id: a.id,
+    const activityMsgs = activities.map((a) => ({
+      id: `act_${a.id}`,
       direction: (a.description || '').startsWith('[INCOMING]') ? 'INBOUND' : 'OUTBOUND',
-      channel: a.activityType,
+      channel: a.activityType as string,
       content: (a.description || '')
         .replace(/^\[INCOMING\]\s*/, '')
         .replace(/^Sent (WHATSAPP|SMS|EMAIL)(?: to [^:]+)?: /, ''),
       status: 'DELIVERED',
-      createdAt: a.createdAt,
+      createdAt: a.createdAt as Date,
+    }));
+
+    // ── 2. Raw WhatsApp messages from Baileys (full history) ─────────────────
+    // Find the lead's phone to match against WhatsApp JIDs
+    const lead = await this.prisma.lead.findUnique({
+      where: { id: leadId },
+      select: { phone: true, name: true, firstName: true },
+    });
+
+    let waMsgs: any[] = [];
+    if (lead?.phone) {
+      const phone = lead.phone.replace(/\D/g, '');
+      const phone10 = phone.slice(-10);
+      const phoneWithCountry = phone.length === 10 ? `91${phone}` : phone;
+
+      // Find matching WhatsApp messages by JID (phone or LID matched by contact pushName)
+      const leadName = (lead.name || lead.firstName || '').toLowerCase();
+
+      const rawMsgs = await this.prisma.whatsAppMessage.findMany({
+        where: {
+          OR: [
+            { remoteJid: { contains: phone10 } },
+            { remoteJid: { contains: phoneWithCountry } },
+          ],
+          // Exclude group and broadcast
+          NOT: [
+            { remoteJid: { endsWith: '@g.us' } },
+            { remoteJid: 'status@broadcast' },
+          ],
+        },
+        orderBy: { timestamp: 'asc' },
+        take: 200,
+      });
+
+      // Also fetch LID-based messages matched by contact pushName
+      if (leadName) {
+        const lidContacts = await this.prisma.whatsAppContact.findMany({
+          where: {
+            pushName: { contains: leadName.split(' ')[0], mode: 'insensitive' },
+            remoteJid: { endsWith: '@lid' },
+          },
+        });
+        if (lidContacts.length > 0) {
+          const lidJids = lidContacts.map((c) => c.remoteJid);
+          const lidMsgs = await this.prisma.whatsAppMessage.findMany({
+            where: { remoteJid: { in: lidJids } },
+            orderBy: { timestamp: 'asc' },
+            take: 200,
+          });
+          rawMsgs.push(...lidMsgs);
+        }
+      }
+
+      waMsgs = rawMsgs.map((m) => {
+        const md = m.messageData as any;
+        const text =
+          md?.conversation ||
+          md?.extendedTextMessage?.text ||
+          md?.imageMessage?.caption ||
+          (md?.imageMessage ? '[Photo]' : null) ||
+          (md?.videoMessage?.caption) ||
+          (md?.videoMessage ? '[Video]' : null) ||
+          (md?.audioMessage ? '[Voice message]' : null) ||
+          (md?.documentMessage
+            ? `[Document: ${md.documentMessage.fileName || 'file'}]`
+            : null) ||
+          '[Media message]';
+
+        return {
+          id: `wa_${m.id}`,
+          direction: m.direction === 'INBOUND' ? 'INBOUND' : 'OUTBOUND',
+          channel: 'WHATSAPP',
+          content: text,
+          status: m.status || 'DELIVERED',
+          createdAt: m.timestamp,
+        };
+      });
+    }
+
+    // ── 3. Merge, deduplicate, and sort chronologically ───────────────────────
+    const allMsgs = [...activityMsgs, ...waMsgs];
+
+    // Deduplicate: if an activity and a WA message have the same content within 60s, keep the WA one (richer)
+    const seen = new Set<string>();
+    const deduped = allMsgs
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .filter((m) => {
+        // Round timestamp to nearest minute for fuzzy dedup
+        const minuteKey = `${m.direction}_${m.content.slice(0, 40)}_${Math.floor(new Date(m.createdAt).getTime() / 60000)}`;
+        if (seen.has(minuteKey)) return false;
+        seen.add(minuteKey);
+        return true;
+      });
+
+    return deduped.map((m) => ({
+      id: m.id,
+      direction: m.direction,
+      channel: m.channel,
+      content: m.content,
+      status: m.status,
+      createdAt: m.createdAt,
     }));
   }
+
 
   @Get('whatsapp/status')
   getWhatsAppStatus() {
