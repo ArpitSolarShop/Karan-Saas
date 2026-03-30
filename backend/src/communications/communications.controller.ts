@@ -86,7 +86,37 @@ export class CommunicationsController {
    * WhatsAppMessage table (raw Baileys history) for complete conversation.
    */
   @Get('thread/:leadId')
-  async getThread(@Param('leadId') leadId: string) {
+  async getThread(@Param('leadId') paramLeadId: string, @Query('phone') qPhone?: string) {
+    let leadId = paramLeadId;
+    let fallbackPhone = qPhone;
+
+    // Resolve SheetRow.id to Lead.id by phone if paramLeadId doesn't belong to a Lead
+    let lead = await this.prisma.lead.findUnique({
+      where: { id: leadId },
+      select: { id: true, phone: true, name: true, firstName: true },
+    });
+
+    if (!lead) {
+      const sheetRow = await this.prisma.sheetRow.findUnique({
+        where: { id: leadId },
+      });
+      if (sheetRow) {
+        const rowData = sheetRow.data as any;
+        const phone = rowData.phone || rowData.phone_primary || rowData.phone_number || qPhone;
+        fallbackPhone = phone;
+        if (phone) {
+          const existingLead = await this.prisma.lead.findFirst({
+            where: { phone: String(phone) },
+            select: { id: true, phone: true, name: true, firstName: true },
+          });
+          if (existingLead) {
+            lead = existingLead;
+            leadId = lead.id; // Switch to query Activity by the real lead ID
+          }
+        }
+      }
+    }
+
     // ── 1. Activity-based messages (outbound CRM sends + newly-logged inbound) ──
     const activities = (await this.prisma.activity.findMany({
       where: { leadId, activityType: { in: ['WHATSAPP', 'EMAIL', 'SMS'] } },
@@ -104,21 +134,16 @@ export class CommunicationsController {
       createdAt: a.createdAt as Date,
     }));
 
-    // ── 2. Raw WhatsApp messages from Baileys (full history) ─────────────────
-    // Find the lead's phone to match against WhatsApp JIDs
-    const lead = await this.prisma.lead.findUnique({
-      where: { id: leadId },
-      select: { phone: true, name: true, firstName: true },
-    });
-
     let waMsgs: any[] = [];
-    if (lead?.phone) {
-      const phone = lead.phone.replace(/\D/g, '');
+    const leadPhone = lead?.phone || fallbackPhone;
+    if (leadPhone) {
+      const phone = leadPhone.replace(/\D/g, '');
       const phone10 = phone.slice(-10);
       const phoneWithCountry = phone.length === 10 ? `91${phone}` : phone;
 
       // Find matching WhatsApp messages by JID (phone or LID matched by contact pushName)
-      const leadName = (lead.name || lead.firstName || '').toLowerCase();
+      const leadName = (lead?.name || lead?.firstName || '').toLowerCase();
+
 
       const rawMsgs = await this.prisma.whatsAppMessage.findMany({
         where: {
@@ -160,15 +185,18 @@ export class CommunicationsController {
         const text =
           md?.conversation ||
           md?.extendedTextMessage?.text ||
-          md?.imageMessage?.caption ||
-          (md?.imageMessage ? '[Photo]' : null) ||
-          (md?.videoMessage?.caption) ||
-          (md?.videoMessage ? '[Video]' : null) ||
-          (md?.audioMessage ? '[Voice message]' : null) ||
+          (md?.imageMessage ? `[📷 Photo] ${md.imageMessage.caption || ''}`.trim() : null) ||
+          (md?.videoMessage ? `[🎥 Video] ${md.videoMessage.caption || ''}`.trim() : null) ||
+          (md?.audioMessage ? '[🎤 Voice message]' : null) ||
           (md?.documentMessage
-            ? `[Document: ${md.documentMessage.fileName || 'file'}]`
+            ? `[📄 Document: ${md.documentMessage.fileName || 'file'}]`
             : null) ||
+          (md?.stickerMessage ? '[🖼️ Sticker]' : null) ||
+          (md?.contactMessage ? '[👤 Contact]' : null) ||
+          (md?.locationMessage ? '[📍 Location]' : null) ||
           '[Media message]';
+
+        const mediaData = md?.imageMessage?.jpegThumbnail || md?.videoMessage?.jpegThumbnail || null;
 
         return {
           id: `wa_${m.id}`,
@@ -177,6 +205,7 @@ export class CommunicationsController {
           content: text,
           status: m.status || 'DELIVERED',
           createdAt: m.timestamp,
+          mediaData,
         };
       });
     }
@@ -203,6 +232,7 @@ export class CommunicationsController {
       content: m.content,
       status: m.status,
       createdAt: m.createdAt,
+      mediaData: (m as any).mediaData,
     }));
   }
 

@@ -1,0 +1,1 @@
+const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); async function main() { const msg = await prisma.whatsAppMessage.findFirst({ where: { messageData: { path: ['imageMessage'], not: null } } }); console.log(msg ? Object.keys(msg.messageData.imageMessage) : 'No image message found'); } main().finally(() => prisma.$disconnect());

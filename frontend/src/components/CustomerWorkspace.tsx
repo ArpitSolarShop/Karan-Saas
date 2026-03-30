@@ -83,8 +83,8 @@ export default function CustomerWorkspace({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   });
 
-  const { data: activities } = useSWR(
-    effectiveLeadId ? `/activities/lead/${effectiveLeadId}` : null,
+  const { data: threadMessages, isLoading: isMessagesLoading } = useSWR(
+    effectiveLeadId ? `/communications/thread/${effectiveLeadId}?phone=${activeLead?.phone || ''}` : null,
     fetcher,
     { refreshInterval: 3000 }
   );
@@ -94,12 +94,10 @@ export default function CustomerWorkspace({
     fetcher
   );
 
-  const messages = (activities || [])
-    .filter((a: any) => ["WHATSAPP", "SMS", "EMAIL"].includes(a.type || a.activityType))
-    .sort(
-      (a: any, b: any) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+  const messages = (threadMessages || []).sort(
+    (a: any, b: any) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
 
   const updateScore = async (newScore: number) => {
     setScore(newScore);
@@ -136,7 +134,7 @@ export default function CustomerWorkspace({
       if (newLeadId && newLeadId !== effectiveLeadId) {
         setResolvedLeadId(newLeadId);
       }
-      mutate(`/activities/lead/${newLeadId || effectiveLeadId}`);
+      mutate(`/communications/thread/${newLeadId || effectiveLeadId}`);
     } catch (err: any) {
       console.error("Failed to send message:", err);
     } finally {
@@ -256,13 +254,11 @@ export default function CustomerWorkspace({
         <>
           {/* Messages scroll area */}
           <div
-            className="flex-grow overflow-y-auto px-3 py-4"
+            className="flex-grow overflow-y-auto px-4 py-6"
             style={{
-              background: "#0f0008",
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5 L55 20 L55 40 L30 55 L5 40 L5 20 Z' fill='none' stroke='rgba(180,0,60,0.04)' stroke-width='1'/%3E%3C/svg%3E")`,
-              backgroundSize: "60px 60px",
+              background: "linear-gradient(rgba(15,23,42,0.94), rgba(15,23,42,0.94)), url('https://picsum.photos/id/1015/1920/1080') center/cover no-repeat",
               scrollbarWidth: "thin" as any,
-              scrollbarColor: "#380022 transparent",
+              scrollbarColor: "rgb(225 29 72) transparent",
             }}
           >
             {/* Date Badge */}
@@ -275,7 +271,12 @@ export default function CustomerWorkspace({
               </span>
             </div>
 
-            {messages.length === 0 && (
+            {isMessagesLoading && messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-32 text-center gap-2">
+                <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin mb-2 opacity-50"></div>
+                <p className="text-xs text-muted-foreground">Loading history...</p>
+              </div>
+            ) : messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-32 text-center gap-2">
                 <WifiOff size={28} className="text-muted-foreground mb-2 opacity-30" />
                 <p className="text-xs text-muted-foreground">No messages yet</p>
@@ -284,79 +285,65 @@ export default function CustomerWorkspace({
             )}
 
             {messages.map((msg: any, idx: number) => {
-              const isOutgoing = !msg.description?.startsWith("[INCOMING]");
-              const channel = msg.type || msg.activityType || "WHATSAPP";
-              const text = (msg.description || "")
-                .replace(/^Sent (WHATSAPP|SMS|EMAIL)(?: to [^:]+)?: /, "")
-                .replace(/^\[INCOMING\] /, "");
+              const isOutgoing = msg.direction === "OUTBOUND";
+              const channel = msg.channel || "WHATSAPP";
+              const text = msg.content || "";
               const time = new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
               const prevMsg = idx > 0 ? messages[idx - 1] : null;
-              const isFirst = !prevMsg || (!prevMsg.description?.startsWith("[INCOMING]")) !== isOutgoing;
+              const isFirst = !prevMsg || prevMsg.direction !== msg.direction;
 
               return (
                 <div
                   key={msg.id}
-                  className={cn("flex", isOutgoing ? "justify-end" : "justify-start", idx > 0 ? "mt-0.5" : "mt-0")}
-                  style={{ marginTop: isFirst ? 12 : 2 }}
+                  className={cn("flex", isOutgoing ? "justify-end" : "justify-start", isFirst ? "mt-4" : "mt-1")}
                 >
                   <div className="relative max-w-[78%]">
                     <div
-                      className="px-3 pt-2 pb-6"
+                      className={cn(
+                        "px-4 py-2.5 shadow-sm text-[14.5px] leading-relaxed",
+                        isOutgoing ? "bg-rose-600 text-white" : "bg-slate-800 border border-slate-700 text-slate-100"
+                      )}
                       style={{
-                        background: isOutgoing
-                          ? "var(--color-primary)"
-                          : "var(--color-surface-2)",
                         borderRadius: isOutgoing
-                          ? (isFirst ? "18px 18px 4px 18px" : "18px 18px 4px 18px")
-                          : (isFirst ? "18px 18px 18px 4px" : "18px 18px 18px 4px"),
-                        boxShadow: isOutgoing
-                          ? "0 2px 8px rgba(99,102,241,0.35)"
-                          : "0 1px 4px rgba(0,0,0,0.3)",
+                          ? (isFirst ? "20px 20px 6px 20px" : "20px 20px 6px 20px")
+                          : (isFirst ? "20px 20px 20px 6px" : "20px 20px 20px 6px"),
                         minWidth: 80,
                       }}
                     >
                       {/* Channel tag */}
-                      <div className="flex items-center gap-1 mb-1">
-                        {CHANNEL_ICONS[channel]}
-                        <span
-                          className="text-[9px] font-bold uppercase tracking-wider"
-                          style={{ color: CHANNEL_COLORS[channel] + "99" }}
-                        >
-                          {channel}
-                        </span>
-                      </div>
+                      {isFirst && (
+                        <div className="flex items-center gap-1.5 mb-1.5 opacity-80">
+                          {CHANNEL_ICONS[channel]}
+                          <span className="text-[9px] font-bold uppercase tracking-wider">{channel}</span>
+                        </div>
+                      )}
 
-                      <p
-                        className="text-[13px] leading-relaxed whitespace-pre-wrap break-words pr-1"
-                        style={{ color: isOutgoing ? "#fff" : "#e2e8f0" }}
-                      >
+                      {/* Meta absolute bottom-right */}
+                      {msg.mediaData && (
+                        <div className="mb-2 overflow-hidden rounded-md border border-slate-700/50 shadow-md">
+                          <img 
+                            src={`data:image/jpeg;base64,${msg.mediaData}`} 
+                            alt="Media thumbnail" 
+                            className="w-full h-auto max-h-[300px] object-cover"
+                          />
+                        </div>
+                      )}
+
+                      <p className="whitespace-pre-wrap break-words pr-2">
                         {text}
                       </p>
 
                       {/* Meta absolute bottom-right */}
                       <div
-                        className="absolute bottom-1.5 right-2.5 flex items-center gap-1"
-                        style={{ fontSize: 10, color: isOutgoing ? "rgba(255,255,255,0.55)" : "var(--color-text-muted)" }}
+                        className={cn(
+                          "flex justify-end items-center gap-1 mt-1 text-[10px]",
+                          isOutgoing ? "text-emerald-300" : "text-slate-400"
+                        )}
                       >
                         <span>{time}</span>
-                        {isOutgoing && <CheckCheck size={12} style={{ color: "#93c5fd" }} />}
+                        {isOutgoing && <CheckCheck size={12} />}
                       </div>
                     </div>
-
-                    {/* Bubble tail */}
-                    {isFirst && (
-                      <svg
-                        viewBox="0 0 8 13" width="8" height="13"
-                        className="absolute top-0"
-                        style={{ [isOutgoing ? "right" : "left"]: -7 }}
-                      >
-                        {isOutgoing ? (
-                        <path fill="var(--color-primary-dark)" d="M5.188 0H0v11.193l6.467-8.625C7.526 1.156 6.958 0 5.188 0z" />
-                        ) : (
-                          <path fill="var(--color-surface-2)" d="M2.812 0H8v11.193L1.533 2.568C.474 1.156 1.042 0 2.812 0z" />
-                        )}
-                      </svg>
-                    )}
                   </div>
                 </div>
               );
@@ -367,20 +354,20 @@ export default function CustomerWorkspace({
 
           {/* ── Input Bar ── */}
           <div
-            className="shrink-0 px-3 py-3 space-y-2"
-            style={{ background: "var(--color-surface)", borderTop: "1px solid var(--color-border)" }}
+            className="shrink-0 px-4 py-4"
+            style={{ background: "#0f172a", borderTop: "1px solid #334155" }}
           >
             {/* Channel selector */}
-            <div className="flex gap-1">
+            <div className="flex gap-2 mb-3">
               {(["WHATSAPP", "SMS", "EMAIL"] as const).map((ch) => (
                 <button
                   key={ch}
                   onClick={() => setSendChannel(ch)}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all"
                   style={{
-                    background: sendChannel === ch ? CHANNEL_COLORS[ch] : "transparent",
-                    color: sendChannel === ch ? "#000" : "var(--color-text-muted)",
-                    border: sendChannel === ch ? "none" : "1px solid var(--color-border)",
+                    background: sendChannel === ch ? "rgba(225, 29, 72, 0.15)" : "transparent",
+                    color: sendChannel === ch ? "#f43f5e" : "#94a3b8",
+                    border: sendChannel === ch ? "1px solid rgba(225, 29, 72, 0.5)" : "1px solid #334155",
                   }}
                 >
                   {CHANNEL_ICONS[ch]}
@@ -390,11 +377,8 @@ export default function CustomerWorkspace({
             </div>
 
             {/* Input row */}
-            <div
-              className="flex items-end gap-2 rounded-2xl px-3 py-2"
-              style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-border)" }}
-            >
-              <button style={{ color: "#9a6070" }} className="shrink-0 mb-1">
+            <div className="flex items-end gap-3 rounded-3xl px-4 py-2.5 bg-slate-800 border border-slate-700 focus-within:border-rose-600 transition-colors">
+              <button className="shrink-0 mb-1 text-slate-400 hover:text-rose-400">
                 <Smile size={20} />
               </button>
               <textarea
@@ -409,17 +393,17 @@ export default function CustomerWorkspace({
                 }}
                 placeholder={`Message via ${sendChannel.toLowerCase()}…`}
                 rows={1}
-                className="flex-1 bg-transparent text-[13px] outline-none resize-none leading-relaxed"
-                style={{ color: "var(--color-text)", caretColor: "var(--color-primary)", minHeight: 36, maxHeight: 120 }}
+                className="flex-1 bg-transparent text-[14px] text-slate-100 placeholder:text-slate-500 outline-none resize-none leading-relaxed py-1"
+                style={{ caretColor: "#e11d48", minHeight: 32, maxHeight: 120 }}
               />
-              <button style={{ color: "#9a6070" }} className="shrink-0 mb-1">
+              <button className="shrink-0 mb-1 text-slate-400 hover:text-rose-400">
                 <Paperclip size={18} />
               </button>
               <button
                 onClick={handleSend}
                 disabled={isSending}
-                className="h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-all disabled:opacity-40"
-                style={{ background: "var(--color-primary)", boxShadow: "0 2px 12px rgba(99,102,241,0.4)" }}
+                className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 transition-all disabled:opacity-40 bg-rose-600 hover:bg-rose-700 shadow-md mb-0.5"
+                style={{ boxShadow: "0 4px 14px rgba(225, 29, 72, 0.4)" }}
               >
                 {message.trim() ? <Send size={16} className="text-white ml-0.5" /> : <Mic size={16} className="text-white" />}
               </button>

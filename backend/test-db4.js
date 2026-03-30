@@ -1,0 +1,1 @@
+const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); async function main() { const row = await prisma.sheetRow.findFirst(); console.log(JSON.stringify(row, null, 2)); } main().finally(() => prisma.$disconnect());
