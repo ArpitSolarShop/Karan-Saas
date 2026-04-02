@@ -1,30 +1,22 @@
-import { UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Controller, Get, Post, Patch, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { DealsService } from './deals.service';
 
-@UseGuards(JwtAuthGuard)
 @Controller('deals')
 export class DealsController {
   constructor(private readonly dealsService: DealsService) {}
 
-  @Get('lead/:leadId')
-  findAllByLead(@Param('leadId') leadId: string) {
-    return this.dealsService.findAllByLead(leadId);
-  }
+  @Post()
+  create(@Body() dto: any) { return this.dealsService.create(dto); }
+
+  @Get()
+  findAll(@Query('tenantId') tenantId?: string) { return this.dealsService.findAll(tenantId); }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.dealsService.findOne(id);
-  }
-
-  @Post()
-  create(@Body() data: any) {
-    return this.dealsService.create(data);
-  }
+  findOne(@Param('id') id: string) { return this.dealsService.findOne(id); }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() data: any) {
-    return this.dealsService.update(id, data);
-  }
+  update(@Param('id') id: string, @Body() dto: any) { return this.dealsService.update(id, dto); }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) { return this.dealsService.remove(id); }
 }

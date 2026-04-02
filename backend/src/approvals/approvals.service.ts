@@ -5,45 +5,40 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ApprovalsService {
   constructor(private prisma: PrismaService) {}
 
-  async createRequest(tenantId: string, requesterId: string, data: any) {
-    return this.prisma.approvalRequest.create({
-      data: {
-        tenantId,
-        requesterId,
-        entityType: data.entityType,
-        entityId: data.entityId,
-        notes: data.notes,
-      },
-    });
-  }
-
-  async getPendingRequests(tenantId: string) {
+  async findAll(tenantId: string) {
     return this.prisma.approvalRequest.findMany({
-      where: { tenantId, status: 'PENDING' },
+      where: { tenantId },
       include: { requester: { select: { firstName: true, lastName: true } } },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async resolveRequest(
-    id: string,
-    tenantId: string,
-    approverId: string,
-    status: 'APPROVED' | 'REJECTED',
-    notes?: string,
-  ) {
-    const request = await this.prisma.approvalRequest.findFirst({
-      where: { id, tenantId },
+  async findPending(approverId: string) {
+    return this.prisma.approvalRequest.findMany({
+      where: { approverId, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
     });
-    if (!request) throw new NotFoundException('Request not found');
+  }
 
+  async create(data: any) {
+    return this.prisma.approvalRequest.create({ data });
+  }
+
+  async approve(id: string, notes?: string) {
+    const req = await this.prisma.approvalRequest.findUnique({ where: { id } });
+    if (!req) throw new NotFoundException('Approval request not found');
     return this.prisma.approvalRequest.update({
       where: { id },
-      data: {
-        status,
-        approverId,
-        notes: notes || request.notes,
-        resolvedAt: new Date(),
-      },
+      data: { status: 'APPROVED', notes, resolvedAt: new Date() },
+    });
+  }
+
+  async reject(id: string, notes?: string) {
+    const req = await this.prisma.approvalRequest.findUnique({ where: { id } });
+    if (!req) throw new NotFoundException('Approval request not found');
+    return this.prisma.approvalRequest.update({
+      where: { id },
+      data: { status: 'REJECTED', notes, resolvedAt: new Date() },
     });
   }
 }

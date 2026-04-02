@@ -3,298 +3,192 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { 
-  Users, 
-  UserPlus, 
-  CheckCircle2, 
-  Megaphone, 
-  PhoneCall, 
-  Clock,
-  ArrowUpRight,
-  TrendingUp,
-  Activity,
-  ShieldCheck,
-  Database,
-  Search,
-  Plus
+  Users, UserPlus, CheckCircle2, Megaphone, PhoneCall, Clock,
+  ArrowUpRight, TrendingUp, Activity, ShieldCheck, Database, Focus,
+  GripHorizontal, BarChart3, PieChart, PanelLeftOpen, Maximize2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription 
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge"; // I should create this, or use a span
-
-interface DashboardStats {
-  totalLeads: number;
-  newLeads: number;
-  convertedLeads: number;
-  totalCalls: number;
-  activeCampaigns: number;
-  dueCallbacks: number;
-}
+import { Badge } from "@/components/ui/badge";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 function TimeDisplay() {
   const [time, setTime] = useState<string>("");
-
   useEffect(() => {
-    // Initial set avoiding hydration mismatch
     setTime(new Date().toLocaleTimeString());
-    const timer = setInterval(() => {
-      setTime(new Date().toLocaleTimeString());
-    }, 1000);
+    const timer = setInterval(() => setTime(new Date().toLocaleTimeString()), 1000);
     return () => clearInterval(timer);
   }, []);
-
   if (!time) return <div className="h-5 w-24 bg-surface-2 animate-pulse rounded" />;
-
   return <p className="text-sm font-black tabular-nums">{time}</p>;
 }
 
-export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalLeads: 0, newLeads: 0, convertedLeads: 0,
-    totalCalls: 0, activeCampaigns: 0, dueCallbacks: 0,
-  });
-  const [recentLeads, setRecentLeads] = useState<any[]>([]);
+export default function DashboardModular() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [leadsRes, campaignsRes, callbacksRes] = await Promise.all([
-          fetch(`${API_URL}/leads`).then(r => r.json()),
-          fetch(`${API_URL}/campaigns`).then(r => r.json()).catch(() => []),
-          fetch(`${API_URL}/callbacks/due`).then(r => r.json()).catch(() => []),
-        ]);
-
-        const leads = Array.isArray(leadsRes) ? leadsRes : [];
-        const campaigns = Array.isArray(campaignsRes) ? campaignsRes : [];
-        const callbacks = Array.isArray(callbacksRes) ? callbacksRes : [];
-
-        setStats({
-          totalLeads: leads.length,
-          newLeads: leads.filter((l: any) => l.status === 'NEW').length,
-          convertedLeads: leads.filter((l: any) => l.status === 'CONVERTED').length,
-          totalCalls: 0,
-          activeCampaigns: campaigns.filter((c: any) => c.status === 'ACTIVE').length,
-          dueCallbacks: callbacks.length,
-        });
-        setRecentLeads(leads.slice(0, 5));
-      } catch (err) { console.error('Dashboard fetch error:', err); }
-      setLoading(false);
-    };
-    fetchData();
+    // Simulate loading for modular widgets
+    const timer = setTimeout(() => setLoading(false), 800);
+    return () => clearTimeout(timer);
   }, []);
 
-  const statCards = [
-    { label: 'Total Leads', value: stats.totalLeads, icon: Users, color: 'text-primary' },
-    { label: 'New Inbound', value: stats.newLeads, icon: UserPlus, color: 'text-success' },
-    { label: 'Conversions', value: stats.convertedLeads, icon: CheckCircle2, color: 'text-primary' },
-    { label: 'Active Campaigns', value: stats.activeCampaigns, icon: Megaphone, color: 'text-primary' },
-    { label: 'Due Callbacks', value: stats.dueCallbacks, icon: Clock, color: 'text-warning' },
-    { label: 'Total Minutes', value: '42k', icon: PhoneCall, color: 'text-primary' },
+  const kpiWidgets = [
+    { label: 'Active Pipeline', value: '$2.4M', icon: BarChart3, color: 'text-primary' },
+    { label: 'Total Leads', value: '1,490', icon: Users, color: 'text-success' },
+    { label: 'Win Rate', value: '28.4%', icon: CheckCircle2, color: 'text-primary' },
+    { label: 'Avg Sale Cycle', value: '14 Days', icon: Clock, color: 'text-warning' },
   ];
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary selection:text-white">
-      <main className="p-8 max-w-[1600px] mx-auto space-y-12">
-        {/* Modern Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+      <main className="p-8 max-w-[1800px] mx-auto space-y-8">
+        {/* Header Action Bar */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 rounded-xl border border-border bg-surface/30 p-6 backdrop-blur-sm">
           <div className="space-y-1">
-            <h2 className="text-5xl font-black tracking-tight uppercase italic leading-none">
-              Command <span className="text-primary tracking-tighter not-italic">Center</span>
+            <h2 className="text-4xl font-black tracking-tight flex items-center gap-3">
+              <Focus className="h-8 w-8 text-primary" /> Core Dashboard
             </h2>
-            <div className="flex items-center gap-3">
-               <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-               <p className="text-text-muted text-[10px] font-black uppercase tracking-[0.4em]">Neural Network Operational // V3.2</p>
+            <div className="flex items-center gap-3 mt-2">
+               <span className="h-2 w-2 rounded-full bg-success animate-pulse shadow-[0_0_10px_rgba(0,255,0,0.5)]" />
+               <p className="text-text-muted text-[11px] font-bold uppercase tracking-widest">Workspace Online // Multi-Tenant System</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right hidden md:block">
-              <p className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-1">Local Terminal Time</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1">Local Time</p>
               <TimeDisplay />
             </div>
             <Separator orientation="vertical" className="h-10 bg-border hidden md:block" />
-            <Button size="lg" className="bg-primary text-white hover:bg-primary-dark font-black uppercase tracking-widest shadow-lg shadow-primary/20 group">
-              <Plus className="mr-2 h-4 w-4 group-hover:rotate-90 transition-transform" /> New Objective
+            <Button variant="outline" className="border-border hover:bg-surface-2 font-bold uppercase tracking-widest text-xs hidden sm:flex">
+              <PanelLeftOpen className="mr-2 h-4 w-4" /> Edit Layout
             </Button>
           </div>
         </div>
 
-        {/* Dynamic Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          {statCards.map((card, i) => (
-            <Card key={i} className="bg-surface border-border hover:border-primary/50 transition-all group overflow-hidden relative">
-              <div className="absolute -right-2 -bottom-2 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
-                 <card.icon size={80} />
+        {/* MODULAR WIDGET GRID */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-12 gap-6 auto-rows-[minmax(180px,auto)]">
+          
+          {/* KPI Row (Span 12 -> 3 columns each on XL) */}
+          {kpiWidgets.map((kpi, i) => (
+            <Card key={i} className="xl:col-span-3 bg-surface border-border hover:border-primary/50 transition-all group overflow-hidden relative shadow-sm">
+              <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab hover:bg-surface-2 p-1 rounded">
+                 <GripHorizontal size={14} className="text-text-muted" />
               </div>
-              <CardHeader className="pb-2 space-y-0">
-                <div className="flex justify-between items-start">
-                  <card.icon size={16} className={card.color} />
-                  <span className="text-[9px] uppercase tracking-widest text-text-muted font-black">{card.label}</span>
+              <div className="absolute -right-6 -bottom-6 opacity-[0.02] group-hover:opacity-[0.06] transition-opacity pointer-events-none">
+                 <kpi.icon size={120} />
+              </div>
+              <CardHeader className="pb-2 space-y-0 relative z-10 w-full pt-6 px-6">
+                <div className="flex justify-between items-start w-full">
+                  <div className="flex items-center gap-2">
+                    <div className={cn("p-2 rounded-lg bg-surface-2", kpi.color.replace('text-', 'bg-').replace('primary', 'primary/10').replace('success', 'green-500/10').replace('warning', 'yellow-500/10'))}>
+                       <kpi.icon size={18} className={kpi.color} />
+                    </div>
+                    <span className="text-[11px] uppercase tracking-widest text-muted-foreground font-bold">{kpi.label}</span>
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-black tracking-tighter">
-                  {loading ? (
-                    <div className="h-8 w-16 bg-surface-2 animate-pulse rounded" />
-                  ) : (
-                    card.value
-                  )}
+              <CardContent className="px-6 pb-6 pt-4 relative z-10">
+                <div className="text-4xl font-black tracking-tighter">
+                  {loading ? <div className="h-10 w-24 bg-surface-2 animate-pulse rounded" /> : kpi.value}
                 </div>
-                <div className="flex items-center gap-1 mt-1">
-                   <TrendingUp size={10} className="text-success" />
-                   <span className="text-[9px] font-bold text-success uppercase">+12.4%</span>
-                </div>
+                {!loading && (
+                   <div className="flex items-center gap-1.5 mt-3">
+                     <TrendingUp size={12} className="text-success" />
+                     <span className="text-xs font-bold text-success capitalize border border-success/20 bg-success/10 px-2 py-0.5 rounded shadow-sm">+12% vs last month</span>
+                   </div>
+                )}
               </CardContent>
             </Card>
           ))}
-        </div>
 
-        {/* Core Intelligence Panels */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Real-time Ledger */}
-          <Card className="lg:col-span-2 bg-surface border-border overflow-hidden flex flex-col">
-            <CardHeader className="border-b border-border bg-surface-2/30 px-6 py-4">
-              <div className="flex justify-between items-center">
+          {/* Large Chart Widget (Span 8) */}
+          <Card className="xl:col-span-8 xl:row-span-2 bg-background border-border shadow-md overflow-hidden flex flex-col relative group">
+            <div className="absolute right-4 top-4 hover:bg-surface-2 p-1 rounded z-20 cursor-grab opacity-50 group-hover:opacity-100">
+               <GripHorizontal size={16} className="text-muted-foreground" />
+            </div>
+            <CardHeader className="border-b border-border bg-surface-2/20 px-6 py-5 z-10">
+              <div className="flex justify-between items-center pr-8">
                 <div>
-                  <CardTitle className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                    <Activity size={14} className="text-primary" /> Active Feed Service
+                  <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                    <Activity size={16} className="text-primary" /> Revenue Trajectory
                   </CardTitle>
-                  <CardDescription className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Inbound lead stream // Priority One</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" asChild className="h-8 text-[10px] uppercase font-black tracking-widest border-border hover:bg-surface-2">
-                   <Link href="/leads">Full Analytics ↗</Link>
-                </Button>
+                <div className="flex items-center gap-2">
+                   <Badge variant="outline" className="border-primary/20 text-primary bg-primary/5">Year to Date</Badge>
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-background/50">
-                  <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="px-6 h-10 text-[9px] font-black uppercase tracking-widest text-text-muted">Entity ID</TableHead>
-                    <TableHead className="px-6 h-10 text-[9px] font-black uppercase tracking-widest text-text-muted">Comm Link</TableHead>
-                    <TableHead className="px-6 h-10 text-[9px] font-black uppercase tracking-widest text-text-muted">Status</TableHead>
-                    <TableHead className="px-6 h-10 text-[9px] font-black uppercase tracking-widest text-text-muted text-right">Integrity</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    Array(5).fill(0).map((_, i) => (
-                      <TableRow key={i} className="border-border opacity-50">
-                        <TableCell colSpan={4} className="h-12 bg-surface-2 animate-pulse" />
-                      </TableRow>
-                    ))
-                  ) : recentLeads.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="h-32 text-center text-text-muted text-xs italic">No Active Intelligence Found</TableCell>
-                    </TableRow>
-                  ) : (
-                    recentLeads.map((lead: any) => (
-                      <TableRow key={lead.id} className="border-border hover:bg-primary/[0.02] transition-colors group">
-                        <TableCell className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                             <Avatar className="h-8 w-8 border border-border">
-                               <AvatarImage src={`https://avatar.vercel.sh/${lead.name}.png`} />
-                               <AvatarFallback className="text-[10px] font-black bg-surface-2">{(lead.name || "U").charAt(0)}</AvatarFallback>
-                             </Avatar>
-                             <span className="font-black text-sm tracking-tight">{lead.name || lead.firstName}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-6 py-4 font-mono text-[10px] text-text-muted">{lead.phone}</TableCell>
-                        <TableCell className="px-6 py-4">
-                          <span className={cn(
-                            "px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.2em] rounded border shadow-sm",
-                            lead.status === 'NEW' ? 'bg-primary text-white border-primary' : 
-                            lead.status === 'CONVERTED' ? 'bg-success/20 text-success border-success/30' : 
-                            'bg-surface-2 text-text-muted border-border'
-                          )}>
-                            {lead.status}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2 group-hover:translate-x-[-4px] transition-transform">
-                             <div className="h-1 w-12 bg-border rounded-full overflow-hidden">
-                                <div className="h-full bg-primary w-[80%]" />
-                             </div>
-                             <span className="text-[9px] font-black text-primary">80%</span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+            <CardContent className="p-0 flex-1 flex flex-col relative min-h-[300px] z-10">
+              {loading ? (
+                <div className="w-full h-full bg-surface-2/50 animate-pulse flex items-center justify-center">
+                  <Activity className="h-12 w-12 text-muted-foreground/30 animate-pulse" />
+                </div>
+              ) : (
+                <div className="w-full h-[400px] bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-surface/10 relative overflow-hidden flex items-end">
+                  {/* CSS SVG Mock Chart */}
+                  <svg className="w-full h-full pt-10" preserveAspectRatio="none" viewBox="0 0 100 100">
+                    <defs>
+                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.4" />
+                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M0,100 L0,70 Q10,50 20,60 T40,40 T60,50 T80,20 L100,30 L100,100 Z" fill="url(#chartGradient)" />
+                    <path d="M0,70 Q10,50 20,60 T40,40 T60,50 T80,20 L100,30" fill="none" stroke="hsl(var(--primary))" strokeWidth="2.5" strokeLinecap="round" />
+                    
+                    {/* Data Points */}
+                    <circle cx="20" cy="60" r="1.5" fill="hsl(var(--background))" stroke="hsl(var(--primary))" strokeWidth="1" />
+                    <circle cx="40" cy="40" r="1.5" fill="hsl(var(--background))" stroke="hsl(var(--primary))" strokeWidth="1" />
+                    <circle cx="60" cy="50" r="1.5" fill="hsl(var(--background))" stroke="hsl(var(--primary))" strokeWidth="1" />
+                    <circle cx="80" cy="20" r="1.5" fill="hsl(var(--background))" stroke="hsl(var(--primary))" strokeWidth="1" />
+                  </svg>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          {/* Infrastructure & Ops */}
-          <div className="space-y-6">
-            <Card className="bg-surface border-border">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xs font-black uppercase tracking-[0.2em]">Objective Directives</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {[
-                  { label: 'Import Leads', href: '/leads', icon: Database },
-                  { label: 'Hyper-Campaigns', href: '/campaigns', icon: Megaphone },
-                  { label: 'Neural Intelligence', href: '/analytics', icon: TrendingUp },
-                  { label: 'Team Protocols', href: '/settings', icon: ShieldCheck },
-                ].map((action, i) => (
-                  <Button 
-                    key={i} 
-                    variant="ghost" 
-                    asChild 
-                    className="w-full justify-start h-12 hover:bg-primary/[0.05] hover:text-primary border border-transparent hover:border-primary/20 transition-all p-3 group"
-                  >
-                    <Link href={action.href}>
-                      <action.icon size={16} className="mr-3 opacity-40 group-hover:opacity-100 transition-opacity" />
-                      <span className="text-[10px] font-black uppercase tracking-widest">{action.label}</span>
-                      <ArrowUpRight size={14} className="ml-auto opacity-0 group-hover:opacity-100 transition-all" />
-                    </Link>
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-surface-2/30 border-border">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-text-muted">Infrastructure Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {[
-                  { name: 'Alpha API Cluster', status: 'SYNCHRONIZED', color: 'bg-primary' },
-                  { name: 'Relational Node 01', status: 'STABLE', color: 'bg-success' },
-                  { name: 'Socket stream', status: 'ACTIVE', color: 'bg-success animate-pulse' },
-                  { name: 'Neural inference', status: 'IDLE', color: 'bg-text-muted' },
-                ].map((svc, i) => (
-                  <div key={i} className="flex items-center justify-between group">
-                    <span className="text-[9px] uppercase font-black tracking-widest text-text-muted group-hover:text-foreground transition-colors">{svc.name}</span>
-                    <div className="flex items-center gap-2">
-                      <div className={cn("h-1 w-1 rounded-full", svc.color)} />
-                      <span className="text-[8px] font-mono text-text-muted italic uppercase tracking-tighter">{svc.status}</span>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+          {/* Action List Widget (Span 4) */}
+          <Card className="xl:col-span-4 xl:row-span-2 bg-surface border-border flex flex-col relative group">
+            <div className="absolute right-4 top-4 hover:bg-surface-2 p-1 rounded z-20 cursor-grab opacity-50 group-hover:opacity-100">
+               <GripHorizontal size={16} className="text-muted-foreground" />
+            </div>
+            <CardHeader className="pb-4 pt-5 px-6 border-b border-border/50">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest text-foreground flex items-center gap-2">
+                 <ShieldCheck size={16} className="text-warning" /> Action Items
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 flex-1 overflow-hidden">
+               <div className="divide-y divide-border/50 h-full overflow-y-auto">
+                 {loading ? (
+                    Array(5).fill(0).map((_, i) => (
+                      <div key={i} className="p-4 flex gap-3 h-20 bg-surface-2/20 animate-pulse border-b border-border/50" />
+                    ))
+                 ) : (
+                    [
+                      { t: 'Review GlobalCorp Contract', desc: 'Overdue by 2 days', time: '10:30 AM', priority: 'High' },
+                      { t: 'Call with Sarah Jenkins', desc: 'Discuss Q3 Proposal', time: '2:00 PM', priority: 'Medium' },
+                      { t: 'Approve Invoice INV-302', desc: 'Net 30 Pending', time: 'Pending', priority: 'Low' },
+                      { t: 'Sync Product Catalog', desc: 'Erp integration check', time: 'Daily', priority: 'Medium' },
+                      { t: 'Update Security Policy', desc: 'Annual review required', time: 'Soon', priority: 'Low' },
+                    ].map((task, i) => (
+                      <div key={i} className="p-4 flex items-start gap-3 hover:bg-primary/[0.02] cursor-pointer transition-colors group/row">
+                        <div className={`mt-0.5 h-3 w-3 rounded-full border-2 ${task.priority === 'High' ? 'border-red-500 bg-red-500/20' : task.priority === 'Medium' ? 'border-warning bg-warning/20' : 'border-border bg-surface-2'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-foreground truncate group-hover/row:text-primary transition-colors">{task.t}</p>
+                          <p className="text-xs text-muted-foreground truncate">{task.desc}</p>
+                        </div>
+                        <span className="text-[10px] font-bold text-muted-foreground bg-surface-2 px-2 py-0.5 rounded uppercase tracking-widest">{task.time}</span>
+                      </div>
+                    ))
+                 )}
+               </div>
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>

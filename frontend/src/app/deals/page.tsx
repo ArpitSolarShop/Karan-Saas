@@ -79,9 +79,15 @@ export default function DealsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-6 mb-6">
         <div>
-          <h1 className="text-4xl font-black tracking-tighter uppercase italic">
-            Deal <span className="text-primary not-italic">Pipeline</span>
-          </h1>
+          <div className="flex items-center gap-3">
+             <h1 className="text-4xl font-black tracking-tighter uppercase italic">
+               Deal <span className="text-primary not-italic">Pipeline</span>
+             </h1>
+             <div className="bg-surface border border-border px-3 py-1.5 rounded-md flex items-center shadow-sm cursor-pointer hover:border-primary/50 transition-colors">
+               <span className="text-xs font-bold text-foreground">Standard Sales</span>
+               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2 text-muted-foreground"><path d="m6 9 6 6 6-6"/></svg>
+             </div>
+          </div>
           <div className="flex items-center gap-4 mt-2">
             <span className="text-xs text-text-muted flex items-center gap-1">
               <TrendingUp size={11} className="text-green-400" /> Pipeline: {fmt(totalPipelineValue)}

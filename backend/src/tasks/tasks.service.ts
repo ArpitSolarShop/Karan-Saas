@@ -24,6 +24,16 @@ export class TasksService {
     });
   }
 
+  async findAll(assignedTo?: string) {
+    return this.prisma.task.findMany({
+      where: assignedTo ? { assignedTo } : undefined,
+      include: {
+        lead: { select: { firstName: true, lastName: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async findByLead(leadId: string) {
     return this.prisma.task.findMany({
       where: { leadId },

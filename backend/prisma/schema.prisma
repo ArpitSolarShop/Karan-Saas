@@ -60,6 +60,49 @@ model Tenant {
   workbooks         Workbook[]
   workflowRules     WorkflowRule[]
 
+  companies         Company[]
+  productCategories ProductCategory[]
+  products          Product[]
+  invoices          Invoice[]
+  payments          Payment[]
+  calendarEvents    CalendarEvent[]
+  emailTemplates    EmailTemplate[]
+  customFields      CustomField[]
+  businessHours     BusinessHours[]
+  numberSequences   NumberSequence[]
+
+  documentFolders   DocumentFolder[]
+  documents         Document[]
+  vendors           Vendor[]
+  salesOrders       SalesOrder[]
+  purchaseOrders    PurchaseOrder[]
+  contracts         Contract[]
+  projects          Project[]
+  pipelines         Pipeline[]
+  closingReasons    ClosingReason[]
+  dedupeRules       DedupeRule[]
+  dedupePairs       DedupePair[]
+  channels          Channel[]
+  savedViews        SavedView[]
+  
+  workflows         Workflow[]
+  
+  webForms          WebForm[]
+  emailCampaigns    EmailCampaign[]
+  
+  gamificationScores GamificationScore[]
+  badges            Badge[]
+  assets            Asset[]
+  assetReservations AssetReservation[]
+  leaveRequests     LeaveRequest[]
+  slaPolicies       SlaPolicy[]
+  contactRelationships ContactRelationship[]
+  events            Event[]
+  eventRegistrations EventRegistration[]
+  surveys           Survey[]
+  announcements     Announcement[]
+  customObjectSchemas CustomObjectSchema[]
+
   @@map("tenants")
 }
 
@@ -116,6 +159,13 @@ model User {
   team              Team?              @relation("TeamMembers", fields: [teamId], references: [id])
   tenant            Tenant             @relation(fields: [tenantId], references: [id])
 
+  calendarEvents    CalendarEvent[]    @relation("UserEvents")
+  savedViews        SavedView[]
+  gamificationScore GamificationScore? @relation("UserGamification")
+  badges            Badge[]            @relation("UserBadges")
+  assetReservations AssetReservation[]
+  leaveRequests     LeaveRequest[]
+
   @@index([tenantId, role])
   @@map("users")
 }
@@ -142,7 +192,7 @@ model Lead {
   phone           String
   phoneSecondary  String?
   email           String?
-  company         String?
+  companyName     String?
   source          String?
   status          LeadStatus       @default(NEW)
   score           Int              @default(0)
@@ -172,6 +222,13 @@ model Lead {
   followups       Followup[]
   agent           User?            @relation("AssignedTo", fields: [assignedTo], references: [id])
   campaign        Campaign?        @relation(fields: [campaignId], references: [id])
+  companyId       String?
+  company         Company?         @relation("CompanyLeads", fields: [companyId], references: [id])
+  leadChannels    LeadChannel[]
+  eventRegistrations EventRegistration[]
+  campaignRecipient CampaignRecipient[]
+  relatedFrom     ContactRelationship[] @relation("ContactRelationA")
+  relatedTo       ContactRelationship[] @relation("ContactRelationB")
   tenant          Tenant           @relation(fields: [tenantId], references: [id])
   notes           Note[]
   pageSubmissions PageSubmission[]
@@ -203,6 +260,9 @@ model Deal {
   attachments       Attachment[]
   lead              Lead         @relation(fields: [leadId], references: [id])
   owner             User         @relation(fields: [ownerId], references: [id])
+  companyId         String?
+  company           Company?     @relation("CompanyDeals", fields: [companyId], references: [id])
+  dealChannels      DealChannel[]
   tenant            Tenant       @relation(fields: [tenantId], references: [id])
   quotes            Quote[]
 
@@ -996,4 +1056,954 @@ enum WaConnectionStatus {
 enum WaMessageDirection {
   INBOUND
   OUTBOUND
+}
+
+
+// --- PHASE 1 CRM MODELS ---
+
+model Company {
+  id          String   @id @default(uuid())
+  name        String
+  industry    String?
+  sector      String?
+  website     String?
+  phone       String?
+  email       String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  zipcode     String?
+  size        String?  // "1-10", "11-50", "51-200", "201-500", "500+"
+  revenue     String?
+  description String?  @db.Text
+  logo        String?
+  linkedinUrl String?
+  taxIdentifier String?
+  contextLinks Json?   
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdBy   String?
+  assignedTo  String?
+  
+  leads       Lead[]      @relation("CompanyLeads")
+  deals       Deal[]      @relation("CompanyDeals")
+  invoices    Invoice[]
+  salesOrders SalesOrder[]
+  contracts   Contract[]
+  projects    Project[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  
+  @@index([tenantId])
+  @@index([name])
+}
+
+model ProductCategory {
+  id          String    @id @default(uuid())
+  name        String
+  description String?   @db.Text
+  parentId    String?
+  parent      ProductCategory? @relation("CategoryTree", fields: [parentId], references: [id])
+  children    ProductCategory[] @relation("CategoryTree")
+  products    Product[]
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  @@index([tenantId])
+}
+
+enum ProductType {
+  GOODS
+  SERVICE
+}
+
+model Product {
+  id           String    @id @default(uuid())
+  name         String
+  sku          String?
+  description  String?   @db.Text
+  price        Float     @default(0)
+  costPrice    Float?    @default(0)
+  currency     String    @default("INR")
+  type         ProductType @default(GOODS)
+  categoryId   String?
+  category     ProductCategory? @relation(fields: [categoryId], references: [id])
+  unitOfMeasure String?  @default("pcs")
+  onSale       Boolean   @default(true)
+  stockQuantity Int?     @default(0)
+  taxRate      Float?    @default(0)
+  images       Json?     
+  
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  
+  invoiceLines InvoiceLine[]
+  quoteLineItems Json? 
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+  
+  @@index([tenantId])
+  @@index([sku])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+model Invoice {
+  id            String   @id @default(uuid())
+  number        String   // auto-generated: INV-2026-00001
+  status        InvoiceStatus @default(DRAFT)
+  issueDate     DateTime @default(now())
+  dueDate       DateTime
+  subtotal      Float    @default(0)
+  taxAmount     Float    @default(0)
+  discountAmount Float   @default(0)
+  total         Float    @default(0)
+  currency      String   @default("INR")
+  notes         String?  @db.Text
+  terms         String?  @db.Text
+  
+  companyId     String?
+  company       Company? @relation(fields: [companyId], references: [id])
+  leadId        String?
+  dealId        String?
+  
+  lineItems     InvoiceLine[]
+  payments      Payment[]
+  
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  createdBy     String
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  
+  @@index([tenantId])
+  @@index([number])
+  @@index([status])
+}
+
+model InvoiceLine {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float   @default(0)
+  taxRate     Float   @default(0)
+  discount    Float   @default(0)
+  total       Float   @default(0)
+  position    Int     @default(0)
+  @@index([invoiceId])
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  CHEQUE
+  ONLINE
+  OTHER
+}
+
+enum PaymentLogStatus {
+  RECEIVED
+  PENDING
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  invoiceId     String?
+  invoice       Invoice? @relation(fields: [invoiceId], references: [id])
+  amount        Float    @default(0)
+  currency      String   @default("INR")
+  paymentDate   DateTime @default(now())
+  paymentMethod PaymentMethod @default(BANK_TRANSFER)
+  status        PaymentLogStatus @default(RECEIVED)
+  reference     String?  
+  notes         String?  @db.Text
+  
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  recordedBy    String
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId])
+  @@index([invoiceId])
+}
+
+enum EventType {
+  MEETING
+  CALL
+  TASK
+  REMINDER
+  EVENT
+  OUT_OF_OFFICE
+}
+
+model CalendarEvent {
+  id            String   @id @default(uuid())
+  title         String
+  description   String?  @db.Text
+  startDatetime DateTime
+  endDatetime   DateTime
+  allDay        Boolean  @default(false)
+  location      String?
+  eventType     EventType @default(MEETING)
+  color         String?  @default("#3b82f6")
+  recurrenceRule String? 
+  
+  userId        String
+  user          User     @relation("UserEvents", fields: [userId], references: [id])
+  
+  attendees     EventAttendee[]
+  
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId])
+  @@index([userId])
+  @@index([startDatetime])
+}
+
+enum AttendeeStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  TENTATIVE
+}
+
+model EventAttendee {
+  id        String @id @default(uuid())
+  eventId   String
+  event     CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String?
+  contactId String?
+  email     String?
+  status    AttendeeStatus @default(PENDING)
+  @@index([eventId])
+}
+
+model EmailTemplate {
+  id        String  @id @default(uuid())
+  name      String
+  subject   String
+  bodyHtml  String  @db.Text
+  bodyText  String? @db.Text
+  category  String?
+  variables Json?   
+  isActive  Boolean @default(true)
+  
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  createdBy String
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([tenantId])
+}
+
+enum CustomFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DECIMAL
+  DATE
+  DATETIME
+  BOOLEAN
+  SELECT
+  MULTISELECT
+  URL
+  EMAIL
+  PHONE
+  FILE
+  JSON
+}
+
+model CustomField {
+  id          String  @id @default(uuid())
+  entityType  String  
+  name        String  
+  label       String  
+  fieldType   CustomFieldType
+  options     Json?   
+  isRequired  Boolean @default(false)
+  defaultValue String?
+  placeholder String?
+  helpText    String?
+  position    Int     @default(0)
+  isActive    Boolean @default(true)
+  
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  values      CustomFieldValue[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@unique([tenantId, entityType, name])
+  @@index([tenantId, entityType])
+}
+
+model CustomFieldValue {
+  id            String @id @default(uuid())
+  customFieldId String
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  entityType    String
+  entityId      String
+  value         Json   
+  @@unique([customFieldId, entityType, entityId])
+  @@index([entityType, entityId])
+}
+
+model BusinessHours {
+  id        String  @id @default(uuid())
+  name      String
+  timezone  String  @default("Asia/Kolkata")
+  isDefault Boolean @default(false)
+  
+  slots     BusinessHourSlot[]
+  holidays  Holiday[]
+  
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model BusinessHourSlot {
+  id              String @id @default(uuid())
+  businessHoursId String
+  businessHours   BusinessHours @relation(fields: [businessHoursId], references: [id], onDelete: Cascade)
+  dayOfWeek       Int    
+  isWorkingDay    Boolean @default(true)
+  openTime        String  
+  closeTime       String  
+  @@unique([businessHoursId, dayOfWeek])
+}
+
+model Holiday {
+  id              String @id @default(uuid())
+  businessHoursId String
+  businessHours   BusinessHours @relation(fields: [businessHoursId], references: [id], onDelete: Cascade)
+  name            String
+  date            DateTime
+  isRecurringAnnually Boolean @default(false)
+}
+
+model NumberSequence {
+  id          String @id @default(uuid())
+  entityType  String 
+  prefix      String 
+  suffix      String? 
+  padLength   Int    @default(5) 
+  currentNumber Int  @default(0)
+  formatPattern String @default("{prefix}-{year}-{number}")
+  
+  tenantId    String
+  tenant      Tenant @relation(fields: [tenantId], references: [id])
+  @@unique([tenantId, entityType])
+}
+
+// --- PHASE 2 CRM MODELS ---
+
+model DocumentFolder {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  parentId  String?
+  parent    DocumentFolder? @relation("FolderTree", fields: [parentId], references: [id])
+  children  DocumentFolder[] @relation("FolderTree")
+  documents Document[]
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model Document {
+  id          String   @id @default(uuid())
+  tenantId    String
+  folderId    String?
+  name        String
+  url         String
+  fileType    String?
+  fileSize    Int?     
+  description String?  @db.Text
+  uploadedBy  String   
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  folder      DocumentFolder? @relation(fields: [folderId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenantId])
+  @@index([folderId])
+}
+
+model Vendor {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  website     String?
+  address     String?  @db.Text
+  taxId       String?
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  purchaseOrders PurchaseOrder[]
+  contracts   Contract[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  @@index([tenantId])
+}
+
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+model SalesOrder {
+  id            String   @id @default(uuid())
+  tenantId      String
+  orderNumber   String   @unique
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  dealId        String?
+  status        OrderStatus @default(DRAFT)
+  orderDate     DateTime @default(now())
+  expectedDate  DateTime?
+  amount        Float    @default(0)
+  items         Json     
+  notes         String?  @db.Text
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId])
+  @@index([companyId])
+}
+
+model PurchaseOrder {
+  id            String   @id @default(uuid())
+  tenantId      String
+  poNumber      String   @unique
+  vendorId      String
+  vendor        Vendor   @relation(fields: [vendorId], references: [id])
+  status        OrderStatus @default(DRAFT)
+  orderDate     DateTime @default(now())
+  expectedDate  DateTime?
+  amount        Float    @default(0)
+  items         Json     
+  notes         String?  @db.Text
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId])
+  @@index([vendorId])
+}
+
+model Contract {
+  id          String   @id @default(uuid())
+  tenantId    String
+  title       String
+  vendorId    String?
+  companyId   String?  
+  startDate   DateTime
+  endDate     DateTime?
+  autoRenew   Boolean  @default(false)
+  value       Float    @default(0)
+  documentUrl String?
+  status      String   @default("DRAFT") // DRAFT, ACTIVE, EXPIRED, TERMINATED
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  vendor      Vendor?  @relation(fields: [vendorId], references: [id])
+  company     Company? @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?  @db.Text
+  status      String   @default("PLANNING") // PLANNING, ACTIVE, ON_HOLD, COMPLETED, CANCELLED
+  startDate   DateTime?
+  dueDate     DateTime?
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id])
+  budget      Float?
+  milestones  ProjectMilestone[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model ProjectMilestone {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  description String?  @db.Text
+  dueDate     DateTime?
+  isCompleted Boolean  @default(false)
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([projectId])
+}
+
+model Pipeline {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  entityType  String   @default("DEAL") // DEAL, LEAD, TICKET
+  isDefault   Boolean  @default(false)
+  stages      PipelineStage[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model PipelineStage {
+  id          String   @id @default(uuid())
+  pipelineId  String
+  name        String
+  color       String   @default("#e2e8f0")
+  probability Int      @default(0)
+  position    Int      @default(0)
+  isWon       Boolean  @default(false)
+  isLost      Boolean  @default(false)
+  pipeline    Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([pipelineId])
+}
+
+model ClosingReason {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  type        String   @default("LOSS") // WON, LOSS
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  @@index([tenantId])
+}
+
+model DedupeRule {
+  id          String   @id @default(uuid())
+  tenantId    String
+  entityType  String
+  name        String
+  fieldRules  Json     
+  threshold   Int      @default(80)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  @@index([tenantId])
+}
+
+model DedupePair {
+  id          String   @id @default(uuid())
+  tenantId    String
+  entityType  String
+  entityAId   String
+  entityBId   String
+  similarityScore Int
+  status      String   @default("PENDING") // PENDING, MERGED, DISMISSED
+  resolvedBy  String?
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  @@index([tenantId, entityType])
+}
+
+model Channel {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  type        String   @default("WEB") // WEB, PHONE, EMAIL, SOCIAL, REFERRAL
+  isActive    Boolean  @default(true)
+  config      Json?
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  leadChannels LeadChannel[]
+  dealChannels DealChannel[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model LeadChannel {
+  id               String   @id @default(uuid())
+  leadId           String
+  channelId        String
+  lead             Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  channel          Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  attributionWeight Float   @default(1.0)
+  createdAt        DateTime @default(now())
+  @@unique([leadId, channelId])
+}
+
+model DealChannel {
+  id               String   @id @default(uuid())
+  dealId           String
+  channelId        String
+  deal             Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  channel          Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  attributionWeight Float   @default(1.0)
+  createdAt        DateTime @default(now())
+  @@unique([dealId, channelId])
+}
+
+model SavedView {
+  id            String   @id @default(uuid())
+  tenantId      String
+  name          String
+  entityType    String
+  filters       Json     @default("[]")
+  columns       Json     @default("[]")
+  sort          Json     @default("[]")
+  isDefault     Boolean  @default(false)
+  isShared      Boolean  @default(false)
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId, entityType])
+}
+
+// --- PHASE 3: AUTOMATIONS & INTEGRATIONS ---
+
+model Workflow {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.Text
+  isActive    Boolean  @default(false)
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdBy   String?
+  
+  triggers    WorkflowTrigger[]
+  conditions  WorkflowCondition[]
+  actions     WorkflowAction[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model WorkflowTrigger {
+  id          String   @id @default(uuid())
+  type        String   // "DEAL_WON", "LEAD_CREATED", "INVOICE_PAID", "SCHEDULED"
+  configuration Json?  // Schedule crons, or specific event filters
+  
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+}
+
+model WorkflowCondition {
+  id          String   @id @default(uuid())
+  field       String   // e.g. "deal.value"
+  operator    String   // "GT", "LT", "EQUALS", "CONTAINS"
+  value       String   // e.g. "10000"
+  
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model WorkflowAction {
+  id          String   @id @default(uuid())
+  type        String   // "SEND_EMAIL", "CALL_WEBHOOK", "CREATE_TASK", "NOTIFY_USER"
+  configuration Json   // Webhook URL, Email Body, User ID
+  order       Int      @default(0)
+  
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+// ApprovalRequest already defined above (line ~814)
+
+model WebForm {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  colorTheme  String   @default("#000000")
+  submitText  String   @default("Submit")
+  redirectUrl String?
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  fields      WebFormField[]
+  
+  createdAt   DateTime @default(now())
+}
+
+model WebFormField {
+  id          String   @id @default(uuid())
+  type        String   // "TEXT", "EMAIL", "PHONE", "CHECKBOX"
+  label       String
+  placeholder String?
+  isRequired  Boolean  @default(false)
+  order       Int      @default(0)
+  
+  webFormId   String
+  webForm     WebForm  @relation(fields: [webFormId], references: [id], onDelete: Cascade)
+}
+
+model EmailCampaign {
+  id          String   @id @default(uuid())
+  name        String
+  subject     String
+  bodyMd      String   @db.Text
+  status      String   @default("DRAFT") // DRAFT, SCHEDULED, SENDING, COMPLETED
+  scheduledFor DateTime?
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  recipients  CampaignRecipient[]
+  
+  createdAt   DateTime @default(now())
+}
+
+model CampaignRecipient {
+  id          String   @id @default(uuid())
+  status      String   @default("QUEUED") // QUEUED, DELIVERED, BOUNCED, OPENED
+  openCount   Int      @default(0)
+  
+  campaignId  String
+  campaign    EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  leadId      String
+  lead        Lead          @relation(fields: [leadId], references: [id])
+  
+  @@index([campaignId, status])
+}
+
+// --- PHASE 4: NICHE EXPANSIONS & GAMIFICATION ---
+
+model GamificationScore {
+  id          String   @id @default(uuid())
+  points      Int      @default(0)
+  level       Int      @default(1)
+  
+  userId      String   @unique
+  user        User     @relation("UserGamification", fields: [userId], references: [id], onDelete: Cascade)
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([tenantId])
+}
+
+model Badge {
+  id          String   @id @default(uuid())
+  name        String   // "Sales Champion", "Fast Responder"
+  iconUrl     String?
+  description String?
+  criteria    Json     // Rules for awarding
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  users       User[]   @relation("UserBadges")
+  
+  createdAt   DateTime @default(now())
+}
+
+model Asset {
+  id          String   @id @default(uuid())
+  name        String   // "Conference Room A", "Company Car 1"
+  type        String   // "ROOM", "VEHICLE", "EQUIPMENT"
+  location    String?
+  status      String   @default("AVAILABLE")
+  metadata    Json?    // specs, capacity
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  reservations AssetReservation[]
+  
+  createdAt   DateTime @default(now())
+}
+
+model AssetReservation {
+  id          String   @id @default(uuid())
+  startTime   DateTime
+  endTime     DateTime
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED, COMPLETED
+  purpose     String?
+  
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model LeaveRequest {
+  id          String   @id @default(uuid())
+  type        String   // "SICK", "VACATION", "PERSONAL"
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?  @db.Text
+  status      String   @default("PENDING")
+  reviewNotes String?
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
+
+model SlaPolicy {
+  id          String   @id @default(uuid())
+  name        String
+  priority    String   // "HIGH", "URGENT"
+  resolutionHours Int
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model ContactRelationship {
+  id            String   @id @default(uuid())
+  contactAId    String
+  contactA      Lead     @relation("ContactRelationA", fields: [contactAId], references: [id])
+  contactBId    String
+  contactB      Lead     @relation("ContactRelationB", fields: [contactBId], references: [id])
+  relationshipType String   // "COLLEAGUE", "MANAGER", "SPOUSE"
+  
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  
+  @@unique([contactAId, contactBId])
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @db.Text
+  startDate   DateTime
+  endDate     DateTime
+  location    String?
+  isVirtual   Boolean  @default(false)
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  registrations EventRegistration[]
+}
+
+model EventRegistration {
+  id          String   @id @default(uuid())
+  status      String   @default("REGISTERED") // "ATTENDED", "NO_SHOW"
+  
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  leadId      String?
+  lead        Lead?    @relation(fields: [leadId], references: [id])
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model Survey {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  questions   SurveyQuestion[]
+  createdAt   DateTime @default(now())
+}
+
+model SurveyQuestion {
+  id          String   @id @default(uuid())
+  type        String   // "TEXT", "MULTIPLE_CHOICE", "RATING"
+  prompt      String
+  options     Json?    // if multiple choice
+  order       Int      @default(0)
+  
+  surveyId    String
+  survey      Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+}
+
+model Announcement {
+  id          String   @id @default(uuid())
+  title       String
+  content     String   @db.Text
+  priority    String   @default("NORMAL")
+  expiresAt   DateTime?
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model CustomObjectSchema {
+  id          String   @id @default(uuid())
+  name        String   // e.g. "Vehicles", "Properties"
+  fields      Json     // Array of field definitions { name, type, required }
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  records     CustomObjectRecord[]
+  createdAt   DateTime @default(now())
+}
+
+model CustomObjectRecord {
+  id          String   @id @default(uuid())
+  data        Json     // The actual values matching the schema
+  
+  schemaId    String
+  schema      CustomObjectSchema @relation(fields: [schemaId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
 }

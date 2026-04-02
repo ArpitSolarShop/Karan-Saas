@@ -1,0 +1,187 @@
+// --- PHASE 4: NICHE EXPANSIONS & GAMIFICATION ---
+
+model GamificationScore {
+  id          String   @id @default(uuid())
+  points      Int      @default(0)
+  level       Int      @default(1)
+  
+  userId      String   @unique
+  user        User     @relation("UserGamification", fields: [userId], references: [id], onDelete: Cascade)
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([tenantId])
+}
+
+model Badge {
+  id          String   @id @default(uuid())
+  name        String   // "Sales Champion", "Fast Responder"
+  iconUrl     String?
+  description String?
+  criteria    Json     // Rules for awarding
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  users       User[]   @relation("UserBadges")
+  
+  createdAt   DateTime @default(now())
+}
+
+model Asset {
+  id          String   @id @default(uuid())
+  name        String   // "Conference Room A", "Company Car 1"
+  type        String   // "ROOM", "VEHICLE", "EQUIPMENT"
+  location    String?
+  status      String   @default("AVAILABLE")
+  metadata    Json?    // specs, capacity
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  reservations AssetReservation[]
+  
+  createdAt   DateTime @default(now())
+}
+
+model AssetReservation {
+  id          String   @id @default(uuid())
+  startTime   DateTime
+  endTime     DateTime
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED, COMPLETED
+  purpose     String?
+  
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model LeaveRequest {
+  id          String   @id @default(uuid())
+  type        String   // "SICK", "VACATION", "PERSONAL"
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?  @db.Text
+  status      String   @default("PENDING")
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
+
+model SlaPolicy {
+  id          String   @id @default(uuid())
+  name        String
+  priority    String   // "HIGH", "URGENT"
+  resolutionHours Int
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model ContactRelationship {
+  id            String   @id @default(uuid())
+  contactAId    String
+  contactA      Lead     @relation("ContactRelationA", fields: [contactAId], references: [id])
+  contactBId    String
+  contactB      Lead     @relation("ContactRelationB", fields: [contactBId], references: [id])
+  relationshipType String   // "COLLEAGUE", "MANAGER", "SPOUSE"
+  
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  
+  @@unique([contactAId, contactBId])
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @db.Text
+  startDate   DateTime
+  endDate     DateTime
+  location    String?
+  isVirtual   Boolean  @default(false)
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  registrations EventRegistration[]
+}
+
+model EventRegistration {
+  id          String   @id @default(uuid())
+  status      String   @default("REGISTERED") // "ATTENDED", "NO_SHOW"
+  
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  leadId      String?
+  lead        Lead?    @relation(fields: [leadId], references: [id])
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model Survey {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  questions   SurveyQuestion[]
+}
+
+model SurveyQuestion {
+  id          String   @id @default(uuid())
+  type        String   // "TEXT", "MULTIPLE_CHOICE", "RATING"
+  prompt      String
+  options     Json?    // if multiple choice
+  
+  surveyId    String
+  survey      Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+}
+
+model Announcement {
+  id          String   @id @default(uuid())
+  title       String
+  content     String   @db.Text
+  priority    String   @default("NORMAL")
+  expiresAt   DateTime?
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model CustomObjectSchema {
+  id          String   @id @default(uuid())
+  name        String   // e.g. "Vehicles", "Properties"
+  fields      Json     // Array of field definitions { name, type, required }
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  records     CustomObjectRecord[]
+}
+
+model CustomObjectRecord {
+  id          String   @id @default(uuid())
+  data        Json     // The actual values matching the schema
+  
+  schemaId    String
+  schema      CustomObjectSchema @relation(fields: [schemaId], references: [id], onDelete: Cascade)
+}

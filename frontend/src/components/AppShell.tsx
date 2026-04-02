@@ -9,12 +9,13 @@ import { useCallStore } from "@/stores/useCallStore";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { InboundCallPopup } from "@/components/InboundCallPopup";
 import { WrapUpTimer } from "@/components/WrapUpTimer";
-import {
-  LogOut, PhoneOff, Mic, MicOff,
-  LayoutDashboard, Users, Megaphone, BarChart2,
-  ClipboardList, Shield, Settings, MessageSquare,
-  CheckSquare, Briefcase, ShieldOff, FileText,
-  BookOpen, ChevronDown, Menu, X, Zap
+import { 
+  Users, Briefcase, Building2, HardDrive, 
+  Settings, LogOut, ChevronLeft, ChevronRight,
+  LayoutDashboard, Box, ScrollText, KanbanSquare, Zap, Target, ArrowRightLeft, MapPin, Search, Plus, Calendar as CalendarIcon, UserCircle2, Car, Database, FormInput, ShieldAlert, Workflow,
+  PhoneOff, Mic, MicOff, Megaphone, BarChart2,
+  ClipboardList, Shield, MessageSquare,
+  CheckSquare, ShieldOff, FileText, BookOpen, ChevronDown, Menu, X, Table
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -25,9 +26,23 @@ const NAV_LINKS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/deals", label: "Deals", icon: Briefcase },
+  { href: "/companies", label: "Companies", icon: Building2 },
+  { href: "/documents", label: "Documents", icon: HardDrive },
+  { href: "/workflows", label: "Automations", icon: Zap },
+  { href: "/projects", label: "Projects", icon: KanbanSquare },
+  { href: "/products", label: "Products", icon: Box },
+  { href: "/invoices", label: "Invoices", icon: ScrollText },
+  { href: "/calendar", label: "Calendar", icon: CalendarIcon },
+  { href: "/hr", label: "HR & Gamification", icon: UserCircle2 },
+  { href: "/assets", label: "Assets & Vehicles", icon: Car },
+  { href: "/custom-objects", label: "Low Code Database", icon: Database },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
+  { href: "/approvals", label: "Approvals", icon: ShieldAlert },
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
+  { href: "/web-forms", label: "Web Forms", icon: FormInput },
   { href: "/marketing", label: "Marketing", icon: Zap },
+  { href: "/chains", label: "Macro Chains", icon: Workflow },
+  { href: "/workbooks", label: "Sheets", icon: Table },
   { href: "/tickets", label: "Support", icon: MessageSquare },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },
   { href: "/supervisor", label: "Supervisor", icon: Shield },

@@ -3,223 +3,131 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/api";
-import api from "@/lib/api";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import {
-  FileText, Settings, Plus, Trash2, PlayCircle, PauseCircle,
-  Copy, ArrowRight, Zap, GitBranch, Bell, Mail
+import { 
+  Zap, Plus, Search, Filter, Play, CheckCircle2, AlertCircle, ToggleLeft, ToggleRight, MoreVertical 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-
-interface WorkflowRule {
-  id: string;
-  name: string;
-  trigger: string;
-  condition?: any;
-  action: string;
-  actionParams: any;
-  isActive: boolean;
-  runCount: number;
-  createdAt: string;
-}
-
-const TRIGGERS = [
-  { value: "LEAD_STATUS_CHANGED", label: "Lead status changes" },
-  { value: "LEAD_CREATED", label: "New lead created" },
-  { value: "CALL_DISPOSITION", label: "Call disposition set" },
-  { value: "DEAL_STAGE_CHANGED", label: "Deal stage changes" },
-  { value: "CALLBACK_DUE", label: "Callback due" },
-  { value: "LEAD_ASSIGNED", label: "Lead assigned to agent" },
-];
-
-const ACTIONS = [
-  { value: "SEND_WHATSAPP", label: "Send WhatsApp message", icon: Mail },
-  { value: "SEND_EMAIL", label: "Send email", icon: Mail },
-  { value: "CREATE_TASK", label: "Create a task", icon: FileText },
-  { value: "CREATE_NOTIFICATION", label: "Send notification", icon: Bell },
-  { value: "UPDATE_LEAD_STATUS", label: "Update lead status", icon: ArrowRight },
-  { value: "ASSIGN_LEAD", label: "Assign lead to agent", icon: ArrowRight },
-];
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function WorkflowsPage() {
-  const { data: rules = [], isLoading, mutate } = useSWR<WorkflowRule[]>("/workflows", fetcher);
-  const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "", trigger: "LEAD_STATUS_CHANGED", action: "SEND_WHATSAPP", message: "", status: "" });
-  const [creating, setCreating] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const { data: workflows, error, isLoading } = useSWR("/workflows", fetcher);
 
-  async function create() {
-    if (!form.name.trim()) return;
-    setCreating(true);
-    try {
-      await api.post("/workflows", {
-        name: form.name,
-        trigger: form.trigger,
-        action: form.action,
-        actionParams: { message: form.message, status: form.status },
-        isActive: true,
-      });
-      mutate();
-      setShowCreate(false);
-      setForm({ name: "", trigger: "LEAD_STATUS_CHANGED", action: "SEND_WHATSAPP", message: "", status: "" });
-    } finally { setCreating(false); }
-  }
-
-  async function toggle(id: string, active: boolean) {
-    await api.patch(`/workflows/${id}`, { isActive: !active });
-    mutate();
-  }
-
-  async function remove(id: string) {
-    await api.delete(`/workflows/${id}`);
-    mutate();
-  }
+  // Mock Workflows
+  const mockWorkflows = [
+    { id: '1', name: 'Auto-Send Invoice on Won', trigger: 'DEAL_WON', action: 'SEND_INVOICE', status: 'ACTIVE', runs: 243, lastRun: '10 mins ago' },
+    { id: '2', name: 'Escalate High-Value Ticket', trigger: 'TICKET_CREATED', action: 'NOTIFY_MANAGER', status: 'ACTIVE', runs: 12, lastRun: '2 days ago' },
+    { id: '3', name: 'Welcome Email Drop', trigger: 'LEAD_CREATED', action: 'SEND_EMAIL', status: 'INACTIVE', runs: 0, lastRun: 'Never' },
+    { id: '4', name: 'Sync SAP ERP via n8n', trigger: 'INVOICE_PAID', action: 'WEBHOOK_POST', status: 'ACTIVE', runs: 8, lastRun: '1 hour ago' },
+  ];
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6 pb-16 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start gap-4 border-b border-border pb-6">
+    <div className="flex-1 space-y-4 p-8 pt-6 relative overflow-hidden bg-background">
+      <div className="absolute top-0 right-0 -m-32 w-96 h-96 bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+
+      <div className="flex items-center justify-between relative z-10">
         <div>
-          <h1 className="text-4xl font-black tracking-tighter uppercase italic">
-            Workflow <span className="text-primary not-italic">Automation</span>
-          </h1>
-          <p className="text-sm text-text-muted mt-1">
-            <Zap size={12} className="inline mr-1 text-primary" />
-            {rules.filter(r => r.isActive).length} active rules · {rules.reduce((s, r) => s + r.runCount, 0)} total executions
+          <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Zap className="h-8 w-8 text-primary" />
+            Automation Engine
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Trigger-Condition-Action (TCA) workflows powered by the global Event Bus.
           </p>
         </div>
-        <Button onClick={() => setShowCreate(!showCreate)} className="bg-primary text-white flex items-center gap-2" size="sm">
-          <Plus size={13} /> New Rule
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button className="bg-primary text-primary-foreground shadow-lg hover:shadow-primary/25 transition-all">
+            <Plus className="mr-2 h-4 w-4" /> New Workflow
+          </Button>
+        </div>
       </div>
 
-      {/* Create form */}
-      {showCreate && (
-        <Card className="bg-surface border-primary/20">
-          <CardContent className="p-5 space-y-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">Create Automation Rule</p>
-
-            <Input
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="Rule name (e.g. 'Send WA on Interested')"
-              className="bg-surface-2 border-border"
-            />
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted block mb-1.5">
-                  <GitBranch size={10} className="inline mr-1" /> When (Trigger)
-                </label>
-                <select
-                  value={form.trigger}
-                  onChange={e => setForm(f => ({ ...f, trigger: e.target.value }))}
-                  className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm"
-                >
-                  {TRIGGERS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted block mb-1.5">
-                  <Zap size={10} className="inline mr-1" /> Then (Action)
-                </label>
-                <select
-                  value={form.action}
-                  onChange={e => setForm(f => ({ ...f, action: e.target.value }))}
-                  className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm"
-                >
-                  {ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
-                </select>
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6 relative z-10">
+        {/* Sidebar Controls */}
+        <Card className="col-span-1 bg-surface border-border">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-sm uppercase tracking-widest font-black text-muted-foreground flex items-center">
+              <Filter className="mr-2 h-4 w-4" /> Filter Views
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search workflows..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 bg-surface-2 border-border"
+              />
             </div>
-
-            {(form.action === "SEND_WHATSAPP" || form.action === "SEND_EMAIL" || form.action === "CREATE_NOTIFICATION") && (
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted block mb-1.5">Message / Content</label>
-                <textarea
-                  value={form.message}
-                  onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
-                  rows={2}
-                  placeholder="Use {{lead.name}}, {{lead.phone}}, {{agent.name}} as variables…"
-                  className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-primary"
-                />
-              </div>
-            )}
-
-            {form.action === "UPDATE_LEAD_STATUS" && (
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted block mb-1.5">New Lead Status</label>
-                <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm">
-                  <option value="">Select status…</option>
-                  {["INTERESTED", "FOLLOW_UP", "CONVERTED", "LOST", "DNC"].map(s => <option key={s}>{s}</option>)}
-                </select>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Button onClick={create} disabled={creating || !form.name.trim()} size="sm" className="bg-primary text-white">
-                {creating ? "Creating…" : "Create Rule"}
-              </Button>
-              <Button onClick={() => setShowCreate(false)} variant="outline" size="sm" className="border-border">Cancel</Button>
+            <div className="space-y-1">
+              {['All Workflows', 'Active', 'Errors', 'Inactive', 'Webhooks Only'].map((l, i) => (
+                <div key={i} className="px-3 py-2 text-sm font-semibold text-muted-foreground rounded hover:bg-primary/10 hover:text-primary cursor-pointer transition-colors">
+                  {l}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
-      )}
 
-      {/* Rules list */}
-      <div className="space-y-3">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 bg-surface rounded-2xl border border-border animate-pulse" />)
-        ) : rules.length === 0 ? (
-          <div className="text-center py-20 text-text-muted">
-            <Zap size={32} className="mx-auto mb-3 opacity-20" />
-            <p className="text-sm font-medium">No automation rules yet</p>
-            <p className="text-xs mt-1">Create your first rule to automate lead follow-ups</p>
-          </div>
-        ) : (
-          rules.map(r => (
-            <Card key={r.id} className={cn("bg-surface border-border transition", !r.isActive && "opacity-50")}>
-              <CardContent className="p-4 flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
-                    r.isActive ? "bg-primary/10 border border-primary/20" : "bg-surface-2 border border-border"
-                  )}>
-                    <Zap size={14} className={r.isActive ? "text-primary" : "text-text-muted"} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm">{r.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-[10px] bg-surface-2 border border-border px-1.5 py-0.5 rounded text-text-muted">
-                        {TRIGGERS.find(t => t.value === r.trigger)?.label || r.trigger}
-                      </span>
-                      <ArrowRight size={9} className="text-text-muted" />
-                      <span className="text-[10px] bg-primary/10 border border-primary/20 text-primary px-1.5 py-0.5 rounded">
-                        {ACTIONS.find(a => a.value === r.action)?.label || r.action}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-text-muted mt-1">{r.runCount} executions · created {format(new Date(r.createdAt), "dd MMM yyyy")}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => toggle(r.id, r.isActive)}
-                    className={cn("p-1.5 rounded-lg border transition",
-                      r.isActive ? "border-green-500/20 text-green-400 hover:bg-green-500/10" : "border-border text-text-muted hover:text-foreground"
-                    )}
-                    title={r.isActive ? "Pause rule" : "Activate rule"}
-                  >
-                    {r.isActive ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
-                  </button>
-                  <button onClick={() => remove(r.id)} className="p-1.5 rounded-lg border border-border text-text-muted hover:text-red-400 transition">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+        {/* Data Table */}
+        <Card className="col-span-1 md:col-span-3 bg-card/50 backdrop-blur-md border-border shadow-sm">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-surface/50">
+                <TableRow className="border-border">
+                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="font-black uppercase text-[10px] tracking-widest text-muted-foreground h-10">Name</TableHead>
+                  <TableHead className="font-black uppercase text-[10px] tracking-widest text-muted-foreground">Trigger</TableHead>
+                  <TableHead className="font-black uppercase text-[10px] tracking-widest text-muted-foreground">Action</TableHead>
+                  <TableHead className="font-black uppercase text-[10px] tracking-widest text-muted-foreground text-right">Metrics</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mockWorkflows.map((wf) => (
+                  <TableRow key={wf.id} className="border-border hover:bg-surface-2 transition-colors group cursor-pointer">
+                    <TableCell className="px-4 py-4">
+                      {wf.status === 'ACTIVE' ? (
+                        <ToggleRight className="text-success h-6 w-6" />
+                      ) : (
+                        <ToggleLeft className="text-muted-foreground h-6 w-6" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-bold text-sm text-foreground">{wf.name}</span>
+                      <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
+                        {wf.status === 'ACTIVE' ? <CheckCircle2 className="h-3 w-3 text-success" /> : <AlertCircle className="h-3 w-3 text-warning" />}
+                        Last run: {wf.lastRun}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[9px] uppercase tracking-widest font-mono bg-primary/5 text-primary border-primary/20">
+                        {wf.trigger}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[9px] uppercase tracking-widest font-mono bg-surface-2 text-foreground border-border">
+                        {wf.action}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className="text-xs font-bold text-muted-foreground">{wf.runs} runs</span>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
+                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

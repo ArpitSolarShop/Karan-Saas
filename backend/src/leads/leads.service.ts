@@ -259,7 +259,7 @@ export class LeadsService {
         l.name || `${l.firstName} ${l.lastName || ''}`.trim(),
         l.phone,
         l.email || '',
-        l.company || '',
+        l.companyName || '',
         l.status,
         l.source || '',
         l.score,

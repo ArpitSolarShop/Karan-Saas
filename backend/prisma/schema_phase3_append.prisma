@@ -1,0 +1,52 @@
+// --- PHASE 3: AUTOMATIONS & INTEGRATIONS ---
+
+model Workflow {
+  id          String   @id @default(uuid())
+  name        String
+  description String?  @db.Text
+  isActive    Boolean  @default(false)
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdBy   String?
+  
+  triggers    WorkflowTrigger[]
+  conditions  WorkflowCondition[]
+  actions     WorkflowAction[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model WorkflowTrigger {
+  id          String   @id @default(uuid())
+  type        String   // "DEAL_WON", "LEAD_CREATED", "INVOICE_PAID", "SCHEDULED"
+  configuration Json?  // Schedule crons, or specific event filters
+  
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+}
+
+model WorkflowCondition {
+  id          String   @id @default(uuid())
+  field       String   // e.g. "deal.value"
+  operator    String   // "GT", "LT", "EQUALS", "CONTAINS"
+  value       String   // e.g. "10000"
+  
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model WorkflowAction {
+  id          String   @id @default(uuid())
+  type        String   // "SEND_EMAIL", "CALL_WEBHOOK", "CREATE_TASK", "NOTIFY_USER"
+  configuration Json   // Webhook URL, Email Body, User ID
+  order       Int      @default(0)
+  
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}

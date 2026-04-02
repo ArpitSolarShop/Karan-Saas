@@ -1,0 +1,270 @@
+// --- PHASE 2 CRM MODELS ---
+
+model DocumentFolder {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  parentId  String?
+  parent    DocumentFolder? @relation("FolderTree", fields: [parentId], references: [id])
+  children  DocumentFolder[] @relation("FolderTree")
+  documents Document[]
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model Document {
+  id          String   @id @default(uuid())
+  tenantId    String
+  folderId    String?
+  name        String
+  url         String
+  fileType    String?
+  fileSize    Int?     
+  description String?  @db.Text
+  uploadedBy  String   
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  folder      DocumentFolder? @relation(fields: [folderId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenantId])
+  @@index([folderId])
+}
+
+model Vendor {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  website     String?
+  address     String?  @db.Text
+  taxId       String?
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  purchaseOrders PurchaseOrder[]
+  contracts   Contract[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  @@index([tenantId])
+}
+
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+model SalesOrder {
+  id            String   @id @default(uuid())
+  tenantId      String
+  orderNumber   String   @unique
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  dealId        String?
+  status        OrderStatus @default(DRAFT)
+  orderDate     DateTime @default(now())
+  expectedDate  DateTime?
+  amount        Float    @default(0)
+  items         Json     
+  notes         String?  @db.Text
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId])
+  @@index([companyId])
+}
+
+model PurchaseOrder {
+  id            String   @id @default(uuid())
+  tenantId      String
+  poNumber      String   @unique
+  vendorId      String
+  vendor        Vendor   @relation(fields: [vendorId], references: [id])
+  status        OrderStatus @default(DRAFT)
+  orderDate     DateTime @default(now())
+  expectedDate  DateTime?
+  amount        Float    @default(0)
+  items         Json     
+  notes         String?  @db.Text
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId])
+  @@index([vendorId])
+}
+
+model Contract {
+  id          String   @id @default(uuid())
+  tenantId    String
+  title       String
+  vendorId    String?
+  companyId   String?  
+  startDate   DateTime
+  endDate     DateTime?
+  autoRenew   Boolean  @default(false)
+  value       Float    @default(0)
+  documentUrl String?
+  status      String   @default("DRAFT") // DRAFT, ACTIVE, EXPIRED, TERMINATED
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  vendor      Vendor?  @relation(fields: [vendorId], references: [id])
+  company     Company? @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?  @db.Text
+  status      String   @default("PLANNING") // PLANNING, ACTIVE, ON_HOLD, COMPLETED, CANCELLED
+  startDate   DateTime?
+  dueDate     DateTime?
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id])
+  budget      Float?
+  milestones  ProjectMilestone[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model ProjectMilestone {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String
+  description String?  @db.Text
+  dueDate     DateTime?
+  isCompleted Boolean  @default(false)
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([projectId])
+}
+
+model Pipeline {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  entityType  String   @default("DEAL") // DEAL, LEAD, TICKET
+  isDefault   Boolean  @default(false)
+  stages      PipelineStage[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model PipelineStage {
+  id          String   @id @default(uuid())
+  pipelineId  String
+  name        String
+  color       String   @default("#e2e8f0")
+  probability Int      @default(0)
+  position    Int      @default(0)
+  isWon       Boolean  @default(false)
+  isLost      Boolean  @default(false)
+  pipeline    Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([pipelineId])
+}
+
+model ClosingReason {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  type        String   @default("LOSS") // WON, LOSS
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  @@index([tenantId])
+}
+
+model DedupeRule {
+  id          String   @id @default(uuid())
+  tenantId    String
+  entityType  String
+  name        String
+  fieldRules  Json     
+  threshold   Int      @default(80)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  @@index([tenantId])
+}
+
+model DedupePair {
+  id          String   @id @default(uuid())
+  tenantId    String
+  entityType  String
+  entityAId   String
+  entityBId   String
+  similarityScore Int
+  status      String   @default("PENDING") // PENDING, MERGED, DISMISSED
+  resolvedBy  String?
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  @@index([tenantId, entityType])
+}
+
+model Channel {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  type        String   @default("WEB") // WEB, PHONE, EMAIL, SOCIAL, REFERRAL
+  isActive    Boolean  @default(true)
+  config      Json?
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  leadChannels LeadChannel[]
+  dealChannels DealChannel[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenantId])
+}
+
+model LeadChannel {
+  id               String   @id @default(uuid())
+  leadId           String
+  channelId        String
+  lead             Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  channel          Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  attributionWeight Float   @default(1.0)
+  createdAt        DateTime @default(now())
+  @@unique([leadId, channelId])
+}
+
+model DealChannel {
+  id               String   @id @default(uuid())
+  dealId           String
+  channelId        String
+  deal             Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  channel          Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  attributionWeight Float   @default(1.0)
+  createdAt        DateTime @default(now())
+  @@unique([dealId, channelId])
+}
+
+model SavedView {
+  id            String   @id @default(uuid())
+  tenantId      String
+  name          String
+  entityType    String
+  filters       Json     @default("[]")
+  columns       Json     @default("[]")
+  sort          Json     @default("[]")
+  isDefault     Boolean  @default(false)
+  isShared      Boolean  @default(false)
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId, entityType])
+}

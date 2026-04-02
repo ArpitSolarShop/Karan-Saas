@@ -1,4 +1,4 @@
-﻿import { UseGuards } from '@nestjs/common';
+import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
   Controller,
@@ -19,6 +19,11 @@ export class TasksController {
   @Post()
   create(@Body() body: any) {
     return this.tasksService.create(body);
+  }
+
+  @Get()
+  findAll() {
+    return this.tasksService.findAll();
   }
 
   @Get('lead/:leadId')

@@ -1,0 +1,81 @@
+// --- PHASE 3.5: TRAILING AUTOMATIONS ---
+
+model ApprovalRequest {
+  id          String   @id @default(uuid())
+  entityType  String   // "DEAL", "LEAVE_REQUEST", "CONTRACT"
+  entityId    String
+  title       String
+  requestedBy String
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  comments    String?  @db.Text
+  
+  approverId  String
+  approver    User     @relation(fields: [approverId], references: [id])
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([tenantId, approverId, status])
+}
+
+model WebForm {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  colorTheme  String   @default("#000000")
+  submitText  String   @default("Submit")
+  redirectUrl String?
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  fields      WebFormField[]
+  
+  createdAt   DateTime @default(now())
+}
+
+model WebFormField {
+  id          String   @id @default(uuid())
+  type        String   // "TEXT", "EMAIL", "PHONE", "CHECKBOX"
+  label       String
+  placeholder String?
+  isRequired  Boolean  @default(false)
+  order       Int      @default(0)
+  
+  webFormId   String
+  webForm     WebForm  @relation(fields: [webFormId], references: [id], onDelete: Cascade)
+}
+
+model EmailCampaign {
+  id          String   @id @default(uuid())
+  name        String
+  subject     String
+  bodyMd      String   @db.Text
+  status      String   @default("DRAFT") // DRAFT, SCHEDULED, SENDING, COMPLETED
+  scheduledFor DateTime?
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  recipients  CampaignRecipient[]
+  
+  createdAt   DateTime @default(now())
+}
+
+model CampaignRecipient {
+  id          String   @id @default(uuid())
+  status      String   @default("QUEUED") // QUEUED, DELIVERED, BOUNCED, OPENED
+  openCount   Int      @default(0)
+  
+  campaignId  String
+  campaign    EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  leadId      String
+  lead        Lead          @relation(fields: [leadId], references: [id])
+  
+  @@index([campaignId, status])
+}

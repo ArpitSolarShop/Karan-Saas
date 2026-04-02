@@ -5,11 +5,18 @@ import { PrismaService } from '../prisma/prisma.service';
 export class DealsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAllByLead(leadId: string) {
+  async create(data: any) {
+    return this.prisma.deal.create({ data });
+  }
+
+  async findAll(tenantId?: string) {
     return this.prisma.deal.findMany({
-      where: { leadId },
-      include: { owner: { select: { firstName: true, lastName: true } } },
+      where: tenantId ? { tenantId } : undefined,
       orderBy: { createdAt: 'desc' },
+      include: {
+        owner: { select: { firstName: true, lastName: true } },
+        lead: { select: { firstName: true, name: true } },
+      },
     });
   }
 
@@ -17,38 +24,19 @@ export class DealsService {
     const deal = await this.prisma.deal.findUnique({
       where: { id },
       include: {
-        lead: true,
         owner: { select: { firstName: true, lastName: true } },
-        quotes: true,
-        attachments: true,
+        lead: true,
       },
     });
     if (!deal) throw new NotFoundException('Deal not found');
     return deal;
   }
 
-  async create(data: any) {
-    return this.prisma.deal.create({
-      data: {
-        tenantId: data.tenantId,
-        leadId: data.leadId,
-        ownerId: data.ownerId,
-        name: data.name,
-        value: data.value || 0,
-        currency: data.currency || 'INR',
-        stage: data.stage || 'PROSPECTING',
-        probability: data.probability || 10,
-        expectedCloseDate: data.expectedCloseDate
-          ? new Date(data.expectedCloseDate)
-          : null,
-      },
-    });
+  async update(id: string, data: any) {
+    return this.prisma.deal.update({ where: { id }, data });
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.deal.update({
-      where: { id },
-      data,
-    });
+  async remove(id: string) {
+    return this.prisma.deal.delete({ where: { id } });
   }
 }

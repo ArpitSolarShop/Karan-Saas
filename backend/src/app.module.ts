@@ -37,10 +37,31 @@ import { ApprovalsModule } from './approvals/approvals.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { BullModule as BullMQModule } from '@nestjs/bullmq';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
+import { CompaniesModule } from './companies/companies.module';
+import { ProductsModule } from './products/products.module';
+import { InvoicesModule } from './invoices/invoices.module';
+import { CalendarModule } from './calendar/calendar.module';
+import { DocumentsModule } from './documents/documents.module';
+import { ProjectsModule } from './projects/projects.module';
+import { VendorsModule } from './vendors/vendors.module';
+import { SalesOrdersModule } from './sales-orders/sales-orders.module';
+import { EventsModule } from './events/events.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
+
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { RazorpayModule } from './integrations/razorpay/razorpay.module';
+import { EmailSyncModule } from './integrations/email-sync/email-sync.module';
+import { GamificationModule } from './gamification/gamification.module';
+import { HrLeavesModule } from './hr-leaves/hr-leaves.module';
+import { AssetsModule } from './assets/assets.module';
+import { SurveysModule } from './surveys/surveys.module';
+import { CustomObjectsModule } from './custom-objects/custom-objects.module';
 
 @Module({
   imports: [
     PrometheusModule.register(),
+    EventEmitterModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     BullMQModule.forRoot({
@@ -80,6 +101,24 @@ import { PrometheusModule } from '@willsoto/nestjs-prometheus';
     MarketingModule,
     ApprovalsModule,
     WhatsappModule,
+    CompaniesModule,
+    ProductsModule,
+    InvoicesModule,
+    CalendarModule,
+    DocumentsModule,
+    ProjectsModule,
+    VendorsModule,
+    SalesOrdersModule,
+    EventsModule,
+    AuditLogsModule,
+    WebhooksModule,
+    RazorpayModule,
+    EmailSyncModule,
+    GamificationModule,
+    HrLeavesModule,
+    AssetsModule,
+    SurveysModule,
+    CustomObjectsModule,
   ],
   controllers: [AppController, ScriptsController],
   providers: [AppService, PrismaService, ScriptsService],
