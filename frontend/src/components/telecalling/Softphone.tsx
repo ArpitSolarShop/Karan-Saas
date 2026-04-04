@@ -28,7 +28,11 @@ export function Softphone() {
   const [speakerMuted, setSpeakerMuted] = useState(false);
 
   const { call, hangup, mute, state } = useSoftphone(sipConfig);
-  const { activeCall, isMuted: callMuted } = useCallStore((s) => s.activeCall ? { activeCall: s.activeCall, isMuted: s.activeCall.isMuted } : { activeCall: null, isMuted: false });
+  const { activeCall, isMuted: callMuted, tickDuration } = useCallStore((s) => ({
+    activeCall: s.activeCall,
+    isMuted: s.activeCall ? s.activeCall.isMuted : false,
+    tickDuration: s.tickDuration
+  }));
 
   // Fetch SIP config from backend on mount
   useEffect(() => {
@@ -38,6 +42,17 @@ export function Softphone() {
       .catch(() => setSipConfig(null))
       .finally(() => setLoadingConfig(false));
   }, [user?.id]);
+
+  // Call duration timer
+  useEffect(() => {
+    let interval: any;
+    if (activeCall?.status === 'connected') {
+      interval = setInterval(() => {
+        tickDuration();
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [activeCall?.status, tickDuration]);
 
   // Call duration display
   const durationSeconds = activeCall?.durationSeconds ?? 0;

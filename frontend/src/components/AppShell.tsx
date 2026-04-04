@@ -15,7 +15,7 @@ import {
   LayoutDashboard, Box, ScrollText, KanbanSquare, Zap, Target, ArrowRightLeft, MapPin, Search, Plus, Calendar as CalendarIcon, UserCircle2, Car, Database, FormInput, ShieldAlert, Workflow,
   PhoneOff, Mic, MicOff, Megaphone, BarChart2,
   ClipboardList, Shield, MessageSquare,
-  CheckSquare, ShieldOff, FileText, BookOpen, ChevronDown, Menu, X, Table
+  CheckSquare, ShieldOff, FileText, BookOpen, ChevronDown, Menu, X, Table, TrendingUp
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -24,7 +24,10 @@ const BYPASS_PATHS = ["/login", "/unauthorized"];
 
 const NAV_LINKS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/inbox", label: "Inbox", icon: MessageSquare },
   { href: "/leads", label: "Leads", icon: Users },
+  { href: "/analytics/sentiment", label: "AI Sentiment", icon: TrendingUp },
+  { href: "/workflows/builder", label: "Automations", icon: Zap },
   { href: "/deals", label: "Deals", icon: Briefcase },
   { href: "/companies", label: "Companies", icon: Building2 },
   { href: "/documents", label: "Documents", icon: HardDrive },
