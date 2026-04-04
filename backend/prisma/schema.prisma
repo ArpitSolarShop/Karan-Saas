@@ -6,6 +6,29 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+enum ColumnType {
+  TEXT
+  NUMBER
+  DATE
+  DATETIME
+  SELECT
+  MULTISELECT
+  BOOLEAN
+  EMAIL
+  PHONE
+  URL
+  PERCENT
+  CURRENCY
+  JSON
+  COLOR
+  RATING
+  FILE
+  FORMULA
+  RELATION
+  ATTACHMENT
+  USER
+}
+
 
 model WorkflowRule {
   id           String    @id @default(uuid())
@@ -67,7 +90,6 @@ model Tenant {
   payments          Payment[]
   calendarEvents    CalendarEvent[]
   emailTemplates    EmailTemplate[]
-  customFields      CustomField[]
   businessHours     BusinessHours[]
   numberSequences   NumberSequence[]
 
@@ -90,8 +112,10 @@ model Tenant {
   webForms          WebForm[]
   emailCampaigns    EmailCampaign[]
   
-  gamificationScores GamificationScore[]
   badges            Badge[]
+  customFieldDefinitions CustomFieldDefinition[]
+  reports           Report[]
+  
   assets            Asset[]
   assetReservations AssetReservation[]
   leaveRequests     LeaveRequest[]
@@ -102,6 +126,10 @@ model Tenant {
   surveys           Survey[]
   announcements     Announcement[]
   customObjectSchemas CustomObjectSchema[]
+  
+  inboxes           OmniInbox[]
+  conversations     OmniConversation[]
+  omniMessages      OmniMessage[]
 
   @@map("tenants")
 }
@@ -140,10 +168,19 @@ model User {
   calls             Call[]             @relation("AgentCalls")
   campaignAgents    CampaignAgent[]
   createdCampaigns  Campaign[]         @relation("CampaignCreator")
+  
+  // Wave 5: Gamification
+  totalPoints       Int                @default(0)
+  level             Int                @default(1)
+  currentStreak     Int                @default(0)
+  points            UserPoint[]
+  badges            UserBadge[]
+  
   deals             Deal[]
   followups         Followup[]
   knowledgeArticles KnowledgeArticle[]
   importedLists     LeadList[]         @relation("ListImporter")
+  omniMessages      OmniMessage[]
   assignedLeads     Lead[]             @relation("AssignedTo")
   notes             Note[]
   notifications     Notification[]
@@ -161,13 +198,60 @@ model User {
 
   calendarEvents    CalendarEvent[]    @relation("UserEvents")
   savedViews        SavedView[]
-  gamificationScore GamificationScore? @relation("UserGamification")
-  badges            Badge[]            @relation("UserBadges")
   assetReservations AssetReservation[]
   leaveRequests     LeaveRequest[]
+  assignedConversations OmniConversation[] @relation("ConversationAssignee")
 
   @@index([tenantId, role])
   @@map("users")
+}
+
+// ── PHASE 1 CRM MODELS ──
+
+model Company {
+  id          String   @id @default(uuid())
+  name        String
+  industry    String?
+  // ... (keep attributes as they are, but ensuring customFields is added)
+  // Re-writing Company since I need to modify it
+  sector      String?
+  website     String?
+  phone       String?
+  email       String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  zipcode     String?
+  size        String?
+  revenue     String?
+  description String?  @db.Text
+  logo        String?
+  linkedinUrl String?
+  taxIdentifier String?
+  contextLinks Json?   
+  
+  customFields Json    @default("{}")
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdBy   String?
+  assignedTo  String?
+  
+  leads       Lead[]      @relation("CompanyLeads")
+  deals       Deal[]      @relation("CompanyDeals")
+  invoices    Invoice[]
+  salesOrders SalesOrder[]
+  contracts   Contract[]
+  projects    Project[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  
+  @@index([tenantId])
+  @@index([name])
+  @@map("companies")
 }
 
 model Team {
@@ -235,6 +319,8 @@ model Lead {
   quotes          Quote[]
   tasks           Task[]
   tickets         Ticket[]
+  conversations   OmniConversation[]
+  omniMessages     OmniMessage[]
 
   @@unique([phone, campaignId])
   @@index([tenantId, assignedTo])
@@ -575,16 +661,16 @@ model AuditLog {
   id         String   @id @default(uuid())
   tenantId   String
   userId     String?
-  entityType String
-  entityId   String
   action     String
-  oldValues  Json?
-  newValues  Json?
-  ipAddress  String?
+  entityType String
+  entityId   String?
+  details    Json?
   createdAt  DateTime @default(now())
+
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
   user       User?    @relation(fields: [userId], references: [id])
 
+  @@index([tenantId])
   @@index([entityType, entityId])
   @@map("audit_logs")
 }
@@ -903,6 +989,72 @@ model WhatsAppContact {
   @@map("whatsapp_contacts")
 }
 
+model OmniInbox {
+  id            String             @id @default(cuid())
+  tenantId      String
+  name          String
+  channelType   String             // "WHATSAPP_CLOUD" | "WHATSAPP_BAILEYS" | "EMAIL" | "SMS"
+  status        String             @default("ACTIVE")
+  config        Json               @default("{}")
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  conversations OmniConversation[]
+  messages      OmniMessage[]
+
+  @@map("omni_inboxes")
+}
+
+model OmniConversation {
+  id            String        @id @default(cuid())
+  tenantId      String
+  inboxId       String
+  contactId     String?       // Links to Lead
+  assigneeId    String?       // Links to User
+  status        String        @default("OPEN") // "OPEN" | "PENDING" | "RESOLVED"
+  subject       String?
+  lastMessageAt DateTime      @default(now())
+  metadata      Json          @default("{}")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  inbox         OmniInbox     @relation(fields: [inboxId], references: [id])
+  contact       Lead?         @relation(fields: [contactId], references: [id])
+  assignee      User?         @relation("ConversationAssignee", fields: [assigneeId], references: [id])
+  messages      OmniMessage[]
+
+  @@index([tenantId, status])
+  @@index([inboxId])
+  @@map("omni_conversations")
+}
+
+model OmniMessage {
+  id             String           @id @default(cuid())
+  tenantId       String
+  conversationId String
+  inboxId        String
+  contactId      String?
+  senderId       String?          // User ID if sent by agent
+  direction      String           // "INBOUND" | "OUTBOUND"
+  content        String?          @db.Text
+  contentType    String           @default("text") // "text" | "image" | "audio" | "document"
+  attachments    Json             @default("[]")
+  metadata       Json             @default("{}")
+  status         String           @default("SENT") // "SENT" | "DELIVERED" | "READ" | "FAILED"
+  externalId     String?          @unique // ID from provider (WaMsgId, etc.)
+  timestamp      DateTime         @default(now())
+
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  conversation   OmniConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  inbox          OmniInbox        @relation(fields: [inboxId], references: [id])
+  contact        Lead?            @relation(fields: [contactId], references: [id])
+  sender         User?            @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId, timestamp])
+  @@map("omni_messages")
+}
+
 model WhatsAppTemplate {
   id         String           @id @default(cuid())
   instanceId String
@@ -1008,18 +1160,6 @@ enum TenantPlan {
   ENTERPRISE
 }
 
-enum ColumnType {
-  TEXT
-  NUMBER
-  DATE
-  BOOLEAN
-  SELECT
-  MULTISELECT
-  FORMULA
-  RELATION
-  ATTACHMENT
-  USER
-}
 
 enum TicketStatus {
   OPEN
@@ -1060,47 +1200,6 @@ enum WaMessageDirection {
 
 
 // --- PHASE 1 CRM MODELS ---
-
-model Company {
-  id          String   @id @default(uuid())
-  name        String
-  industry    String?
-  sector      String?
-  website     String?
-  phone       String?
-  email       String?
-  address     String?
-  city        String?
-  state       String?
-  country     String?
-  zipcode     String?
-  size        String?  // "1-10", "11-50", "51-200", "201-500", "500+"
-  revenue     String?
-  description String?  @db.Text
-  logo        String?
-  linkedinUrl String?
-  taxIdentifier String?
-  contextLinks Json?   
-  
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  createdBy   String?
-  assignedTo  String?
-  
-  leads       Lead[]      @relation("CompanyLeads")
-  deals       Deal[]      @relation("CompanyDeals")
-  invoices    Invoice[]
-  salesOrders SalesOrder[]
-  contracts   Contract[]
-  projects    Project[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
-  
-  @@index([tenantId])
-  @@index([name])
-}
 
 model ProductCategory {
   id          String    @id @default(uuid())
@@ -1328,57 +1427,6 @@ model EmailTemplate {
   @@index([tenantId])
 }
 
-enum CustomFieldType {
-  TEXT
-  TEXTAREA
-  NUMBER
-  DECIMAL
-  DATE
-  DATETIME
-  BOOLEAN
-  SELECT
-  MULTISELECT
-  URL
-  EMAIL
-  PHONE
-  FILE
-  JSON
-}
-
-model CustomField {
-  id          String  @id @default(uuid())
-  entityType  String  
-  name        String  
-  label       String  
-  fieldType   CustomFieldType
-  options     Json?   
-  isRequired  Boolean @default(false)
-  defaultValue String?
-  placeholder String?
-  helpText    String?
-  position    Int     @default(0)
-  isActive    Boolean @default(true)
-  
-  tenantId    String
-  tenant      Tenant  @relation(fields: [tenantId], references: [id])
-  values      CustomFieldValue[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  @@unique([tenantId, entityType, name])
-  @@index([tenantId, entityType])
-}
-
-model CustomFieldValue {
-  id            String @id @default(uuid())
-  customFieldId String
-  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
-  entityType    String
-  entityId      String
-  value         Json   
-  @@unique([customFieldId, entityType, entityId])
-  @@index([entityType, entityId])
-}
 
 model BusinessHours {
   id        String  @id @default(uuid())
@@ -1391,43 +1439,59 @@ model BusinessHours {
   
   tenantId  String
   tenant    Tenant  @relation(fields: [tenantId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  @@index([tenantId])
+
+  @@map("business_hours")
 }
 
 model BusinessHourSlot {
-  id              String @id @default(uuid())
+  id              String        @id @default(uuid())
   businessHoursId String
   businessHours   BusinessHours @relation(fields: [businessHoursId], references: [id], onDelete: Cascade)
-  dayOfWeek       Int    
-  isWorkingDay    Boolean @default(true)
-  openTime        String  
-  closeTime       String  
-  @@unique([businessHoursId, dayOfWeek])
+  dayOfWeek       DayOfWeek
+  openTime        String        // HH:mm
+  closeTime       String        // HH:mm
+  isClosed        Boolean       @default(false)
+
+  @@map("business_hour_slots")
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
 }
 
 model Holiday {
-  id              String @id @default(uuid())
+  id              String   @id @default(uuid())
   businessHoursId String
   businessHours   BusinessHours @relation(fields: [businessHoursId], references: [id], onDelete: Cascade)
   name            String
   date            DateTime
-  isRecurringAnnually Boolean @default(false)
+  isRecurring     Boolean  @default(false)
+
+  @@unique([businessHoursId, date])
+  @@map("holidays")
 }
 
 model NumberSequence {
-  id          String @id @default(uuid())
-  entityType  String 
-  prefix      String 
-  suffix      String? 
-  padLength   Int    @default(5) 
-  currentNumber Int  @default(0)
-  formatPattern String @default("{prefix}-{year}-{number}")
-  
+  id          String   @id @default(uuid())
   tenantId    String
-  tenant      Tenant @relation(fields: [tenantId], references: [id])
+  entityType  String   // "INVOICE", "ORDER", "QUOTE", etc.
+  prefix      String
+  suffix      String?
+  nextNumber  Int      @default(1)
+  padding     Int      @default(5) // INV-00001
+  isActive    Boolean  @default(true)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   @@unique([tenantId, entityType])
+  @@map("number_sequences")
 }
 
 // --- PHASE 2 CRM MODELS ---
@@ -1815,39 +1879,7 @@ model CampaignRecipient {
   @@index([campaignId, status])
 }
 
-// --- PHASE 4: NICHE EXPANSIONS & GAMIFICATION ---
-
-model GamificationScore {
-  id          String   @id @default(uuid())
-  points      Int      @default(0)
-  level       Int      @default(1)
-  
-  userId      String   @unique
-  user        User     @relation("UserGamification", fields: [userId], references: [id], onDelete: Cascade)
-  
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@index([tenantId])
-}
-
-model Badge {
-  id          String   @id @default(uuid())
-  name        String   // "Sales Champion", "Fast Responder"
-  iconUrl     String?
-  description String?
-  criteria    Json     // Rules for awarding
-  
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  
-  users       User[]   @relation("UserBadges")
-  
-  createdAt   DateTime @default(now())
-}
+// --- PHASE 4: NICHE EXPANSIONS ---
 
 model Asset {
   id          String   @id @default(uuid())
@@ -2006,4 +2038,85 @@ model CustomObjectRecord {
   schemaId    String
   schema      CustomObjectSchema @relation(fields: [schemaId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
+}
+
+// ── Wave 5: Gamification Engine ─────────────────────────────────────────────
+
+model UserPoint {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points    Int
+  reason    String   // e.g. "LEAD_CREATED", "CALL_COMPLETED"
+  metadata  Json?    // e.g. { leadId: "..." }
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("user_points")
+}
+
+model Badge {
+  id          String      @id @default(uuid())
+  tenantId    String?     // Nullable if global, or required if tenant-specific
+  tenant      Tenant?     @relation(fields: [tenantId], references: [id])
+  name        String
+  description String
+  icon        String      // Lucide icon name or URL
+  criteria    Json        // e.g. { type: "CALL_COUNT", value: 100 }
+  points      Int         @default(0)
+  userBadges  UserBadge[]
+
+  @@unique([tenantId, name])
+  @@map("badges")
+}
+
+model UserBadge {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId   String
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt  DateTime @default(now())
+
+  @@unique([userId, badgeId])
+  @@map("user_badges")
+}
+
+// ── Wave 5: Dynamic Schema (Custom Fields) ──────────────────────────────────
+
+model CustomFieldDefinition {
+  id          String     @id @default(uuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  entityType  String     // "LEAD", "COMPANY", "DEAL", "PRODUCT"
+  name        String     // Internal name (snake_case)
+  label       String     // Display label
+  type        ColumnType @default(TEXT)
+  options     Json?      // For SELECT/MULTISELECT: ["Option 1", "Option 2"]
+  isRequired  Boolean    @default(false)
+  defaultValue String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([tenantId, entityType, name])
+  @@map("custom_field_definitions")
+}
+
+// ── Wave 5: Advanced Reporting ──────────────────────────────────────────────
+
+model Report {
+  id          String     @id @default(uuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  name        String
+  description String?
+  entityType  String
+  config      Json       // { columns: [], filters: [], chartType: "..." }
+  isPublic    Boolean    @default(false)
+  createdBy   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("reports")
 }

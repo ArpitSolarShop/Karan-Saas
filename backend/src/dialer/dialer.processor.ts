@@ -66,7 +66,24 @@ export class DialerProcessor extends WorkerHost {
       }
 
       case 'progressive_dial': {
-        const { leadId, agentId, campaignId, tenantId } = job.data;
+        let { leadId, agentId, campaignId, tenantId } = job.data;
+
+        // If no agentId provided (queued without assignment), find one now
+        if (!agentId) {
+          const availableAgent = await this.prisma.user.findFirst({
+            where: {
+              tenantId,
+              agentStatus: 'AVAILABLE',
+              campaignAgents: { some: { campaignId } }
+            }
+          });
+          if (!availableAgent) {
+            // Re-queue or fail? For now, we'll log and return
+            this.logger.warn(`No available agents for progressive dial job ${job.id}`);
+            return;
+          }
+          agentId = availableAgent.id;
+        }
 
         const lead = await this.prisma.lead.findUnique({
           where: { id: leadId },
@@ -95,7 +112,7 @@ export class DialerProcessor extends WorkerHost {
               callDirection: 'OUTBOUND',
               status: 'INITIATED',
               durationSeconds: 0,
-            } as any,
+            },
           });
 
           this.gateway.broadcastCallEvent(agentId, 'PROGRESSIVE_DIALING', {

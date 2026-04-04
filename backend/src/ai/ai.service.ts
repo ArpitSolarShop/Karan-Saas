@@ -2,56 +2,64 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DeepgramClient } from '@deepgram/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { SearchService } from '../search/search.service';
+import { ConfigService } from '@nestjs/config';
+import OpenAI from 'openai';
 
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private deepgram: DeepgramClient;
-
-  // Sentiment keyword dictionaries
-  private readonly POSITIVE_WORDS = [
-    'interested',
-    'yes',
-    'great',
-    'sure',
-    'love',
-    'perfect',
-    'excellent',
-    'definitely',
-    'buy',
-    'purchase',
-  ];
-  private readonly NEGATIVE_WORDS = [
-    'no',
-    'not interested',
-    'busy',
-    'expensive',
-    'competitor',
-    'cancel',
-    'refund',
-    'unhappy',
-    'bad',
-    'terrible',
-  ];
-  private readonly ALERT_KEYWORDS = [
-    'competitor',
-    'price',
-    'refund',
-    'cancel',
-    'escalate',
-    'manager',
-    'complaint',
-    'legal',
-    'lawsuit',
-  ];
+  private openai: OpenAI;
 
   constructor(
     private prisma: PrismaService,
     private searchService: SearchService,
+    private config: ConfigService,
   ) {
     this.deepgram = new DeepgramClient(
-      process.env.DEEPGRAM_API_KEY as any,
-    ) as any;
+      this.config.get<string>('DEEPGRAM_API_KEY') as string,
+    );
+
+    this.openai = new OpenAI({
+      apiKey: this.config.get<string>('OPENAI_API_KEY'),
+    });
+  }
+
+  /**
+   * LLM-powered Sentiment Analysis & Summarization
+   */
+  async analyzeWithLLM(text: string): Promise<{ sentiment: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL'; summary: string; keywords: string[] }> {
+    if (!this.config.get('OPENAI_API_KEY')) {
+      this.logger.warn('[AI] OPENAI_API_KEY missing - falling back to Neutral');
+      return { sentiment: 'NEUTRAL', summary: 'AI Analysis skipped (API Key missing)', keywords: [] };
+    }
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `Analyze this call transcript. Return ONLY a JSON object with: 
+            1. sentiment: "POSITIVE", "NEGATIVE", or "NEUTRAL"
+            2. summary: A 2-sentence summary of the call.
+            3. keywords: Array of 3-5 key topics mentioned.`
+          },
+          { role: 'user', content: text }
+        ],
+        response_format: { type: 'json_object' }
+      });
+
+      const result = JSON.parse(response.choices[0].message.content || '{}');
+      return {
+        sentiment: (result.sentiment?.toUpperCase() as any) || 'NEUTRAL',
+        summary: result.summary || '',
+        keywords: result.keywords || []
+      };
+    } catch (err) {
+      this.logger.error(`[AI] LLM Analysis failed: ${err.message}`);
+      return { sentiment: 'NEUTRAL', summary: 'Analysis failed', keywords: [] };
+    }
   }
 
   /**
@@ -62,9 +70,7 @@ export class AiService {
     this.logger.log(`[AI] Transcribing call ${callId}`);
 
     try {
-      const { result, error }: any = await (
-        this.deepgram as any
-      ).listen.prerecorded.transcribeUrl(
+      const { result, error }: any = await (this.deepgram as any).listen.prerecorded.transcribeUrl(
         { url: recordingUrl },
         {
           model: 'nova-2',
@@ -83,28 +89,31 @@ export class AiService {
       // Calculate talk ratio
       const agentWords = words.filter((w: any) => w.speaker === 0).length;
       const customerWords = words.filter((w: any) => w.speaker === 1).length;
-      const talkRatio =
-        words.length > 0 ? Math.round((agentWords / words.length) * 100) : 50;
+      const talkRatio = words.length > 0 ? Math.round((agentWords / words.length) * 100) : 50;
 
-      // Sentiment analysis
-      const sentiment = this.analyzeSentiment(transcript);
-      const keywordsFound = this.extractKeywords(transcript);
+      // LLM Analysis
+      const { sentiment, summary, keywords } = await this.analyzeWithLLM(transcript);
 
       // Store transcript
-      const transcriptRecord = await (this.prisma as any).callTranscript.upsert(
-        {
-          where: { callId },
-          create: {
-            callId,
-            text: transcript,
-            sentiment,
-            keywordsFound,
-            talkRatio,
-            rawResult: result,
-          },
-          update: { text: transcript, sentiment, keywordsFound, talkRatio },
+      const transcriptRecord = await (this.prisma as any).callTranscript.upsert({
+        where: { callId },
+        create: {
+          callId,
+          text: transcript,
+          sentiment,
+          summary,
+          keywordsFound: keywords,
+          talkRatio,
+          rawResult: result,
         },
-      );
+        update: { 
+          text: transcript, 
+          sentiment, 
+          summary, 
+          keywordsFound: keywords, 
+          talkRatio 
+        },
+      });
 
       // Index in Meilisearch for search
       const call = await this.prisma.call.findUnique({
@@ -114,49 +123,25 @@ export class AiService {
           agent: { select: { firstName: true, lastName: true } },
         },
       });
+
       if (call) {
         await this.searchService.indexCallTranscript({
           id: callId,
           leadName: call.lead?.name || '',
           agentName: `${call.agent?.firstName} ${call.agent?.lastName}`,
-          notes: (call as any).notes || '',
+          notes: (call as any).notes || summary || '',
           transcript,
           tenantId: call.tenantId,
           campaignId: call.campaignId || undefined,
         });
       }
 
-      this.logger.log(
-        `[AI] Transcript stored for call ${callId} | sentiment: ${sentiment} | keywords: ${keywordsFound.join(', ')}`,
-      );
+      this.logger.log(`[AI] Analysis complete for call ${callId} | Sentiment: ${sentiment}`);
       return transcriptRecord;
     } catch (err) {
-      this.logger.error(
-        `[AI] Transcription failed for call ${callId}: ${(err as Error).message}`,
-      );
+      this.logger.error(`[AI] Transcription failed for call ${callId}: ${err.message}`);
       throw err;
     }
-  }
-
-  /** Simple rule-based sentiment analysis */
-  private analyzeSentiment(text: string): 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' {
-    const lower = text.toLowerCase();
-    const positive = this.POSITIVE_WORDS.filter((w) =>
-      lower.includes(w),
-    ).length;
-    const negative = this.NEGATIVE_WORDS.filter((w) =>
-      lower.includes(w),
-    ).length;
-
-    if (positive > negative + 1) return 'POSITIVE';
-    if (negative > positive + 1) return 'NEGATIVE';
-    return 'NEUTRAL';
-  }
-
-  /** Extract alert keywords from transcript */
-  private extractKeywords(text: string): string[] {
-    const lower = text.toLowerCase();
-    return this.ALERT_KEYWORDS.filter((kw) => lower.includes(kw));
   }
 
   /**
@@ -169,37 +154,37 @@ export class AiService {
   }
 
   /**
-   * Score a lead using basic heuristics (upgrade to ML in Phase 4).
+   * Score a lead using AI heuristics and call history.
    * Returns 0–100.
    */
-  async scoreLeadHeuristic(leadId: string): Promise<number> {
-    const lead: any = await this.prisma.lead.findUnique({
+  async scoreLead(leadId: string): Promise<number> {
+    const lead = await this.prisma.lead.findUnique({
       where: { id: leadId },
       include: {
-        calls: { select: { status: true, talkTimeSeconds: true } },
-        activities: { select: { activityType: true } },
+        calls: { 
+          include: { transcript: true },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        },
       },
     });
+
     if (!lead) return 0;
 
-    let score = 50; // Base
+    let totalScore = 50; // Neutral starting point
 
-    // More calls = more engaged
-    const calls = lead.calls || [];
-    score += Math.min(calls.length * 5, 20);
+    // Analysis based on last 5 calls
+    for (const call of lead.calls) {
+      if (call.transcript) {
+        if (call.transcript.sentiment === 'POSITIVE') totalScore += 10;
+        if (call.transcript.sentiment === 'NEGATIVE') totalScore -= 15;
+      }
+      
+      if (call.status === 'COMPLETED' && (call.talkTimeSeconds || 0) > 120) {
+        totalScore += 5;
+      }
+    }
 
-    // Longer talk time = more interest
-    const totalTalk = calls.reduce(
-      (acc: number, c: any) => acc + (c.talkTimeSeconds || 0),
-      0,
-    );
-    if (totalTalk > 300) score += 10;
-    if (totalTalk > 600) score += 10;
-
-    // Recent activity
-    const activities = lead.activities || [];
-    score += Math.min(activities.length * 2, 10);
-
-    return Math.min(Math.max(score, 0), 100);
+    return Math.min(Math.max(totalScore, 0), 100);
   }
 }

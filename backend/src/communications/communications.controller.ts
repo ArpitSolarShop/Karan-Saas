@@ -1,10 +1,12 @@
-import { UseGuards } from '@nestjs/common';
+import { UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Controller, Post, Get, Body, Res, Param, Query } from '@nestjs/common';
 import type { Response } from 'express';
 import { CommunicationsService } from './communications.service';
 import { BaileysEngineService } from '../whatsapp/baileys.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { InboxService } from './inbox.service';
+import { ConversationService } from './conversation.service';
 import * as QRCode from 'qrcode';
 
 @UseGuards(JwtAuthGuard)
@@ -14,7 +16,30 @@ export class CommunicationsController {
     private readonly commsService: CommunicationsService,
     private readonly baileysEngine: BaileysEngineService,
     private readonly prisma: PrismaService,
+    private readonly inboxService: InboxService,
+    private readonly conversationService: ConversationService,
   ) {}
+
+  @Get('inboxes')
+  async getInboxes(@Req() req: any) {
+    return this.inboxService.getInboxes(req.user.tenantId);
+  }
+
+  @Get('conversations')
+  async getConversations(
+    @Req() req: any,
+    @Query('inboxId') inboxId?: string,
+  ) {
+    return this.conversationService.getConversations(req.user.tenantId, inboxId);
+  }
+
+  @Get('conversations/:id/messages')
+  async getMessages(
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.conversationService.getMessages(id, limit ? parseInt(limit) : 50);
+  }
 
   /**
    * POST /communications/send

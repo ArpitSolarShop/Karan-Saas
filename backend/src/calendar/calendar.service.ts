@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateCalendarEventDto } from './dto/create-calendar-event.dto';
+import { UpdateCalendarEventDto } from './dto/update-calendar-event.dto';
 
 @Injectable()
 export class CalendarService {
@@ -32,27 +34,41 @@ export class CalendarService {
     return event;
   }
 
-  async create(data: any) {
+  async create(createCalendarEventDto: CreateCalendarEventDto) {
+    const { attendees, ...eventData } = createCalendarEventDto;
+
     return this.prisma.calendarEvent.create({
       data: {
-        tenantId: data.tenantId,
-        userId: data.userId,
-        title: data.title,
-        description: data.description,
-        startDatetime: new Date(data.startDatetime),
-        endDatetime: new Date(data.endDatetime),
-        allDay: data.allDay || false,
-        location: data.location,
-        eventType: data.eventType || 'MEETING',
-        color: data.color || '#3b82f6',
+        ...eventData,
+        startDatetime: new Date(eventData.startDatetime),
+        endDatetime: new Date(eventData.endDatetime),
+        ...(attendees && attendees.length > 0
+          ? {
+              attendees: {
+                create: attendees,
+              },
+            }
+          : {}),
+      },
+      include: {
+        attendees: true,
       },
     });
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, updateCalendarEventDto: UpdateCalendarEventDto) {
+    const { attendees, startDatetime, endDatetime, tenantId, userId, ...eventData } = updateCalendarEventDto as any;
+
+    // Handle updates for nested attendees specifically or just update base data
+    // Here we focus on base event update. For full attendee sync, consider deleting and recreating or using a sync method.
+
     return this.prisma.calendarEvent.update({
       where: { id },
-      data,
+      data: {
+        ...eventData,
+        ...(startDatetime && { startDatetime: new Date(startDatetime) }),
+        ...(endDatetime && { endDatetime: new Date(endDatetime) }),
+      },
     });
   }
 

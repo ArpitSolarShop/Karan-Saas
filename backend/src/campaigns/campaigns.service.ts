@@ -142,4 +142,51 @@ export class CampaignsService {
       take: 100,
     }) as any;
   }
+  /**
+   * Predictive Dialer Algorithm (VICIdial Port)
+   * Calculates how many concurrent calls to place for a campaign.
+   */
+  async calculatePacing(campaignId: string) {
+    const campaign = await this.prisma.campaign.findUniqueOrThrow({
+      where: { id: campaignId },
+      include: { 
+        campaignAgents: { 
+          include: { agent: true } 
+        } 
+      }
+    });
+
+    // 1. Count Available (Ready) Agents
+    const availableAgents = campaign.campaignAgents.filter(
+      ca => (ca.agent as any).agentStatus === 'READY'
+    ).length;
+
+    if (availableAgents === 0) return { targetCalls: 0, strategy: 'STANDBY' };
+
+    // 2. Calculate Success Rate (Last 100 calls)
+    const lastCalls = await this.prisma.call.findMany({
+      where: { campaignId },
+      take: 100,
+      orderBy: { createdAt: 'desc' },
+      select: { status: true }
+    });
+
+    const answeredCount = lastCalls.filter(c => c.status === 'COMPLETED').length;
+    const successRate = lastCalls.length > 0 ? (answeredCount / lastCalls.length) : 0.2; // Default 20%
+
+    // 3. Pacing Formula: (Available Agents * Multiplier) / Success Rate
+    // Multiplier can be fixed (e.g. 1.5) or dynamic based on "Drop Rate"
+    const multiplier = 2.0; 
+    const targetCalls = Math.ceil((availableAgents * multiplier) / (successRate || 0.1));
+
+    // Cap at a reasonable number (e.g. 5x agents) to prevent overwhelming the PBX
+    const cappedCalls = Math.min(targetCalls, availableAgents * 5);
+
+    return {
+      availableAgents,
+      successRate: (successRate * 100).toFixed(1) + '%',
+      targetCalls: cappedCalls,
+      strategy: 'PREDICTIVE'
+    };
+  }
 }

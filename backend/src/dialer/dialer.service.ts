@@ -1,51 +1,63 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { DialerPacingService } from './pacing.service';
 import { CallType, CallStatus } from '@prisma/client';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 
 @Injectable()
 export class DialerService {
+  private readonly logger = new Logger(DialerService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly pacing: DialerPacingService,
     @InjectQueue('dialer') private readonly dialerQueue: Queue,
   ) {}
 
-  /** Trigger Auto-Dialer campaign logic pushing thousands of leads to Redis/BullMQ */
+  /** Trigger Auto-Dialer campaign logic pushing leads to Redis/BullMQ based on pacing */
   async startCampaign(
     campaignId: string,
-    type: 'predictive' | 'progressive' = 'predictive',
+    tenantId: string,
   ) {
-    const leads = await this.prisma.lead.findMany({
-      where: { campaignId, status: 'NEW', isDnc: false },
-    });
-
-    // Fire-and-forget push to Redis-backed job queue
-    for (const lead of leads) {
-      if (type === 'predictive') {
-        await this.dialerQueue.add('predictive_dial', {
-          leadId: lead.id,
-          campaignId,
-          tenantId: lead.tenantId,
-        });
-      } else {
-        const agent = await this.prisma.user.findFirst({
-          where: { tenantId: lead.tenantId, agentStatus: 'AVAILABLE' },
-        });
-        if (agent) {
-          await this.dialerQueue.add('progressive_dial', {
-            leadId: lead.id,
-            agentId: agent.id,
-            campaignId,
-            tenantId: lead.tenantId,
-          });
-        }
-      }
+    // 1. Determine available slots from Pacing Service
+    const slots = await this.pacing.getAvailablePacingSlots(campaignId, tenantId);
+    
+    if (slots <= 0) {
+      this.logger.debug(`No available slots for campaign ${campaignId}. Skipping tick.`);
+      return { status: 'WAITING_FOR_AGENTS', slots: 0 };
     }
 
-    return { status: 'DIALING', queued: leads.length };
+    // 2. Fetch only 'slots' number of leads
+    const leads = await this.prisma.lead.findMany({
+      where: { 
+        campaignId, 
+        status: 'NEW', 
+        isDnc: false 
+      },
+      take: slots,
+      orderBy: { createdAt: 'asc' }
+    });
+
+    if (leads.length === 0) {
+      return { status: 'NO_LEADS_LEFT', slots };
+    }
+
+    // 3. Queue the jobs
+    const campaign = await this.prisma.campaign.findUnique({ where: { id: campaignId } });
+    const dialJobName = campaign?.dialerMode === 'PREDICTIVE' ? 'predictive_dial' : 'progressive_dial';
+
+    for (const lead of leads) {
+      await this.dialerQueue.add(dialJobName, {
+        leadId: lead.id,
+        campaignId,
+        tenantId,
+      });
+    }
+
+    return { status: 'DIALING', queued: leads.length, slots };
   }
 
   // ── Existing Manual Stubs ───────────────────────────────────────────────

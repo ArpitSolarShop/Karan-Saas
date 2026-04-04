@@ -1,9 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CommunicationsService } from '../communications/communications.service';
-import { TasksService } from '../tasks/tasks.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { Logger } from '@nestjs/common';
+import axios from 'axios';
 
 @Injectable()
 export class WorkflowsService {
@@ -95,7 +93,7 @@ export class WorkflowsService {
           data: { runCount: { increment: 1 }, lastRunAt: new Date() } as any,
         });
       } catch (err) {
-        this.logger.error(`[Workflow] Rule ${rule.name} failed: ${err}`);
+        this.logger.error(`[Workflow] Rule ${rule.name} failed: ${err.message}`);
       }
     }
   }
@@ -118,9 +116,27 @@ export class WorkflowsService {
       : '';
 
     switch (rule.action) {
+      case 'TRIGGER_WEBHOOK':
+        if (params.url) {
+          try {
+            await axios.post(params.url, {
+              ruleName: rule.name,
+              trigger: rule.trigger,
+              timestamp: new Date().toISOString(),
+              context,
+              message,
+            }, {
+              headers: { 'X-CRM-Workflow-Signature': 'superior-crm-v1' }
+            });
+            this.logger.log(`[Workflow] Webhook triggered to ${params.url}`);
+          } catch (err) {
+            this.logger.error(`[Workflow] Webhook failed to ${params.url}: ${err.message}`);
+          }
+        }
+        break;
+
       case 'SEND_WHATSAPP':
         if (context.leadId && context.phone) {
-          // Fire via notifications service stub (real WA via CommunicationsService)
           this.logger.log(`[Workflow] WA to ${context.phone}: ${message}`);
         }
         break;

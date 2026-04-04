@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 
 @Injectable()
 export class InvoicesService {
@@ -28,32 +30,62 @@ export class InvoicesService {
     return invoice;
   }
 
-  async create(data: any) {
-    // Generate Invoice Number properly
-    // For now we do a simple fallback
-    const number = data.number || `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-    
+  async create(createInvoiceDto: CreateInvoiceDto) {
+    const { lineItems, ...invoiceData } = createInvoiceDto;
+
+    // Generate Invoice Number if not provided
+    const invoiceNumber =
+      createInvoiceDto.number ||
+      (await this.prisma.getNextNumber(createInvoiceDto.tenantId, 'INVOICE'));
+
+    // Calculate totals from line items
+    let subtotal = 0;
+    let taxAmount = 0;
+    let discountAmount = 0;
+
+    const mappedLineItems = lineItems.map((item) => {
+      const itemSubtotal = item.quantity * item.unitPrice;
+      const itemTax = itemSubtotal * ((item.taxRate || 0) / 100);
+      const itemDiscount = item.discount || 0;
+      const itemTotal = itemSubtotal + itemTax - itemDiscount;
+
+      subtotal += itemSubtotal;
+      taxAmount += itemTax;
+      discountAmount += itemDiscount;
+
+      return {
+        ...item,
+        total: itemTotal,
+      };
+    });
+
+    const total = subtotal + taxAmount - discountAmount;
+
     return this.prisma.invoice.create({
       data: {
-        tenantId: data.tenantId,
-        number: number,
-        status: data.status || 'DRAFT',
-        dueDate: data.dueDate ? new Date(data.dueDate) : new Date(new Date().setDate(new Date().getDate() + 14)), // default 14 days
-        subtotal: data.subtotal || 0,
-        taxAmount: data.taxAmount || 0,
-        discountAmount: data.discountAmount || 0,
-        total: data.total || 0,
-        currency: data.currency || 'INR',
-        companyId: data.companyId,
-        createdBy: data.createdBy,
+        ...invoiceData,
+        number: invoiceNumber,
+        subtotal,
+        taxAmount,
+        discountAmount,
+        total,
+        lineItems: {
+          create: mappedLineItems,
+        },
+      },
+      include: {
+        lineItems: true,
       },
     });
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, updateInvoiceDto: UpdateInvoiceDto) {
+    const { tenantId, createdBy, lineItems, ...updateData } = updateInvoiceDto as any;
+    // Note: status updates might trigger other logic (e.g. payment recording)
+    // For now simple update
     return this.prisma.invoice.update({
       where: { id },
-      data,
+      data: updateData,
     });
   }
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import makeWASocket, {
   DisconnectReason,
@@ -10,13 +10,14 @@ import { usePrismaAuthState } from './prisma-auth-store';
 import pino from 'pino';
 import { WhatsappGateway } from './whatsapp.gateway';
 import { MetricsService } from './metrics.service';
+import { InboxService } from '../communications/inbox.service';
+import { ConversationService } from '../communications/conversation.service';
 
 @Injectable()
 export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BaileysEngineService.name);
   
   // Natively stores all connected WebSockets in the NestJS process memory
-  // This achieves 100% self-sufficiency without Docker containers
   private readonly sessions = new Map<string, WASocket>();
 
   // Stores the latest QR code strings waiting to be scanned
@@ -26,6 +27,10 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly gateway: WhatsappGateway,
     private readonly metrics: MetricsService,
+    @Inject(forwardRef(() => InboxService))
+    private readonly inboxService: InboxService,
+    @Inject(forwardRef(() => ConversationService))
+    private readonly conversationService: ConversationService,
   ) {}
 
   async onModuleInit() {
@@ -159,7 +164,51 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
 
             this.logger.log(`[${instanceId}] Incoming Message from ${jid}`);
 
-            // Persist the message natively into our standard PostgreSQL database
+            // 1. Get Instance & Tenant context
+            const instance = await this.prisma.whatsAppInstance.findUnique({
+              where: { id: instanceId },
+              select: { tenantId: true, name: true }
+            });
+            if (!instance) continue;
+
+            // 2. Resolve/Create Unified Inbox
+            const inbox = await this.inboxService.getOrCreateInboxForChannel(
+              instance.tenantId,
+              'WHATSAPP_BAILEYS',
+              instanceId,
+              `WhatsApp: ${instance.name}`
+            );
+
+            // 3. Extract text content for unified view
+            const msgData = msg.message as any;
+            const textContent =
+              msgData?.conversation ||
+              msgData?.extendedTextMessage?.text ||
+              msgData?.imageMessage?.caption ||
+              (msgData?.imageMessage ? '[Photo]' : null) ||
+              (msgData?.videoMessage ? '[Video]' : null) ||
+              (msgData?.audioMessage ? '[Voice message]' : null) ||
+              (msgData?.documentMessage ? `[Document: ${msgData.documentMessage.fileName || 'file'}]` : null) ||
+              '[Media message]';
+
+            // 4. Create/Update Unified Conversation
+            const conversation = await this.conversationService.findOrCreateConversation(
+              instance.tenantId,
+              inbox.id,
+              jid || 'unknown'
+            );
+
+            // 5. Add to Unified Messages
+            await this.conversationService.addMessage(instance.tenantId, conversation.id, {
+              inboxId: inbox.id,
+              direction: 'INBOUND',
+              content: textContent,
+              contentType: Object.keys(msg.message)[0] || 'text',
+              externalId: msgId,
+              metadata: msg.message
+            });
+
+            // --- Keep Legacy WhatsApp-specific sync for backward compat ---
             await this.prisma.whatsAppMessage.upsert({
                where: { messageId: msgId },
                update: {},
@@ -174,7 +223,6 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
                }
             });
 
-            // Upsert standard Contact logic natively
             if (jid && msg.pushName) {
                 await this.prisma.whatsAppContact.upsert({
                     where: { instanceId_remoteJid: { instanceId, remoteJid: jid } },
@@ -183,96 +231,7 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
                 });
             }
 
-            // ── Save as Activity so the REST /communications/thread API shows it ──
-            if (jid) {
-              // Skip group chats, broadcast, and status messages — inbox is for 1-on-1 only
-              const isGroup = jid.endsWith('@g.us') || jid === 'status@broadcast';
-              if (!isGroup) {
-                try {
-                  // Determine if this is a LID JID (linked device) or a standard phone JID
-                  const isLidJid = jid.endsWith('@lid');
-                  const isPhoneJid = jid.endsWith('@s.whatsapp.net');
-
-                  // Extract text content from the Baileys message object
-                  const msgData = msg.message as any;
-                  const textContent =
-                    msgData?.conversation ||
-                    msgData?.extendedTextMessage?.text ||
-                    msgData?.imageMessage?.caption ||
-                    (msgData?.imageMessage ? '[Photo]' : null) ||
-                    (msgData?.videoMessage ? '[Video]' : null) ||
-                    (msgData?.audioMessage ? '[Voice message]' : null) ||
-                    (msgData?.documentMessage ? `[Document: ${msgData.documentMessage.fileName || 'file'}]` : null) ||
-                    '[Media message]';
-
-                  let lead: { id: string; tenantId: string } | null = null;
-
-                  // Strategy 1: Standard phone JID — match by phone number
-                  if (isPhoneJid) {
-                    const rawPhone = jid.replace(/@s\.whatsapp\.net$/, '');
-                    const phone10 = rawPhone.replace(/^91/, '').slice(-10);
-                    lead = await this.prisma.lead.findFirst({
-                      where: {
-                        OR: [
-                          { phone: rawPhone },
-                          { phone: phone10 },
-                          { phone: { endsWith: phone10 } },
-                          { phone: { endsWith: rawPhone } },
-                        ],
-                      },
-                      select: { id: true, tenantId: true },
-                    });
-                  }
-
-                  // Strategy 2: LID JID or phone match failed — use pushName to find the lead
-                  if (!lead && msg.pushName) {
-                    const name = msg.pushName.trim();
-                    lead = await this.prisma.lead.findFirst({
-                      where: {
-                        OR: [
-                          { name: { contains: name, mode: 'insensitive' } },
-                          { firstName: { contains: name, mode: 'insensitive' } },
-                        ],
-                      },
-                      select: { id: true, tenantId: true },
-                    });
-                    if (lead) {
-                      this.logger.log(`[${instanceId}] Matched lead by pushName "${name}" for LID JID ${jid}`);
-                    }
-                  }
-
-                  if (lead) {
-                    // Get any user to satisfy the FK (system user fallback)
-                    const systemUser = await this.prisma.user.findFirst({
-                      where: { tenantId: lead.tenantId },
-                      select: { id: true },
-                    });
-
-                    if (systemUser) {
-                      await this.prisma.activity.create({
-                        data: {
-                          leadId: lead.id,
-                          userId: systemUser.id,
-                          activityType: 'WHATSAPP',
-                          description: `[INCOMING] ${textContent}`,
-                        },
-                      });
-                      this.logger.log(`[${instanceId}] ✅ Saved inbound message as Activity for lead ${lead.id} | "${textContent.slice(0, 40)}"`);
-                    }
-                  } else {
-                    this.logger.warn(`[${instanceId}] ⚠️ No lead found for JID ${jid} (pushName: "${msg.pushName}") — message not linked`);
-                  }
-                } catch (err) {
-                  this.logger.error(`[${instanceId}] Failed to save inbound message as Activity:`, err);
-                }
-              } else {
-                this.logger.debug(`[${instanceId}] Skipping group/broadcast message from ${jid}`);
-              }
-            }
-            // ────────────────────────────────────────────────────────────────────
-
-
-            // Emit to WebSocket Gateway so the Next.js UI auto-refreshes
+            // Emit to WebSocket Gateway so the UI auto-refreshes
             this.gateway.emitMessageUpsert(instanceId, {
                id: msgId,
                instanceId,

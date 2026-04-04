@@ -14,7 +14,7 @@ export class TelephonyService {
   ) {}
 
   get isConnected() {
-    return true; // We can expand this to check ESL status via FreeswitchService getter
+    return true; // Expand later if needed
   }
 
   // ── Call Management ─────────────────────────────────────────────────────
@@ -34,7 +34,6 @@ export class TelephonyService {
     if (!agent || !agent.extension)
       throw new Error('Agent extension not found');
 
-    // Commands FreeSWITCH to dial agent string, then bridge to customer
     const callUUID = await this.freeswitch.originateCall(
       agent.extension,
       toNumber,
@@ -58,11 +57,8 @@ export class TelephonyService {
   }
 
   async transferCall(callUUID: string, targetExtension: string) {
-    if (!this.freeswitch) throw new Error('Not connected');
     this.logger.log(`Transferring ${callUUID} to ${targetExtension}`);
-    // FreeSWITCH command to execute a blind transfer:
-    // uuid_transfer <uuid> <dest>
-    // Assuming freeswitch.api takes direct commands if expanded, but for now we mock it or add it later
+    await this.freeswitch.transfer(callUUID, targetExtension);
     return { callUUID, targetExtension };
   }
 
@@ -92,7 +88,7 @@ export class TelephonyService {
 
   async startRecording(callUUID: string) {
     this.logger.log(`Start recording ${callUUID}`);
-    return `s3://bucket/recordings/${callUUID}.wav`;
+    return `recordings/${callUUID}.wav`;
   }
 
   async stopRecording(callUUID: string) {
@@ -103,33 +99,46 @@ export class TelephonyService {
 
   async getSipConfig(agentId: string) {
     const agent = await this.prisma.user.findUnique({ where: { id: agentId } });
+    const domain = process.env.FREESWITCH_DOMAIN || '127.0.0.1';
+    const wssPort = process.env.FREESWITCH_WSS_PORT || '7443';
+
     return {
-      uri: `sip:${agent?.extension}@127.0.0.1`,
-      wsServer: 'wss://127.0.0.1:7443',
-      authorizationUser: agent?.extension,
+      sipUri: `sip:${agent?.extension}@${domain}`,
+      wsServer: `wss://${domain}:${wssPort}`,
       password: agent?.sipPassword || '1234',
+      iceServers: [
+        { urls: [process.env.STUN_SERVER || 'stun:stun.l.google.com:19302'] },
+        {
+          urls: [process.env.TURN_SERVER || `turn:${domain}:3478`],
+          username: 'turnuser',
+          credential: 'turnpassword',
+        },
+      ],
     };
   }
 
   async getTurnCredentials(agentId: string) {
+    const domain = process.env.FREESWITCH_DOMAIN || '127.0.0.1';
     return {
       username: 'turnuser',
       credential: 'turnpassword',
-      urls: ['turn:127.0.0.1:3478'],
+      urls: [`turn:${domain}:3478`],
     };
   }
 
   // ── Voicemail Drop ────────────────────────────────────────────────────────
 
   async voicemailDrop(callUUID: string, filePath: string) {
-    await this.freeswitch.dropVoicemail(callUUID, filePath);
+    await this.freeswitch.playAudio(callUUID, filePath);
   }
 
   async saveLocation(
     agentId: string,
     data: { lat: number; lng: number; accuracy?: number; battery?: number },
   ) {
-    return (this.prisma as any).agentLocation.create({
+    const locationModel = (this.prisma as any).agentLocation;
+    if (!locationModel) return;
+    return locationModel.create({
       data: {
         agentId,
         latitude: data.lat,

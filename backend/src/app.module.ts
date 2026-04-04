@@ -57,6 +57,9 @@ import { HrLeavesModule } from './hr-leaves/hr-leaves.module';
 import { AssetsModule } from './assets/assets.module';
 import { SurveysModule } from './surveys/surveys.module';
 import { CustomObjectsModule } from './custom-objects/custom-objects.module';
+import { PaymentsModule } from './payments/payments.module';
+import { CustomFieldsModule } from './custom-fields/custom-fields.module';
+import { BusinessHoursModule } from './business-hours/business-hours.module';
 
 @Module({
   imports: [
@@ -119,6 +122,9 @@ import { CustomObjectsModule } from './custom-objects/custom-objects.module';
     AssetsModule,
     SurveysModule,
     CustomObjectsModule,
+    PaymentsModule,
+    CustomFieldsModule,
+    BusinessHoursModule,
   ],
   controllers: [AppController, ScriptsController],
   providers: [AppService, PrismaService, ScriptsService],

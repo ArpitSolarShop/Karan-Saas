@@ -25,6 +25,10 @@ import { Public } from '../auth/public.decorator';
  *   GET  /whatsapp/webhook — Verification handshake (Meta calls this when you register the webhook URL)
  *   POST /whatsapp/webhook — Receives incoming messages, status updates, read receipts
  */
+import { InboxService } from '../communications/inbox.service';
+import { ConversationService } from '../communications/conversation.service';
+import { Inject, forwardRef } from '@nestjs/common';
+
 @Controller('whatsapp/webhook')
 export class CloudApiWebhookController {
   private readonly logger = new Logger(CloudApiWebhookController.name);
@@ -34,6 +38,10 @@ export class CloudApiWebhookController {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly gateway: WhatsappGateway,
+    @Inject(forwardRef(() => InboxService))
+    private readonly inboxService: InboxService,
+    @Inject(forwardRef(() => ConversationService))
+    private readonly conversationService: ConversationService,
   ) {
     this.verifyToken = this.config.get(
       'META_WEBHOOK_VERIFY_TOKEN',
@@ -148,11 +156,29 @@ export class CloudApiWebhookController {
       const timestamp = msg.timestamp;
       const msgType = msg.type; // text, image, document, interactive, button, etc.
 
+      // 1. Get Instance & Tenant context
+      const instance = await this.prisma.whatsAppInstance.findUnique({
+        where: { id: instanceId },
+        select: { tenantId: true, name: true }
+      });
+      if (!instance) continue;
+
+      // 2. Resolve/Create Unified Inbox
+      const inbox = await this.inboxService.getOrCreateInboxForChannel(
+        instance.tenantId,
+        'WHATSAPP_CLOUD',
+        instanceId,
+        `Cloud: ${instance.name}`
+      );
+
       // Extract message body based on type
       let messageData: any = {};
+      let textContent = '';
+
       switch (msgType) {
         case 'text':
           messageData = { body: msg.text?.body };
+          textContent = msg.text?.body || '';
           break;
         case 'image':
           messageData = {
@@ -160,6 +186,7 @@ export class CloudApiWebhookController {
             caption: msg.image?.caption,
             mimeType: msg.image?.mime_type,
           };
+          textContent = msg.image?.caption ? `🖼️ ${msg.image.caption}` : '🖼️ [Image]';
           break;
         case 'document':
           messageData = {
@@ -168,6 +195,7 @@ export class CloudApiWebhookController {
             caption: msg.document?.caption,
             mimeType: msg.document?.mime_type,
           };
+          textContent = `📄 Document: ${msg.document?.filename || 'file'}`;
           break;
         case 'video':
           messageData = {
@@ -175,12 +203,14 @@ export class CloudApiWebhookController {
             caption: msg.video?.caption,
             mimeType: msg.video?.mime_type,
           };
+          textContent = msg.video?.caption ? `🎬 ${msg.video.caption}` : '🎬 [Video]';
           break;
         case 'audio':
           messageData = {
             audioId: msg.audio?.id,
             mimeType: msg.audio?.mime_type,
           };
+          textContent = '🎵 [Audio message]';
           break;
         case 'location':
           messageData = {
@@ -189,41 +219,35 @@ export class CloudApiWebhookController {
             name: msg.location?.name,
             address: msg.location?.address,
           };
-          break;
-        case 'contacts':
-          messageData = { contacts: msg.contacts };
-          break;
-        case 'interactive':
-          messageData = {
-            type: msg.interactive?.type,
-            button_reply: msg.interactive?.button_reply,
-            list_reply: msg.interactive?.list_reply,
-          };
-          break;
-        case 'button':
-          messageData = { text: msg.button?.text, payload: msg.button?.payload };
-          break;
-        case 'reaction':
-          messageData = {
-            emoji: msg.reaction?.emoji,
-            message_id: msg.reaction?.message_id,
-          };
-          break;
-        case 'sticker':
-          messageData = {
-            stickerId: msg.sticker?.id,
-            mimeType: msg.sticker?.mime_type,
-          };
+          textContent = `📍 Location: ${msg.location?.name || 'Shared location'}`;
           break;
         default:
           messageData = msg[msgType] || {};
+          textContent = `[${msgType} message]`;
       }
 
       this.logger.log(
-        `[${instanceId}] Incoming ${msgType} from ${from}: ${JSON.stringify(messageData).substring(0, 100)}`,
+        `[${instanceId}] Incoming ${msgType} from ${from}: ${textContent.substring(0, 100)}`,
       );
 
-      // Persist to WhatsAppMessage
+      // 4. Create/Update Unified Conversation
+      const conversation = await this.conversationService.findOrCreateConversation(
+        instance.tenantId,
+        inbox.id,
+        `${from}@s.whatsapp.net` // Standardize JID format
+      );
+
+      // 5. Add to Unified Messages
+      await this.conversationService.addMessage(instance.tenantId, conversation.id, {
+        inboxId: inbox.id,
+        direction: 'INBOUND',
+        content: textContent,
+        contentType: msgType,
+        externalId: wamid,
+        metadata: msg
+      });
+
+      // --- Keep Legacy WhatsApp-specific sync for backward compat ---
       await this.prisma.whatsAppMessage.upsert({
         where: { messageId: wamid },
         update: {},
@@ -270,15 +294,15 @@ export class CloudApiWebhookController {
         timestamp: new Date(parseInt(timestamp) * 1000),
       });
 
-      // Log to CRM Activity (if lead exists with this phone)
+      // Log to CRM Activity (Legacy Activity Logging)
       try {
         const lead = await this.prisma.lead.findFirst({
           where: { phone: { contains: from } },
         });
 
         if (lead) {
-          // Resolve a valid userId for the FK
           const systemUser = await this.prisma.user.findFirst({
+            where: { tenantId: instance.tenantId },
             select: { id: true },
           });
 
@@ -288,7 +312,7 @@ export class CloudApiWebhookController {
                 leadId: lead.id,
                 userId: systemUser.id,
                 activityType: 'WHATSAPP',
-                description: `[CLOUD_API INBOUND] ${msgType}: ${messageData.body || messageData.caption || JSON.stringify(messageData).substring(0, 80)}`,
+                description: `[CLOUD_API] ${textContent}`,
               },
             });
           }
