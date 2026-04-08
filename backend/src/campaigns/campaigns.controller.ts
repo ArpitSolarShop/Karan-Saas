@@ -13,9 +13,10 @@ import { QueueService } from '../queue/queue.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 
 @Controller('campaigns')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class CampaignsController {
   constructor(
     private service: CampaignsService,
@@ -73,10 +74,10 @@ export class CampaignsController {
   // ── Dialer Control ──────────────────────────────────────────────────────────
 
   /**
-   * POST /campaigns/:id/dialer/start
+   * POST /campaigns/dialer/:id/start
    * Begins the auto-dialer for this campaign (schedules BullMQ repeating job).
    */
-  @Post(':id/dialer/start')
+  @Post('dialer/:id/start')
   @UseGuards(RolesGuard)
   @Roles('ADMIN', 'MANAGER', 'SUPERVISOR')
   async startDialer(@Param('id') id: string) {
@@ -86,10 +87,10 @@ export class CampaignsController {
   }
 
   /**
-   * POST /campaigns/:id/dialer/pause
+   * POST /campaigns/dialer/:id/pause
    * Pauses the auto-dialer (stops repeating job, keeps status).
    */
-  @Post(':id/dialer/pause')
+  @Post('dialer/:id/pause')
   @UseGuards(RolesGuard)
   @Roles('ADMIN', 'MANAGER', 'SUPERVISOR')
   async pauseDialer(@Param('id') id: string) {
@@ -99,16 +100,35 @@ export class CampaignsController {
   }
 
   /**
-   * POST /campaigns/:id/dialer/stop
+   * POST /campaigns/dialer/:id/stop
    * Stops the auto-dialer completely and marks campaign completed.
    */
-  @Post(':id/dialer/stop')
+  @Post('dialer/:id/stop')
   @UseGuards(RolesGuard)
   @Roles('ADMIN', 'MANAGER', 'SUPERVISOR')
   async stopDialer(@Param('id') id: string) {
     await this.service.updateStatus(id, 'COMPLETED');
     await this.queueService.stopCampaignDialer(id);
     return { stopped: true, campaignId: id };
+  }
+
+  @Get('dialer/:id/progress')
+  async getDialerProgress(@Param('id') id: string) {
+    return this.service.getDialerProgress(id);
+  }
+
+  @Get('dialer/:id/config')
+  async getDialerConfig(@Param('id') id: string) {
+    const campaign: any = await this.service.findOne(id);
+    const config = campaign?.dialerConfig || {};
+    return {
+      mode: config.mode || 'PREDICTIVE',
+      callsPerAgent: config.callsPerAgent || 1.2,
+      dropRateLimit: config.dropRateLimit || 3,
+      amdEnabled: config.amdEnabled ?? true,
+      maxRetries: config.maxRetries || 3,
+      paceAlgorithm: config.paceAlgorithm || 'ADAPTIVE'
+    };
   }
 
   // ── Clone & Import History ────────────────────────────────────────────────

@@ -104,6 +104,22 @@ export class CampaignsService {
     };
   }
 
+  async getDialerProgress(id: string) {
+    const [total, completed, failed] = await Promise.all([
+      this.prisma.lead.count({ where: { campaignId: id } }),
+      this.prisma.lead.count({ where: { campaignId: id, status: { in: ['CONTACTED', 'CONVERTED'] } } }),
+      this.prisma.lead.count({ where: { campaignId: id, status: { in: ['LOST', 'DNC'] } } }),
+    ]);
+    const pending = total - (completed + failed);
+    return {
+      total,
+      completed,
+      failed,
+      pending: Math.max(0, pending),
+      completionRate: total > 0 ? Math.round(((completed + failed) / total) * 100) : 0,
+    };
+  }
+
   async remove(id: string) {
     return this.prisma.campaign.delete({ where: { id } });
   }

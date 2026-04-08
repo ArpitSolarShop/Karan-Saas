@@ -11,6 +11,7 @@ import { QueueService } from './queue.service';
 import { QueueController } from './queue.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthModule } from '../auth/auth.module';
+import { DialerModule } from '../dialer/dialer.module';
 
 const REDIS_CONFIG = {
   host: (process.env.REDIS_URL || 'redis://localhost:6380')
@@ -26,6 +27,7 @@ const REDIS_CONFIG = {
   imports: [
     PrismaModule,
     AuthModule,
+    DialerModule,
     BullModule.forRoot({ redis: REDIS_CONFIG }),
     BullModule.registerQueue(
       { name: QUEUES.IMPORT },

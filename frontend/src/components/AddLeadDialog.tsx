@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import CompanySelect from "@/components/companies/CompanySelect";
 
 export default function AddLeadDialog({ isOpen, onClose, onSuccess, columns, sheetId }: AddLeadDialogProps) {
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -69,6 +70,17 @@ export default function AddLeadDialog({ isOpen, onClose, onSuccess, columns, she
 
         <ScrollArea className="flex-1 p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2 mb-6">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Corporate Account (Optional)</Label>
+              <CompanySelect 
+                value={formData.companyId}
+                onSelect={(id) => setFormData({ ...formData, companyId: id })}
+                className="w-full"
+              />
+            </div>
+
+            <Separator className="bg-border my-6" />
+
             <div className="grid grid-cols-2 gap-6">
               {columns.filter(col => col.dataType !== 'FORMULA').map((col) => (
                 <div key={col.id} className="space-y-2">

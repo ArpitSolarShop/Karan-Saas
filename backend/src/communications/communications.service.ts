@@ -4,6 +4,8 @@ import { ActivitiesService } from '../activities/activities.service';
 import { WhatsAppService } from './providers/whatsapp.service';
 import { EmailService } from './providers/email.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConversationService } from './conversation.service';
+import { InboxService } from './inbox.service';
 
 @Injectable()
 export class CommunicationsService {
@@ -13,21 +15,24 @@ export class CommunicationsService {
     private activities: ActivitiesService,
     private whatsapp: WhatsAppService,
     private email: EmailService,
+    private conversationService: ConversationService,
+    private inboxService: InboxService,
   ) {}
 
   async sendCommunication(
+    tenantId: string,
     id: string,
     type: 'WHATSAPP' | 'SMS' | 'EMAIL',
     message: string,
     userId: string,
   ) {
-    let lead: any = await this.leadsService.findOne(id);
+    let lead: any = await this.leadsService.findOne(id, tenantId);
     let targetLeadId = id;
 
     // If lead not found by ID, it might be a SheetRow ID
     if (!lead) {
-      const sheetRow = await this.prisma.sheetRow.findUnique({
-        where: { id },
+      const sheetRow = await this.prisma.sheetRow.findFirst({
+        where: { id, tenantId },
       });
 
       if (!sheetRow) {
@@ -44,7 +49,7 @@ export class CommunicationsService {
       // Try finding an existing lead by phone
       if (phone) {
         const existingLead = await this.prisma.lead.findFirst({
-          where: { phone: String(phone) },
+          where: { phone: String(phone), tenantId },
         });
 
         if (existingLead) {
@@ -53,6 +58,7 @@ export class CommunicationsService {
         } else {
           // AUTO-CONVERT: Create a new Lead from the SheetRow data
           lead = await this.leadsService.create({
+            tenantId,
             name: rowData.name || 'Sheet Lead',
             phone: String(phone),
             email: email || null,
@@ -118,11 +124,43 @@ export class CommunicationsService {
 
       if (resolvedUserId && resolvedUserId !== 'SYSTEM') {
         await this.activities.log(
+          lead.tenantId || 'dev-tenant-001',
           targetLeadId,
           resolvedUserId,
           type,
           `Sent ${type} to ${target}: ${message}`,
         );
+      }
+
+      // Sync into Omnichannel Inbox
+      try {
+        const inbox = await this.inboxService.getOrCreateInboxForChannel(
+          lead.tenantId,
+          type,
+          'default',
+          `${type} Inbox`
+        );
+
+        const conversation = await this.conversationService.findOrCreateConversation(
+          lead.tenantId,
+          inbox.id,
+          target,
+          targetLeadId
+        );
+
+        await this.conversationService.addMessage(
+          lead.tenantId,
+          conversation.id,
+          {
+            inboxId: inbox.id,
+            direction: 'OUTBOUND',
+            content: message,
+            contentType: 'text',
+            senderId: resolvedUserId && resolvedUserId !== 'SYSTEM' ? resolvedUserId : undefined,
+          }
+        );
+      } catch (e) {
+        // Just log, don't fail the message send if sync fails
       }
     }
 

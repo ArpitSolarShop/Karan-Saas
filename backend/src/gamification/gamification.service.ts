@@ -27,45 +27,48 @@ export class GamificationService {
     const points = EVENT_POINTS[event];
     this.logger.log(`Awarding ${points} points to user ${userId} for event ${event}`);
 
-    // Update UserStats
-    const stats = await this.prisma.userStats.upsert({
-      where: { userId },
-      update: {
-        points: { increment: points },
-        experience: { increment: points },
-        leadsCount: event === GamificationEvent.LEAD_CREATED ? { increment: 1 } : undefined,
-        callsCount: event === GamificationEvent.CALL_COMPLETED ? { increment: 1 } : undefined,
-        dealsCount: event === GamificationEvent.DEAL_WON ? { increment: 1 } : undefined,
-      },
-      create: {
+    // Record the point event in UserPoint history
+    await this.prisma.userPoint.create({
+      data: {
         userId,
         points,
-        experience: points,
-        leadsCount: event === GamificationEvent.LEAD_CREATED ? 1 : 0,
-        callsCount: event === GamificationEvent.CALL_COMPLETED ? 1 : 0,
-        dealsCount: event === GamificationEvent.DEAL_WON ? 1 : 0,
+        reason: event,
+        metadata: { tenantId },
       },
     });
 
-    await this.checkLevelUp(userId, stats.experience);
+    // Update the User's aggregate stats (totalPoints, level, currentStreak)
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        totalPoints: { increment: points },
+      },
+    });
+
+    // Check level up
+    await this.checkLevelUp(userId, updatedUser.totalPoints);
+    // Check badge eligibility
     await this.checkBadgeEligibility(userId, tenantId);
-    
-    return stats;
+
+    return updatedUser;
   }
 
-  private async checkLevelUp(userId: string, experience: number) {
-    // Basic level logic: Level = floor(sqrt(exp / 100)) + 1
-    const newLevel = Math.floor(Math.sqrt(experience / 100)) + 1;
-    
-    await this.prisma.userStats.update({
-      where: { userId },
+  private async checkLevelUp(userId: string, totalPoints: number) {
+    // Basic level logic: Level = floor(sqrt(totalPoints / 100)) + 1
+    const newLevel = Math.floor(Math.sqrt(totalPoints / 100)) + 1;
+
+    await this.prisma.user.update({
+      where: { id: userId },
       data: { level: newLevel },
     });
   }
 
   async checkBadgeEligibility(userId: string, tenantId: string) {
-    const userStats = await this.prisma.userStats.findUnique({ where: { userId } });
-    if (!userStats) return;
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { totalPoints: true, level: true, currentStreak: true },
+    });
+    if (!user) return;
 
     // Get all badges for this tenant (or global badges)
     const badges = await this.prisma.badge.findMany({
@@ -84,9 +87,9 @@ export class GamificationService {
       });
       if (alreadyHas) continue;
 
-      if (criteria.type === 'LEAD_COUNT' && userStats.leadsCount >= criteria.value) eligible = true;
-      if (criteria.type === 'CALL_COUNT' && userStats.callsCount >= criteria.value) eligible = true;
-      if (criteria.type === 'POINTS' && userStats.points >= criteria.value) eligible = true;
+      if (criteria.type === 'POINTS' && user.totalPoints >= criteria.value) eligible = true;
+      if (criteria.type === 'LEVEL' && user.level >= criteria.value) eligible = true;
+      if (criteria.type === 'STREAK' && user.currentStreak >= criteria.value) eligible = true;
 
       if (eligible) {
         await this.prisma.userBadge.create({
@@ -95,5 +98,32 @@ export class GamificationService {
         this.logger.log(`User ${userId} earned badge: ${badge.name}`);
       }
     }
+  }
+
+  async getLeaderboard(tenantId: string, limit = 10) {
+    return this.prisma.user.findMany({
+      where: { tenantId, isActive: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        totalPoints: true,
+        level: true,
+        currentStreak: true,
+        badges: {
+          include: { badge: true },
+        },
+      },
+      orderBy: { totalPoints: 'desc' },
+      take: limit,
+    });
+  }
+
+  async getUserPoints(userId: string) {
+    return this.prisma.userPoint.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
   }
 }

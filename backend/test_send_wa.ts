@@ -17,7 +17,7 @@ async function bootstrap() {
   console.log(`[Test] Attempting to send WhatsApp message to lead ${leadId}...`);
   
   try {
-    const result = await commsService.sendCommunication(leadId, 'WHATSAPP', message, 'SYSTEM');
+    const result = await commsService.sendCommunication('dev-tenant-001', leadId, 'WHATSAPP', message, 'SYSTEM');
     console.log('[Test] Result:', JSON.stringify(result, null, 2));
   } catch (error) {
     console.error('[Test] Error:', error);

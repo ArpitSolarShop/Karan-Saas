@@ -26,6 +26,9 @@ The left side of the screen has icons for every section of the CRM:
 | Icon | Section | What It Does |
 |------|---------|-------------|
 | 📊 | **Dashboard** | Overview of your key metrics and activity |
+| 🏢 | **Companies** | Manage your B2B accounts and clients |
+| 🛡️ | **Approvals** | Request deals, SLA, and leave approvals |
+| 📊 | **Workbooks** | Live built-in spreadsheets |
 | 👥 | **Leads** | All your potential customers |
 | 💰 | **Deals** | Your sales pipeline (Kanban board) |
 | 📋 | **Tasks** | Your to-do list and assignments |

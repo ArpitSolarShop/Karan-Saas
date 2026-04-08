@@ -210,6 +210,7 @@ export class WhatsAppClientService implements OnModuleInit, OnModuleDestroy {
     if (lead) {
       await this.prisma.activity.create({
         data: {
+          tenantId: lead.tenantId,
           leadId: lead.id,
           userId: 'SYSTEM',
           activityType: 'WHATSAPP',

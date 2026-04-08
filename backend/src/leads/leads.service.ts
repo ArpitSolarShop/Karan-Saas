@@ -4,9 +4,10 @@ import { Lead, LeadStatus } from '@prisma/client';
 import { LeadsGateway } from './leads.gateway';
 import { ActivitiesService } from '../activities/activities.service';
 import { SearchService } from '../search/search.service';
-import { AuditService } from '../audit/audit.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { DedupeService } from './services/dedupe.service';
 
-const DEV_TENANT_ID = 'dev-tenant-001';
+// Production-ready service strictly scoped by tenant context.
 
 @Injectable()
 export class LeadsService {
@@ -15,37 +16,26 @@ export class LeadsService {
     private leadsGateway: LeadsGateway,
     private activities: ActivitiesService,
     private search: SearchService,
-    private audit: AuditService,
+    private auditLogs: AuditLogsService,
+    private dedupe: DedupeService,
   ) { }
 
-  private async ensureDevTenant(): Promise<string> {
-    const existing = await this.prisma.tenant.findUnique({
-      where: { id: DEV_TENANT_ID },
-    });
-    if (!existing) {
-      await this.prisma.tenant.create({
-        data: {
-          id: DEV_TENANT_ID,
-          name: 'Alpha Development',
-          subdomain: 'dev',
-          plan: 'STARTER',
-          maxAgents: 100,
-        },
-      });
-    }
-    return DEV_TENANT_ID;
+  // Strict isolation check
+  private async validateTenant(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new Error('Enterprise tenant mismatch or unauthorized access.');
   }
 
-  async findAll() {
+  async findAll(tenantId: string) {
     return this.prisma.lead.findMany({
-      where: { deletedAt: null },
+      where: { tenantId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, tenantId: string) {
     return this.prisma.lead.findUnique({
-      where: { id },
+      where: { id, tenantId },
       include: {
         calls: { orderBy: { createdAt: 'desc' }, take: 20 },
         followups: true,
@@ -59,7 +49,19 @@ export class LeadsService {
   }
 
   async create(data: any) {
-    const tenantId = await this.ensureDevTenant();
+    const tenantId = data.tenantId;
+    if (!tenantId) throw new Error('Tenant identification required for lead creation.');
+
+    // 1. 200% Feature: Pre-creation Dedupe check
+    if (data.phone) {
+      const existing = await this.dedupe.getDuplicatesByPhone(tenantId, data.phone);
+      if (existing.length > 0) {
+        // We log it, but allow if forced, or throw error depending on enterprise policy
+        // For now, let's flag it in metadata
+        data.customFields = { ...data.customFields, duplicateFlag: true, duplicateOf: existing[0].id };
+      }
+    }
+
     const lead = await this.prisma.lead.create({
       data: {
         tenantId,
@@ -69,76 +71,89 @@ export class LeadsService {
         phone: data.phone || '',
         phoneSecondary: data.phoneSecondary || null,
         email: data.email || null,
-        company: data.company || null,
+        companyName: data.companyName || data.company || null,
         source: data.source || null,
         status: data.status || LeadStatus.NEW,
         score: data.score || 0,
         priority: data.priority || 1,
         city: data.city || null,
         state: data.state || null,
+        companyId: data.companyId || null,
         tags: data.tags || [],
         customFields: data.customFields || {},
       },
     });
     this.leadsGateway.broadcastUpdate('leadCreated', lead);
     await this.activities.log(
+      lead.tenantId,
       lead.id,
       'SYSTEM',
       'LEAD_CREATED',
       `Lead ${lead.name} was created.`,
     );
     await this.search.indexLead(lead);
-    await this.audit.record({
+
+    // 2. 200% Feature: Advanced Audit Logging
+    await this.auditLogs.logChange({
       tenantId: lead.tenantId,
       entityType: 'LEAD',
       entityId: lead.id,
       action: 'CREATE',
-      newValues: lead,
+      details: { newValues: lead },
     });
     return lead;
   }
 
-  async update(id: string, data: any) {
-    const lead = await this.prisma.lead.update({ where: { id }, data });
+  async update(id: string, tenantId: string, data: any) {
+    const oldLead = await this.prisma.lead.findUnique({ where: { id, tenantId } });
+    if (!oldLead) throw new Error('Lead not found in this tenant context.');
+    const lead = await this.prisma.lead.update({ where: { id, tenantId }, data });
+    
     this.leadsGateway.broadcastUpdate('leadUpdated', lead);
     await this.activities.log(
+      lead.tenantId,
       id,
       'SYSTEM',
       'LEAD_UPDATED',
       `Lead updated. Status: ${lead.status}`,
     );
     await this.search.indexLead(lead);
-    await this.audit.record({
+
+    // 2. 200% Feature: Advanced Audit Logging (with comparison)
+    await this.auditLogs.logChange({
       tenantId: lead.tenantId,
       entityType: 'LEAD',
       entityId: lead.id,
       action: 'UPDATE',
-      newValues: lead,
+      details: { oldValues: oldLead, newValues: lead },
     });
     return lead;
   }
 
-  async remove(id: string) {
+  async remove(id: string, tenantId: string) {
+    const oldLead = await this.prisma.lead.findUnique({ where: { id, tenantId } });
+    if (!oldLead) throw new Error('Lead not found in this tenant context.');
     const lead = await this.prisma.lead.update({
-      where: { id },
+      where: { id, tenantId },
       data: { deletedAt: new Date() },
     });
     this.leadsGateway.broadcastUpdate('leadDeleted', { id });
     await this.search.deleteLeadFromIndex(id);
-    await this.audit.record({
+
+    // 2. 200% Feature: Advanced Audit Logging
+    await this.auditLogs.logChange({
       tenantId: lead.tenantId,
       entityType: 'LEAD',
       entityId: id,
       action: 'DELETE',
-      oldValues: lead,
+      details: { oldValues: oldLead },
     });
     return lead;
   }
 
   // ── Import ─────────────────────────────────────────────────────────────────
 
-  async importLeads(buffer: Buffer, filename: string, mimetype: string) {
-    const tenantId = await this.ensureDevTenant();
+  async importLeads(tenantId: string, buffer: Buffer, filename: string, mimetype: string) {
     let rawData: any[] = [];
 
     if (filename.endsWith('.md')) {
@@ -227,8 +242,9 @@ export class LeadsService {
     };
   }
 
-  async getImportHistory() {
+  async getImportHistory(tenantId: string) {
     return this.prisma.leadList.findMany({
+      where: { tenantId },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
@@ -236,12 +252,15 @@ export class LeadsService {
 
   // ── Export CSV ─────────────────────────────────────────────────────────────
 
-  async exportCsv(filters?: {
-    status?: string;
-    assignedTo?: string;
-    tags?: string[];
-  }): Promise<string> {
-    const where: any = { deletedAt: null };
+  async exportCsv(
+    tenantId: string,
+    filters?: {
+      status?: string;
+      assignedTo?: string;
+      tags?: string[];
+    },
+  ): Promise<string> {
+    const where: any = { tenantId, deletedAt: null };
     if (filters?.status) where.status = filters.status;
     if (filters?.assignedTo) where.assignedTo = filters.assignedTo;
     if (filters?.tags?.length) where.tags = { hasSome: filters.tags };
@@ -278,33 +297,34 @@ export class LeadsService {
   // ── Bulk Actions ──────────────────────────────────────────────────────────
 
   async bulkAction(
+    tenantId: string,
     action: 'assign' | 'tag' | 'delete' | 'status',
     ids: string[],
     value?: any,
   ) {
     if (action === 'assign') {
       await this.prisma.lead.updateMany({
-        where: { id: { in: ids } },
+        where: { id: { in: ids }, tenantId },
         data: { assignedTo: value },
       });
       return { updated: ids.length };
     }
     if (action === 'status') {
       await this.prisma.lead.updateMany({
-        where: { id: { in: ids } },
+        where: { id: { in: ids }, tenantId },
         data: { status: value },
       });
       return { updated: ids.length };
     }
     if (action === 'tag') {
       for (const id of ids) {
-        const lead = await this.prisma.lead.findUnique({ where: { id } });
+        const lead = await this.prisma.lead.findUnique({ where: { id, tenantId } });
         if (!lead) continue;
         const merged = Array.from(
           new Set([...(lead.tags || []), ...((value as string[]) || [])]),
         );
         await this.prisma.lead.update({
-          where: { id },
+          where: { id, tenantId },
           data: { tags: merged },
         });
       }
@@ -312,7 +332,7 @@ export class LeadsService {
     }
     if (action === 'delete') {
       await this.prisma.lead.updateMany({
-        where: { id: { in: ids } },
+        where: { id: { in: ids }, tenantId },
         data: { deletedAt: new Date() },
       });
       for (const id of ids) {
@@ -327,17 +347,17 @@ export class LeadsService {
 
   // ── Tag management ─────────────────────────────────────────────────────────
 
-  async addTag(id: string, tag: string) {
-    const lead = await this.prisma.lead.findUnique({ where: { id } });
-    if (!lead) throw new Error('Lead not found');
+  async addTag(id: string, tenantId: string, tag: string) {
+    const lead = await this.prisma.lead.findUnique({ where: { id, tenantId } });
+    if (!lead) throw new Error('Lead not found in this tenant context.');
     const tags = Array.from(new Set([...(lead.tags || []), tag]));
-    return this.prisma.lead.update({ where: { id }, data: { tags } });
+    return this.prisma.lead.update({ where: { id, tenantId }, data: { tags } });
   }
 
-  async removeTag(id: string, tag: string) {
-    const lead = await this.prisma.lead.findUnique({ where: { id } });
-    if (!lead) throw new Error('Lead not found');
+  async removeTag(id: string, tenantId: string, tag: string) {
+    const lead = await this.prisma.lead.findUnique({ where: { id, tenantId } });
+    if (!lead) throw new Error('Lead not found in this tenant context.');
     const tags = (lead.tags || []).filter((t) => t !== tag);
-    return this.prisma.lead.update({ where: { id }, data: { tags } });
+    return this.prisma.lead.update({ where: { id, tenantId }, data: { tags } });
   }
 }

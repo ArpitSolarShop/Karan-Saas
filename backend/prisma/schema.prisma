@@ -99,6 +99,9 @@ model Tenant {
   salesOrders       SalesOrder[]
   purchaseOrders    PurchaseOrder[]
   contracts         Contract[]
+  activities        Activity[]
+  notes             Note[]
+  tasks             Task[]
   projects          Project[]
   pipelines         Pipeline[]
   closingReasons    ClosingReason[]
@@ -131,6 +134,44 @@ model Tenant {
   conversations     OmniConversation[]
   omniMessages      OmniMessage[]
 
+  // Telephony Engine
+  extensions         Extension[]
+  sipTrunks          SipTrunk[]
+  outboundRoutes     OutboundRoute[]
+  ivrMenus           IvrMenu[]
+  acdQueues          AcdQueue[]
+  skills             Skill[]
+  ringGroups         RingGroup[]
+  timeConditions     TimeCondition[]
+  cdrs               Cdr[]
+
+  // Campaign Engine
+  campaignContactLists CampaignContactList[]
+  dialerConfigs      DialerConfig[]
+  transmissions      Transmission[]
+  callSpools         CallSpool[]
+  dncEntries         DncEntry[]
+  agentScripts       AgentScript[]
+
+  // Agent Management
+  agentSessions      AgentSession[]
+  pauseCodes         PauseCode[]
+  agentPauses        AgentPause[]
+  agentCapacities    AgentCapacity[]
+  assignmentPolicies AssignmentPolicy[]
+  wallboardConfigs   WallboardConfig[]
+  qualityForms       QualityForm[]
+  qualityEvaluations QualityEvaluation[]
+  csatResponses      CsatResponse[]
+  cannedResponses    CannedResponse[]
+ 
+  sheets             Sheet[]
+  sheetColumns       SheetColumn[]
+  sheetRows          SheetRow[]
+  sheetViews         SheetView[]
+ 
+  callbacks          Callback[]
+ 
   @@map("tenants")
 }
 
@@ -201,6 +242,12 @@ model User {
   assetReservations AssetReservation[]
   leaveRequests     LeaveRequest[]
   assignedConversations OmniConversation[] @relation("ConversationAssignee")
+
+  // Telephony & Agent Management
+  extensions        Extension[]        @relation("UserExtension")
+  agentSkills       AgentSkill[]       @relation("AgentSkills")
+  agentSessions     AgentSession[]     @relation("AgentSessions")
+  agentCapacity     AgentCapacity?     @relation("AgentCapacityConfig")
 
   @@index([tenantId, role])
   @@map("users")
@@ -460,6 +507,7 @@ model Disposition {
 
 model Callback {
   id          String         @id @default(uuid())
+  tenantId    String
   leadId      String
   agentId     String
   callId      String?
@@ -471,7 +519,9 @@ model Callback {
   agent       User           @relation("CallbackAgent", fields: [agentId], references: [id])
   call        Call?          @relation(fields: [callId], references: [id])
   lead        Lead           @relation(fields: [leadId], references: [id])
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
 
+  @@index([tenantId])
   @@index([scheduledAt])
   @@map("callbacks")
 }
@@ -502,6 +552,10 @@ model Campaign {
   script             Script?            @relation(fields: [scriptId], references: [id])
   tenant             Tenant             @relation(fields: [tenantId], references: [id])
   leads              Lead[]
+
+  // Campaign Engine additions
+  contactLists       CampaignContactList[] @relation("CampaignLists")
+  dialerConfig       DialerConfig?      @relation("CampaignDialer")
 
   @@map("campaigns")
 }
@@ -595,18 +649,22 @@ model Followup {
 
 model Note {
   id        String   @id @default(uuid())
+  tenantId  String
   leadId    String
   agentId   String
   note      String
   createdAt DateTime @default(now())
   agent     User     @relation(fields: [agentId], references: [id])
   lead      Lead     @relation(fields: [leadId], references: [id])
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
 
+  @@index([tenantId])
   @@map("notes")
 }
 
 model Activity {
   id           String   @id @default(uuid())
+  tenantId     String
   leadId       String
   userId       String
   activityType String
@@ -614,7 +672,9 @@ model Activity {
   createdAt    DateTime @default(now())
   lead         Lead     @relation(fields: [leadId], references: [id])
   user         User     @relation(fields: [userId], references: [id])
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
 
+  @@index([tenantId])
   @@map("activities")
 }
 
@@ -627,6 +687,7 @@ model Tag {
 
 model Task {
   id         String   @id @default(uuid())
+  tenantId   String
   leadId     String?
   assignedTo String
   taskType   String?
@@ -637,7 +698,9 @@ model Task {
   createdAt  DateTime @default(now())
   user       User     @relation("TaskAssignee", fields: [assignedTo], references: [id])
   lead       Lead?    @relation(fields: [leadId], references: [id])
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
 
+  @@index([tenantId])
   @@index([dueDate, assignedTo])
   @@map("tasks")
 }
@@ -723,6 +786,7 @@ model Workbook {
 
 model Sheet {
   id         String        @id @default(uuid())
+  tenantId   String
   workbookId String
   name       String
   createdAt  DateTime      @default(now())
@@ -731,12 +795,15 @@ model Sheet {
   rows       SheetRow[]
   views      SheetView[]
   workbook   Workbook      @relation(fields: [workbookId], references: [id], onDelete: Cascade)
+  tenant     Tenant        @relation(fields: [tenantId], references: [id])
 
+  @@index([tenantId])
   @@map("sheets")
 }
 
 model SheetColumn {
   id        String     @id @default(uuid())
+  tenantId  String
   sheetId   String
   key       String
   name      String
@@ -746,20 +813,25 @@ model SheetColumn {
   formula   String?
   createdAt DateTime   @default(now())
   sheet     Sheet      @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
 
+  @@index([tenantId])
   @@unique([sheetId, key])
   @@map("sheet_columns")
 }
 
 model SheetRow {
   id        String   @id @default(uuid())
+  tenantId  String
   sheetId   String
   rowIndex  Int
   data      Json     @default("{}")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   sheet     Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
 
+  @@index([tenantId])
   @@unique([sheetId, rowIndex])
   @@index([sheetId, rowIndex])
   @@map("sheet_rows")
@@ -767,6 +839,7 @@ model SheetRow {
 
 model SheetView {
   id            String   @id @default(uuid())
+  tenantId      String
   sheetId       String
   name          String
   filters       Json     @default("[]")
@@ -774,7 +847,9 @@ model SheetView {
   hiddenColumns Json     @default("[]")
   createdAt     DateTime @default(now())
   sheet         Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
 
+  @@index([tenantId])
   @@map("sheet_views")
 }
 
@@ -2119,4 +2194,732 @@ model Report {
   updatedAt   DateTime   @updatedAt
 
   @@map("reports")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ██  TELEPHONY ENGINE — Extensions, Trunks, IVR, Queues, Skills, CDR       ██
+// ══════════════════════════════════════════════════════════════════════════════
+
+enum ExtensionType {
+  SIP
+  IAX
+  PJSIP
+  WEBRTC
+}
+
+enum QueueStrategy {
+  RING_ALL
+  LEAST_RECENT
+  FEWEST_CALLS
+  RANDOM
+  ROUND_ROBIN
+  LINEAR
+  WEIGHT_RANDOM
+}
+
+model Extension {
+  id               String        @id @default(uuid())
+  number           String
+  name             String
+  type             ExtensionType @default(SIP)
+  password         String
+  callerIdName     String?
+  callerIdNum      String?
+  context          String        @default("from-internal")
+  voicemailEnabled Boolean       @default(false)
+  callRecording    Boolean       @default(false)
+  transport        String        @default("udp")
+  codecs           String[]      @default(["ulaw", "alaw"])
+  maxContacts      Int           @default(1)
+  isActive         Boolean       @default(true)
+
+  userId           String?
+  user             User?         @relation("UserExtension", fields: [userId], references: [id])
+  tenantId         String
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+
+  queueMembers     QueueMember[]
+  ringGroupMembers RingGroupMember[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@map("extensions")
+}
+
+model SipTrunk {
+  id             String   @id @default(uuid())
+  name           String
+  host           String
+  port           Int      @default(5060)
+  username       String?
+  password       String?
+  transport      String   @default("udp")
+  codecs         String[] @default(["ulaw", "alaw"])
+  maxChannels    Int      @default(0)
+  context        String   @default("from-trunk")
+  isActive       Boolean  @default(true)
+  provider       String?
+  monthlyBilling Float?   @default(0)
+
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  outboundRoutes OutboundRoute[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("sip_trunks")
+}
+
+model OutboundRoute {
+  id          String   @id @default(uuid())
+  name        String
+  pattern     String
+  priority    Int      @default(0)
+  prefix      String?
+  trunkId     String
+  trunk       SipTrunk @relation(fields: [trunkId], references: [id], onDelete: Cascade)
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("outbound_routes")
+}
+
+model IvrMenu {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  greeting       String?
+  timeout        Int      @default(10)
+  retries        Int      @default(3)
+  invalidSound   String?
+  timeoutSound   String?
+  nodes          Json     @default("[]")
+  isActive       Boolean  @default(true)
+
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("ivr_menus")
+}
+
+model AcdQueue {
+  id               String        @id @default(uuid())
+  name             String
+  strategy         QueueStrategy @default(RING_ALL)
+  timeout          Int           @default(30)
+  wrapUpTime       Int           @default(15)
+  maxWaitTime      Int           @default(300)
+  maxCallers       Int           @default(0)
+  musicOnHold      String?
+  announceFreq     Int           @default(60)
+  announcePosition Boolean       @default(true)
+  joinEmpty        Boolean       @default(true)
+  leaveWhenEmpty   Boolean       @default(false)
+  serviceLevelSec  Int           @default(60)
+  isActive         Boolean       @default(true)
+
+  tenantId         String
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  members          QueueMember[]
+  skills           QueueSkill[]
+  campaigns        DialerConfig[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@map("acd_queues")
+}
+
+model QueueMember {
+  id          String    @id @default(uuid())
+  queueId     String
+  queue       AcdQueue  @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  extensionId String
+  extension   Extension @relation(fields: [extensionId], references: [id])
+  penalty     Int       @default(0)
+  paused      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@unique([queueId, extensionId])
+  @@map("queue_members")
+}
+
+model Skill {
+  id          String       @id @default(uuid())
+  name        String
+  description String?
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+
+  agents      AgentSkill[]
+  rules       SkillRule[]
+  queueSkills QueueSkill[]
+  createdAt   DateTime     @default(now())
+
+  @@unique([tenantId, name])
+  @@map("skills")
+}
+
+model AgentSkill {
+  id      String @id @default(uuid())
+  agentId String
+  agent   User   @relation("AgentSkills", fields: [agentId], references: [id])
+  skillId String
+  skill   Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  level   Int    @default(50)
+
+  @@unique([agentId, skillId])
+  @@map("agent_skills")
+}
+
+model SkillRule {
+  id       String @id @default(uuid())
+  name     String
+  skillId  String
+  skill    Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  minLevel Int    @default(1)
+  timeout  Int    @default(30)
+
+  @@map("skill_rules")
+}
+
+model QueueSkill {
+  id      String   @id @default(uuid())
+  queueId String
+  queue   AcdQueue @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  skillId String
+  skill   Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([queueId, skillId])
+  @@map("queue_skills")
+}
+
+model RingGroup {
+  id          String            @id @default(uuid())
+  name        String
+  number      String
+  strategy    QueueStrategy     @default(RING_ALL)
+  ringTime    Int               @default(20)
+  description String?
+  isActive    Boolean           @default(true)
+
+  tenantId    String
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  members     RingGroupMember[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@map("ring_groups")
+}
+
+model RingGroupMember {
+  id          String    @id @default(uuid())
+  ringGroupId String
+  ringGroup   RingGroup @relation(fields: [ringGroupId], references: [id], onDelete: Cascade)
+  extensionId String
+  extension   Extension @relation(fields: [extensionId], references: [id])
+
+  @@unique([ringGroupId, extensionId])
+  @@map("ring_group_members")
+}
+
+model TimeCondition {
+  id          String   @id @default(uuid())
+  name        String
+  matchAction String   @default("QUEUE")
+  matchTarget String?
+  noMatchAction String @default("VOICEMAIL")
+  noMatchTarget String?
+  timeRanges  Json     @default("[]")
+  isActive    Boolean  @default(true)
+
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("time_conditions")
+}
+
+model Cdr {
+  id              String   @id @default(uuid())
+  callId          String?
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  src             String?
+  dst             String?
+  callerIdName    String?
+  callerIdNum     String?
+  channel         String?
+  destChannel     String?
+  disposition     String?
+  duration        Int      @default(0)
+  billableSeconds Int      @default(0)
+  startTime       DateTime?
+  answerTime      DateTime?
+  endTime         DateTime?
+  uniqueId        String?  @unique
+  linkedId        String?
+  recordingUrl    String?
+  direction       CallDirection @default(OUTBOUND)
+  queueName       String?
+  agentId         String?
+  campaignId      String?
+  cost            Float    @default(0)
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId, startTime])
+  @@index([agentId])
+  @@index([campaignId])
+  @@map("cdr")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ██  CAMPAIGN ENGINE — Dialer, Transmission, DNC, Scripts                  ██
+// ══════════════════════════════════════════════════════════════════════════════
+
+enum DialerMode {
+  PREDICTIVE
+  PREVIEW
+  PROGRESSIVE
+  POWER
+  MANUAL
+  IVR_BLAST
+  SMS_BLAST
+  EMAIL_BLAST
+}
+
+enum TransmissionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  RETRY
+  DNC_BLOCKED
+  CANCELLED
+}
+
+enum SpoolStatus {
+  QUEUED
+  DIALING
+  RINGING
+  ANSWERED
+  COMPLETED
+  NO_ANSWER
+  BUSY
+  FAILED
+  AMD_DETECTED
+  CANCELLED
+}
+
+model CampaignContactList {
+  id          String            @id @default(uuid())
+  name        String
+  description String?
+  sourceFile  String?
+  totalCount  Int               @default(0)
+  activeCount Int               @default(0)
+  dncCount    Int               @default(0)
+
+  campaignId  String
+  campaign    Campaign          @relation("CampaignLists", fields: [campaignId], references: [id], onDelete: Cascade)
+  contacts    CampaignContact[]
+  tenantId    String
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime          @default(now())
+
+  @@index([campaignId])
+  @@map("campaign_contact_lists")
+}
+
+model CampaignContact {
+  id           String             @id @default(uuid())
+  firstName    String?
+  lastName     String?
+  phone        String
+  phoneAlt     String?
+  email        String?
+  company      String?
+  customData   Json               @default("{}")
+  status       TransmissionStatus @default(PENDING)
+  lastDialedAt DateTime?
+  attempts     Int                @default(0)
+  priority     Int                @default(0)
+  isDnc        Boolean            @default(false)
+
+  listId       String
+  list         CampaignContactList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  leadId       String?
+  transmissions Transmission[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([listId, status])
+  @@index([phone])
+  @@map("campaign_contacts")
+}
+
+model DialerConfig {
+  id                   String     @id @default(uuid())
+  mode                 DialerMode @default(PREDICTIVE)
+  callsPerAgent        Float      @default(1.2)
+  dropRateLimit        Float      @default(3.0)
+  amdEnabled           Boolean    @default(true)
+  amdAction            String     @default("DROP")
+  maxRingTime          Int        @default(30)
+  maxRetries           Int        @default(3)
+  retryIntervalMinutes Int        @default(60)
+  callerIdNumber       String?
+  callerIdName         String?
+  trunkId              String?
+  queueId              String?
+  queue                AcdQueue?  @relation(fields: [queueId], references: [id])
+  sortOrder            String     @default("FIFO")
+  filterStatus         String[]   @default(["PENDING"])
+  paceAlgorithm        String     @default("ADAPTIVE")
+
+  campaignId           String     @unique
+  campaign             Campaign   @relation("CampaignDialer", fields: [campaignId], references: [id], onDelete: Cascade)
+  tenantId             String
+  tenant               Tenant     @relation(fields: [tenantId], references: [id])
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@map("dialer_configs")
+}
+
+model Transmission {
+  id             String             @id @default(uuid())
+  contactId      String
+  contact        CampaignContact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  campaignId     String
+  serviceType    String             @default("VOICE")
+  direction      String             @default("OUTBOUND")
+  status         TransmissionStatus @default(PENDING)
+  response       String?
+  retriesAllowed Int                @default(3)
+  retriesDone    Int                @default(0)
+  lastAttemptAt  DateTime?
+  completedAt    DateTime?
+
+  tenantId       String
+  tenant         Tenant             @relation(fields: [tenantId], references: [id])
+  spools         CallSpool[]
+  createdAt      DateTime           @default(now())
+
+  @@index([campaignId, status])
+  @@index([tenantId])
+  @@map("transmissions")
+}
+
+model CallSpool {
+  id              String      @id @default(uuid())
+  transmissionId  String
+  transmission    Transmission @relation(fields: [transmissionId], references: [id], onDelete: Cascade)
+  callSid         String?     @unique
+  status          SpoolStatus @default(QUEUED)
+  response        String?
+  phoneDialed     String?
+  agentId         String?
+  duration        Int         @default(0)
+  talkTime        Int         @default(0)
+  holdTime        Int         @default(0)
+  recordingUrl    String?
+  amdResult       String?
+  startTime       DateTime?
+  connectTime     DateTime?
+  endTime         DateTime?
+  providerId      String?
+  cost            Float       @default(0)
+
+  tenantId        String
+  tenant          Tenant      @relation(fields: [tenantId], references: [id])
+  results         SpoolResult[]
+  createdAt       DateTime    @default(now())
+
+  @@index([transmissionId])
+  @@map("call_spools")
+}
+
+model SpoolResult {
+  id          String    @id @default(uuid())
+  spoolId     String
+  spool       CallSpool @relation(fields: [spoolId], references: [id], onDelete: Cascade)
+  resultType  String
+  resultData  Json      @default("{}")
+  dispositionCode String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([spoolId])
+  @@map("spool_results")
+}
+
+model DncEntry {
+  id          String   @id @default(uuid())
+  phone       String
+  source      String   @default("MANUAL")
+  reason      String?
+  campaignId  String?
+  addedBy     String?
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, phone])
+  @@index([tenantId])
+  @@map("dnc_entries")
+}
+
+model AgentScript {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  nodes       Json     @default("[]")
+  isActive    Boolean  @default(true)
+  version     Int      @default(1)
+
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("agent_scripts")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ██  AGENT MANAGEMENT — Sessions, Breaks, Capacity, Quality, CSAT          ██
+// ══════════════════════════════════════════════════════════════════════════════
+
+enum SessionStatus {
+  ACTIVE
+  ENDED
+  FORCED_LOGOUT
+}
+
+enum PauseType {
+  LUNCH
+  TEA_BREAK
+  MEETING
+  TRAINING
+  BATHROOM
+  PERSONAL
+  SYSTEM
+  OTHER
+}
+
+enum AssignmentMethod {
+  ROUND_ROBIN
+  LEAST_BUSY
+  MOST_IDLE
+  SKILL_BASED
+  RANDOM
+  MANUAL
+}
+
+model AgentSession {
+  id          String        @id @default(uuid())
+  agentId     String
+  agent       User          @relation("AgentSessions", fields: [agentId], references: [id])
+  status      SessionStatus @default(ACTIVE)
+  loginAt     DateTime      @default(now())
+  logoutAt    DateTime?
+  ipAddress   String?
+  userAgent   String?
+  totalTalkTime    Int      @default(0)
+  totalIdleTime    Int      @default(0)
+  totalPauseTime   Int      @default(0)
+  callsHandled     Int      @default(0)
+  callsTransferred Int      @default(0)
+
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  pauses      AgentPause[]
+  createdAt   DateTime      @default(now())
+
+  @@index([agentId, loginAt])
+  @@index([tenantId])
+  @@map("agent_sessions")
+}
+
+model PauseCode {
+  id          String    @id @default(uuid())
+  code        String
+  name        String
+  type        PauseType @default(OTHER)
+  maxDuration Int?
+  isPaid      Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  color       String    @default("#6B7280")
+
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  pauses      AgentPause[]
+
+  @@unique([tenantId, code])
+  @@map("pause_codes")
+}
+
+model AgentPause {
+  id          String        @id @default(uuid())
+  sessionId   String
+  session     AgentSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  pauseCodeId String
+  pauseCode   PauseCode     @relation(fields: [pauseCodeId], references: [id])
+  startedAt   DateTime      @default(now())
+  endedAt     DateTime?
+  duration    Int?
+  notes       String?
+
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+
+  @@index([sessionId])
+  @@map("agent_pauses")
+}
+
+model AgentCapacity {
+  id                  String @id @default(uuid())
+  agentId             String @unique
+  agent               User   @relation("AgentCapacityConfig", fields: [agentId], references: [id])
+  maxConcurrentChats  Int    @default(5)
+  maxConcurrentCalls  Int    @default(1)
+  maxConcurrentEmails Int    @default(10)
+  autoAcceptCalls     Boolean @default(false)
+  autoAcceptChats     Boolean @default(false)
+
+  tenantId            String
+  tenant              Tenant  @relation(fields: [tenantId], references: [id])
+
+  @@map("agent_capacities")
+}
+
+model AssignmentPolicy {
+  id          String           @id @default(uuid())
+  name        String
+  method      AssignmentMethod @default(ROUND_ROBIN)
+  entityType  String           @default("CONVERSATION")
+  priority    Int              @default(0)
+  conditions  Json             @default("[]")
+  isActive    Boolean          @default(true)
+
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([tenantId])
+  @@map("assignment_policies")
+}
+
+model WallboardConfig {
+  id          String   @id @default(uuid())
+  name        String
+  layout      Json     @default("[]")
+  refreshRate Int      @default(5)
+  isDefault   Boolean  @default(false)
+
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("wallboard_configs")
+}
+
+model QualityForm {
+  id          String              @id @default(uuid())
+  name        String
+  description String?
+  sections    Json                @default("[]")
+  maxScore    Int                 @default(100)
+  isActive    Boolean             @default(true)
+
+  tenantId    String
+  tenant      Tenant              @relation(fields: [tenantId], references: [id])
+  evaluations QualityEvaluation[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([tenantId])
+  @@map("quality_forms")
+}
+
+model QualityEvaluation {
+  id           String      @id @default(uuid())
+  formId       String
+  form         QualityForm @relation(fields: [formId], references: [id])
+  callId       String?
+  agentId      String
+  evaluatorId  String
+  scores       Json        @default("{}")
+  totalScore   Float       @default(0)
+  maxScore     Float       @default(100)
+  percentage   Float       @default(0)
+  comments     String?     @db.Text
+  status       String      @default("DRAFT")
+
+  tenantId     String
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([agentId])
+  @@index([tenantId])
+  @@map("quality_evaluations")
+}
+
+model CsatResponse {
+  id              String   @id @default(uuid())
+  conversationId  String?
+  callId          String?
+  contactId       String?
+  agentId         String?
+  rating          Int
+  feedbackMessage String?  @db.Text
+  channel         String   @default("VOICE")
+
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([agentId])
+  @@map("csat_responses")
+}
+
+model CannedResponse {
+  id          String   @id @default(uuid())
+  shortCode   String
+  content     String   @db.Text
+  category    String?
+  isGlobal    Boolean  @default(false)
+  userId      String?
+  isActive    Boolean  @default(true)
+
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, shortCode])
+  @@index([tenantId])
+  @@map("canned_responses")
 }

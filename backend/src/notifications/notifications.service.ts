@@ -5,17 +5,20 @@ import { PrismaService } from '../prisma/prisma.service';
 export class NotificationsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(recipientId?: string) {
+  async findAll(tenantId: string, recipientId?: string) {
     return this.prisma.notification.findMany({
-      where: recipientId ? { recipientId } : undefined,
+      where: { 
+        tenantId,
+        ...(recipientId && { recipientId })
+      },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
   }
 
-  async findUnread(recipientId: string) {
+  async findUnread(tenantId: string, recipientId: string) {
     return this.prisma.notification.findMany({
-      where: { recipientId, isRead: false },
+      where: { tenantId, recipientId, isRead: false },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -27,11 +30,11 @@ export class NotificationsService {
     body?: string;
     entityType?: string;
     entityId?: string;
-    tenantId?: string;
+    tenantId: string;
   }) {
     return this.prisma.notification.create({
       data: {
-        tenantId: data.tenantId || 'dev-tenant-001',
+        tenantId: data.tenantId,
         recipientId: data.recipientId,
         type: data.type,
         title: data.title,
@@ -42,24 +45,24 @@ export class NotificationsService {
     });
   }
 
-  async markRead(id: string) {
+  async markRead(id: string, tenantId: string) {
     return this.prisma.notification.update({
-      where: { id },
+      where: { id, tenantId },
       data: { isRead: true, readAt: new Date() },
     });
   }
 
-  async markAllRead(recipientId: string) {
+  async markAllRead(tenantId: string, recipientId: string) {
     return this.prisma.notification.updateMany({
-      where: { recipientId, isRead: false },
+      where: { tenantId, recipientId, isRead: false },
       data: { isRead: true, readAt: new Date() },
     });
   }
 
   // ── Suppressions (DNC) ──
-  async findAllSuppressions(tenantId?: string) {
+  async findAllSuppressions(tenantId: string) {
     return this.prisma.suppression.findMany({
-      where: tenantId ? { tenantId } : undefined,
+      where: { tenantId },
       orderBy: { addedAt: 'desc' },
     });
   }
@@ -69,11 +72,11 @@ export class NotificationsService {
     type: string;
     reason?: string;
     addedBy?: string;
-    tenantId?: string;
+    tenantId: string;
   }) {
     return this.prisma.suppression.create({
       data: {
-        tenantId: data.tenantId || 'dev-tenant-001',
+        tenantId: data.tenantId,
         phoneE164: data.phoneE164,
         type: data.type,
         reason: data.reason,
@@ -82,15 +85,15 @@ export class NotificationsService {
     });
   }
 
-  async checkDnc(phone: string) {
+  async checkDnc(tenantId: string, phone: string) {
     const suppression = await this.prisma.suppression.findFirst({
-      where: { phoneE164: phone },
+      where: { tenantId, phoneE164: phone },
     });
     return { isDnc: !!suppression, suppression };
   }
 
-  async removeSuppression(id: string) {
-    return this.prisma.suppression.delete({ where: { id } });
+  async removeSuppression(id: string, tenantId: string) {
+    return this.prisma.suppression.delete({ where: { id, tenantId } });
   }
 
   // ── Audit Logs ──
@@ -101,24 +104,27 @@ export class NotificationsService {
     action: string;
     oldValues?: any;
     newValues?: any;
-    tenantId?: string;
+    tenantId: string;
   }) {
     return this.prisma.auditLog.create({
       data: {
-        tenantId: data.tenantId || 'dev-tenant-001',
+        tenantId: data.tenantId,
         userId: data.userId,
         entityType: data.entityType,
         entityId: data.entityId,
         action: data.action,
-        oldValues: data.oldValues,
-        newValues: data.newValues,
+        details: {
+          oldValues: data.oldValues ?? null,
+          newValues: data.newValues ?? null,
+        },
       },
     });
   }
 
-  async getAuditTrail(entityType?: string, entityId?: string) {
+  async getAuditTrail(tenantId: string, entityType?: string, entityId?: string) {
     return this.prisma.auditLog.findMany({
       where: {
+        tenantId,
         ...(entityType && { entityType }),
         ...(entityId && { entityId }),
       },

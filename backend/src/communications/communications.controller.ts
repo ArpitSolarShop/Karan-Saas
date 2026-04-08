@@ -56,6 +56,7 @@ export class CommunicationsController {
       content?: string;
       userId?: string;
     },
+    @Req() req: any,
   ) {
     const type = (body.channel || body.type || 'WHATSAPP') as
       | 'WHATSAPP'
@@ -63,10 +64,11 @@ export class CommunicationsController {
       | 'SMS';
     const message = body.content || body.message || '';
     return this.commsService.sendCommunication(
+      req.user.tenantId,
       body.leadId,
       type,
       message,
-      body.userId || 'SYSTEM',
+      body.userId || req.user.id || 'SYSTEM',
     );
   }
 
@@ -75,9 +77,13 @@ export class CommunicationsController {
    * Inbox thread list — group activities by lead
    */
   @Get('threads')
-  async getThreads() {
+  async getThreads(@Req() req: any) {
+    const tenantId = req.user.tenantId;
     const activities = (await this.prisma.activity.findMany({
-      where: { activityType: { in: ['WHATSAPP', 'EMAIL', 'SMS'] } },
+      where: { 
+        tenantId,
+        activityType: { in: ['WHATSAPP', 'EMAIL', 'SMS'] } 
+      },
       include: {
         lead: {
           select: { id: true, name: true, firstName: true, phone: true },
@@ -111,19 +117,20 @@ export class CommunicationsController {
    * WhatsAppMessage table (raw Baileys history) for complete conversation.
    */
   @Get('thread/:leadId')
-  async getThread(@Param('leadId') paramLeadId: string, @Query('phone') qPhone?: string) {
+  async getThread(@Param('leadId') paramLeadId: string, @Req() req: any, @Query('phone') qPhone?: string) {
     let leadId = paramLeadId;
     let fallbackPhone = qPhone;
+    const tenantId = req.user.tenantId;
 
     // Resolve SheetRow.id to Lead.id by phone if paramLeadId doesn't belong to a Lead
     let lead = await this.prisma.lead.findUnique({
-      where: { id: leadId },
+      where: { id: leadId, tenantId },
       select: { id: true, phone: true, name: true, firstName: true },
     });
 
     if (!lead) {
       const sheetRow = await this.prisma.sheetRow.findUnique({
-        where: { id: leadId },
+        where: { id: leadId, tenantId },
       });
       if (sheetRow) {
         const rowData = sheetRow.data as any;
@@ -131,7 +138,7 @@ export class CommunicationsController {
         fallbackPhone = phone;
         if (phone) {
           const existingLead = await this.prisma.lead.findFirst({
-            where: { phone: String(phone) },
+            where: { phone: String(phone), tenantId },
             select: { id: true, phone: true, name: true, firstName: true },
           });
           if (existingLead) {
@@ -144,7 +151,7 @@ export class CommunicationsController {
 
     // ── 1. Activity-based messages (outbound CRM sends + newly-logged inbound) ──
     const activities = (await this.prisma.activity.findMany({
-      where: { leadId, activityType: { in: ['WHATSAPP', 'EMAIL', 'SMS'] } },
+      where: { leadId, tenantId, activityType: { in: ['WHATSAPP', 'EMAIL', 'SMS'] } },
       orderBy: { createdAt: 'asc' },
     })) as any[];
 

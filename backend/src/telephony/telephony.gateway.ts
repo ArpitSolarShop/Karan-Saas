@@ -6,6 +6,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 
 @WebSocketGateway({  cors: {
     origin: [
@@ -26,6 +27,35 @@ export class TelephonyGateway {
     this.logger.log(`Frontend Connected: ${client.id}`);
   }
 
+  @SubscribeMessage('join_room')
+  handleJoinRoom(client: Socket, @MessageBody() data: { roomId: string }) {
+    client.join(data.roomId);
+    this.logger.log(`Client ${client.id} joined room ${data.roomId}`);
+    return { status: 'OK' };
+  }
+
+  @SubscribeMessage('call:initiate')
+  handleCallInitiate(client: Socket, @MessageBody() data: { to: string; agentId: string; metadata?: any }) {
+    this.logger.log(`[Signaling] Call Initiate from ${data.agentId} to ${data.to}`);
+    // In real scenario, talk to FreeSWITCH here
+    this.server.to(`agent:${data.agentId}`).emit('call:status', { status: 'CONNECTING', to: data.to, metadata: data.metadata });
+    return { status: 'OK' };
+  }
+
+  @SubscribeMessage('call:answer')
+  handleCallAnswer(client: Socket, @MessageBody() data: { agentId: string; callId: string }) {
+    this.logger.log(`[Signaling] Call Answered by ${data.agentId}`);
+    this.server.to(`agent:${data.agentId}`).emit('call:status', { status: 'INCALL', callId: data.callId });
+    return { status: 'OK' };
+  }
+
+  @SubscribeMessage('call:hangup')
+  handleCallHangup(client: Socket, @MessageBody() data: { agentId: string; callId: string }) {
+    this.logger.log(`[Signaling] Call Hangup by ${data.agentId}`);
+    this.server.to(`agent:${data.agentId}`).emit('call:status', { status: 'IDLE', callId: data.callId });
+    return { status: 'OK' };
+  }
+
   handleDisconnect(client: Socket) {
     this.logger.log(`Frontend Disconnected: ${client.id}`);
   }
@@ -39,5 +69,11 @@ export class TelephonyGateway {
   @SubscribeMessage('ping')
   handlePing(@MessageBody() data: any): string {
     return 'pong';
+  }
+
+  @OnEvent('bi.wallboard.update')
+  handleWallboardUpdate(payload: any) {
+    // Broadcast to everyone subscribed to global BI
+    this.server.emit('bi:live_metrics', payload);
   }
 }

@@ -1,0 +1,64 @@
+
+> backend@0.0.1 build
+> nest build
+
+[96msrc/communications/communications.service.ts[0m:[93m124[0m:[93m31[0m - [91merror[0m[90m TS2554: [0mExpected 5 arguments, but got 4.
+
+[7m124[0m         await this.activities.log(
+[7m   [0m [91m                              ~~~[0m
+
+  [96msrc/activities/activities.service.ts[0m:[93m13[0m:[93m5[0m
+    [7m13[0m     description: string,
+    [7m  [0m [96m    ~~~~~~~~~~~~~~~~~~~[0m
+    An argument for 'description' was not provided.
+[96msrc/communications/whatsapp-client.service.ts[0m:[93m212[0m:[93m9[0m - [91merror[0m[90m TS2322: [0mType '{ leadId: string; userId: string; activityType: string; description: string; }' is not assignable to type '(Without<ActivityCreateInput, ActivityUncheckedCreateInput> & ActivityUncheckedCreateInput) | (Without<...> & ActivityCreateInput)'.
+  Type '{ leadId: string; userId: string; activityType: string; description: string; }' is not assignable to type 'Without<ActivityCreateInput, ActivityUncheckedCreateInput> & ActivityUncheckedCreateInput'.
+    Property 'tenantId' is missing in type '{ leadId: string; userId: string; activityType: string; description: string; }' but required in type 'ActivityUncheckedCreateInput'.
+
+[7m212[0m         data: {
+[7m   [0m [91m        ~~~~[0m
+
+  [96mnode_modules/.prisma/client/index.d.ts[0m:[93m195835[0m:[93m5[0m
+    [7m195835[0m     tenantId: string
+    [7m      [0m [96m    ~~~~~~~~[0m
+    'tenantId' is declared here.
+  [96mnode_modules/.prisma/client/index.d.ts[0m:[93m46550[0m:[93m5[0m
+    [7m46550[0m     data: XOR<ActivityCreateInput, ActivityUncheckedCreateInput>
+    [7m     [0m [96m    ~~~~[0m
+    The expected type comes from property 'data' which is declared here on type '{ select?: ActivitySelect<DefaultArgs> | null | undefined; omit?: ActivityOmit<DefaultArgs> | null | undefined; include?: ActivityInclude<...> | ... 1 more ... | undefined; data: (Without<...> & ActivityUncheckedCreateInput) | (Without<...> & ActivityCreateInput); }'
+[96msrc/leads/leads.service.ts[0m:[93m98[0m:[93m27[0m - [91merror[0m[90m TS2554: [0mExpected 5 arguments, but got 4.
+
+[7m98[0m     await this.activities.log(
+[7m  [0m [91m                          ~~~[0m
+
+  [96msrc/activities/activities.service.ts[0m:[93m13[0m:[93m5[0m
+    [7m13[0m     description: string,
+    [7m  [0m [96m    ~~~~~~~~~~~~~~~~~~~[0m
+    An argument for 'description' was not provided.
+[96msrc/leads/leads.service.ts[0m:[93m122[0m:[93m27[0m - [91merror[0m[90m TS2554: [0mExpected 5 arguments, but got 4.
+
+[7m122[0m     await this.activities.log(
+[7m   [0m [91m                          ~~~[0m
+
+  [96msrc/activities/activities.service.ts[0m:[93m13[0m:[93m5[0m
+    [7m13[0m     description: string,
+    [7m  [0m [96m    ~~~~~~~~~~~~~~~~~~~[0m
+    An argument for 'description' was not provided.
+[96msrc/whatsapp/cloud-api-webhook.controller.ts[0m:[93m311[0m:[93m15[0m - [91merror[0m[90m TS2322: [0mType '{ leadId: string; userId: string; activityType: string; description: string; }' is not assignable to type '(Without<ActivityCreateInput, ActivityUncheckedCreateInput> & ActivityUncheckedCreateInput) | (Without<...> & ActivityCreateInput)'.
+  Type '{ leadId: string; userId: string; activityType: string; description: string; }' is not assignable to type 'Without<ActivityCreateInput, ActivityUncheckedCreateInput> & ActivityUncheckedCreateInput'.
+    Property 'tenantId' is missing in type '{ leadId: string; userId: string; activityType: string; description: string; }' but required in type 'ActivityUncheckedCreateInput'.
+
+[7m311[0m               data: {
+[7m   [0m [91m              ~~~~[0m
+
+  [96mnode_modules/.prisma/client/index.d.ts[0m:[93m195835[0m:[93m5[0m
+    [7m195835[0m     tenantId: string
+    [7m      [0m [96m    ~~~~~~~~[0m
+    'tenantId' is declared here.
+  [96mnode_modules/.prisma/client/index.d.ts[0m:[93m46550[0m:[93m5[0m
+    [7m46550[0m     data: XOR<ActivityCreateInput, ActivityUncheckedCreateInput>
+    [7m     [0m [96m    ~~~~[0m
+    The expected type comes from property 'data' which is declared here on type '{ select?: ActivitySelect<DefaultArgs> | null | undefined; omit?: ActivityOmit<DefaultArgs> | null | undefined; include?: ActivityInclude<...> | ... 1 more ... | undefined; data: (Without<...> & ActivityUncheckedCreateInput) | (Without<...> & ActivityCreateInput); }'
+
+Found 5 error(s).
+

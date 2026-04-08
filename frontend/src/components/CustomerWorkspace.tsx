@@ -26,8 +26,19 @@ import {
   Star,
   Download,
   WifiOff,
+  Zap,
+  ShieldCheck,
+  BrainCircuit,
+  ThumbsUp,
+  ThumbsDown,
+  Minus,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import CompanySelect from "@/components/companies/CompanySelect";
+import Timeline from "@/components/leads/Timeline";
+import { toast } from "sonner";
+import Link from "next/link";
 
 interface CustomerWorkspaceProps {
   isOpen: boolean;
@@ -55,7 +66,7 @@ export default function CustomerWorkspace({
   onCall,
 }: CustomerWorkspaceProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const [channelTab, setChannelTab] = useState<"messages" | "quotes">(
+  const [channelTab, setChannelTab] = useState<"messages" | "quotes" | "timeline">(
     "messages"
   );
   const [sendChannel, setSendChannel] = useState<"WHATSAPP" | "SMS" | "EMAIL">(
@@ -142,6 +153,18 @@ export default function CustomerWorkspace({
     }
   };
 
+  const handleUpdateCompany = async (companyId: string) => {
+    if (!activeLead?.id) return;
+    try {
+      await api.patch(`/leads-v2/${activeLead.id}`, { companyId: companyId || null });
+      toast.success(companyId ? "Account linked" : "Account unlinked");
+      mutate(`/sheets/sheet-001/rows`);
+      // Also mutate the communications thread if needed, but the lead object in parent should update via SWR
+    } catch (error) {
+      toast.error("Failed to update account link");
+    }
+  };
+
   if (!isOpen || !activeLead || !isMounted) return null;
 
   const leadName =
@@ -182,6 +205,49 @@ export default function CustomerWorkspace({
           <p className="text-muted-foreground text-[11px] truncate">
             {activeLead.phone || activeLead.email || "No contact info"}
           </p>
+          
+          <div className="mt-2 group/company">
+            {activeLead.companyId ? (
+              <div className="flex items-center justify-between gap-2 bg-primary/5 border border-primary/10 rounded px-2 py-1">
+                <Link 
+                  href={`/companies/${activeLead.companyId}`}
+                  className="flex items-center gap-1.5 text-[10px] font-bold text-primary hover:underline truncate"
+                >
+                  <Building2 size={10} />
+                  {activeLead.company?.name || "Linked Account"}
+                </Link>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-4 w-4 opacity-0 group-hover/company:opacity-100 transition-opacity"
+                  onClick={() => handleUpdateCompany("")}
+                >
+                  <X size={10} />
+                </Button>
+              </div>
+            ) : (
+              <CompanySelect 
+                value={activeLead.companyId} 
+                onSelect={(id) => handleUpdateCompany(id)} 
+                className="w-full"
+              />
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 mt-2">
+             <div className={cn(
+               "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest flex items-center gap-1",
+               activeLead.aiSentimentLast === 'POSITIVE' ? 'bg-success/10 text-success border border-success/20' : 
+               activeLead.aiSentimentLast === 'NEGATIVE' ? 'bg-destructive/10 text-destructive border border-destructive/20' : 
+               'bg-muted text-muted-foreground border border-border'
+             )}>
+                <BrainCircuit size={8}/> 
+                {activeLead.aiSentimentLast || 'NEUTRAL'} SENTIMENT
+             </div>
+             {activeLead.isDnc && (
+               <div className="px-1.5 py-0.5 bg-destructive/10 text-destructive border border-destructive/20 rounded text-[8px] font-black uppercase tracking-widest">DNC PROTECTED</div>
+             )}
+          </div>
         </div>
 
         <div className="flex items-center gap-1 mr-8">
@@ -203,12 +269,32 @@ export default function CustomerWorkspace({
         </div>
       </header>
 
-      {/* ── Lead Score ── */}
-      <div className="px-4 py-2 bg-[#1a1a2e] border-b border-white/5 flex items-center justify-between shrink-0">
-        <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
-          Lead Score
-        </span>
-        <div className="flex items-center gap-3">
+      {/* ── Intelligence Gauge ── */}
+      <div className="px-6 py-5 bg-[#0f172a] border-b border-white/5 relative overflow-hidden shrink-0">
+        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+           <Zap size={80} className="text-primary"/>
+        </div>
+        
+        <div className="flex items-end justify-between relative z-10 mb-4">
+           <div>
+              <h4 className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Alpha Score Index</h4>
+              <p className="text-[9px] text-muted-foreground uppercase font-mono mt-1">Priority Class: {score > 80 ? 'CRITICAL' : score > 50 ? 'HIGH' : 'STANDARD'}</p>
+           </div>
+           <div className="text-right">
+              <span className="text-3xl font-black text-foreground tabular-nums tracking-tighter">{score}</span>
+              <span className="text-[10px] font-bold text-muted-foreground ml-1">/100</span>
+           </div>
+        </div>
+
+        <div className="space-y-3 relative z-10">
+          <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden border border-white/5">
+             <div 
+               className={cn("h-full transition-all duration-500 ease-out shadow-lg", 
+                 score > 80 ? 'bg-success' : score > 50 ? 'bg-primary' : 'bg-yellow-500'
+               )} 
+               style={{ width: `${score}%`, boxShadow: '0 0 10px var(--tw-shadow-color)' }}
+             />
+          </div>
           <input
             type="range"
             min="0"
@@ -218,13 +304,12 @@ export default function CustomerWorkspace({
             onMouseUp={(e) =>
               updateScore(parseInt((e.target as HTMLInputElement).value))
             }
-            className="w-28 h-1 rounded-full cursor-pointer accent-primary"
+            className="w-full h-1 opacity-0 absolute inset-0 cursor-pointer"
           />
-          <span
-            className="text-xs font-black tabular-nums min-w-[28px] text-right text-primary"
-          >
-            {score}
-          </span>
+          <div className="flex justify-between items-center text-[8px] font-black text-white/30 uppercase tracking-widest">
+             <span>Qualification: {score > 40 ? 'VERIFIED' : 'PENDING'}</span>
+             <span>Last Adjusted: Just now</span>
+          </div>
         </div>
       </div>
 
@@ -233,6 +318,7 @@ export default function CustomerWorkspace({
         {[
           { id: "messages", label: "Messages" },
           { id: "quotes", label: "Quotes" },
+          { id: "timeline", label: "Timeline" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -410,7 +496,7 @@ export default function CustomerWorkspace({
             </div>
           </div>
         </>
-      ) : (
+      ) : channelTab === "quotes" ? (
         /* ── Quotes Panel ── */
         <div className="flex-grow overflow-y-auto bg-[#0d1117] px-4 py-4 space-y-4">
           {!quotes || quotes.length === 0 ? (
@@ -465,6 +551,8 @@ export default function CustomerWorkspace({
             ))
           )}
         </div>
+      ) : (
+        <Timeline leadId={activeLead.id} />
       )}
     </div>
   );

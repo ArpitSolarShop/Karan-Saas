@@ -16,27 +16,45 @@ export class AiService {
     private searchService: SearchService,
     private config: ConfigService,
   ) {
-    this.deepgram = new DeepgramClient(
-      this.config.get<string>('DEEPGRAM_API_KEY') as string,
-    );
-
-    this.openai = new OpenAI({
-      apiKey: this.config.get<string>('OPENAI_API_KEY'),
+    this.deepgram = new DeepgramClient({
+      apiKey: this.config.get<string>('DEEPGRAM_API_KEY') || '',
     });
+
+    const aiKey = this.config.get<string>('GROQ_API_KEY') || this.config.get<string>('OPENAI_API_KEY');
+    
+    // We will use standard OpenAI SDK but repointed to an Open Source proxy 
+    // Defaults to Groq for ultra-fast Llama/Gemma. Falls back to OpenAI if standard key.
+    const isGroq = !!this.config.get<string>('GROQ_API_KEY');
+    
+    this.openai = new OpenAI({
+      apiKey: aiKey || 'sk-placeholder-key-not-configured',
+      baseURL: isGroq ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1',
+    });
+    
+    if (!aiKey) {
+      this.logger.warn('[AI] Neither GROQ_API_KEY nor OPENAI_API_KEY found — AI features disabled');
+    } else {
+      this.logger.log(`[AI] Initialized with Open-Weights Compatible Engine. Provider: ${isGroq ? 'Groq (Llama/Gemma)' : 'Standard LLM'}`);
+    }
+  }
+
+  private getDefaultModel(): string {
+     return this.config.get<string>('GROQ_API_KEY') ? 'llama3-8b-8192' : 'gpt-4o-mini';
   }
 
   /**
    * LLM-powered Sentiment Analysis & Summarization
    */
   async analyzeWithLLM(text: string): Promise<{ sentiment: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL'; summary: string; keywords: string[] }> {
-    if (!this.config.get('OPENAI_API_KEY')) {
+    if (!this.config.get('OPENAI_API_KEY') && !this.config.get('GROQ_API_KEY')) {
       this.logger.warn('[AI] OPENAI_API_KEY missing - falling back to Neutral');
       return { sentiment: 'NEUTRAL', summary: 'AI Analysis skipped (API Key missing)', keywords: [] };
     }
 
     try {
+      const model = this.getDefaultModel();
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: model,
         messages: [
           {
             role: 'system',
@@ -186,5 +204,52 @@ export class AiService {
     }
 
     return Math.min(Math.max(totalScore, 0), 100);
+  }
+
+  /**
+   * Evaluates a Lead based on their initial CRM context.
+   * Used heavily by the native Backend Automation Workflow Engine.
+   */
+  async evaluateLeadAction(leadContext: any): Promise<{ summary: string; suggestedPriority: 'HIGH' | 'MEDIUM' | 'LOW' }> {
+    const aiKey = this.config.get<string>('GROQ_API_KEY') || this.config.get<string>('OPENAI_API_KEY');
+    if (!aiKey) {
+       return { summary: 'AI grading skipped (no provider injected).', suggestedPriority: 'MEDIUM' };
+    }
+
+    try {
+      // Opt to use Gemma 2 if we are on Groq, else fallback to standard Llama3 or GPT
+      const model = this.config.get<string>('GROQ_API_KEY') ? 'gemma2-9b-it' : this.getDefaultModel();
+      
+      const payloadContext = JSON.stringify({
+        name: leadContext.leadName || 'Unknown Lead',
+        email: leadContext.email || 'N/A',
+        source: leadContext.source || 'Direct',
+        notes: leadContext.initialNotes || 'No notes provided',
+      });
+
+      this.logger.log(`[AI] Grading Lead Context via ${model}: ${leadContext.leadId}`);
+
+      const response = await this.openai.chat.completions.create({
+        model: model,
+        temperature: 0.1,
+        messages: [
+          {
+            role: 'system',
+            content: `You are an AI Lead Grader. Given the JSON dump of a newly arrived Sales Lead, output a strictly formatted JSON dict containing "summary" (A 2 sentence assessment of this lead's value based on standard B2B heuristic rules) and "suggestedPriority" (Must be exactly one of "HIGH", "MEDIUM", or "LOW").`
+          },
+          { role: 'user', content: payloadContext }
+        ],
+        response_format: { type: 'json_object' }
+      });
+
+      const result = JSON.parse(response.choices[0].message.content || '{}');
+      return {
+         summary: result.summary || 'Analyzed via Open Weights.',
+         suggestedPriority: result.suggestedPriority || 'MEDIUM',
+      };
+    } catch (err) {
+      this.logger.error(`[AI] evaluateLeadAction failed: ${err.message}`);
+      return { summary: `Error: ${err.message}`, suggestedPriority: 'MEDIUM' };
+    }
   }
 }

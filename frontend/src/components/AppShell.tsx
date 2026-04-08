@@ -14,7 +14,7 @@ import {
   Settings, LogOut, ChevronLeft, ChevronRight,
   LayoutDashboard, Box, ScrollText, KanbanSquare, Zap, Target, ArrowRightLeft, MapPin, Search, Plus, Calendar as CalendarIcon, UserCircle2, Car, Database, FormInput, ShieldAlert, Workflow,
   PhoneOff, Mic, MicOff, Megaphone, BarChart2,
-  ClipboardList, Shield, MessageSquare,
+  ClipboardList, Shield, MessageSquare, ShieldCheck,
   CheckSquare, ShieldOff, FileText, BookOpen, ChevronDown, Menu, X, Table, TrendingUp
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,29 +26,26 @@ const NAV_LINKS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inbox", label: "Inbox", icon: MessageSquare },
   { href: "/leads", label: "Leads", icon: Users },
+  { href: "/telephony", label: "Telephony", icon: PhoneOff },
+  { href: "/campaign-engine", label: "Dialer", icon: Megaphone },
+  { href: "/supervisor", label: "Supervisor", icon: Shield },
   { href: "/analytics/sentiment", label: "AI Sentiment", icon: TrendingUp },
   { href: "/workflows/builder", label: "Automations", icon: Zap },
   { href: "/deals", label: "Deals", icon: Briefcase },
   { href: "/companies", label: "Companies", icon: Building2 },
   { href: "/documents", label: "Documents", icon: HardDrive },
-  { href: "/workflows", label: "Automations", icon: Zap },
   { href: "/projects", label: "Projects", icon: KanbanSquare },
   { href: "/products", label: "Products", icon: Box },
   { href: "/invoices", label: "Invoices", icon: ScrollText },
   { href: "/calendar", label: "Calendar", icon: CalendarIcon },
   { href: "/hr", label: "HR & Gamification", icon: UserCircle2 },
   { href: "/assets", label: "Assets & Vehicles", icon: Car },
-  { href: "/custom-objects", label: "Low Code Database", icon: Database },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/approvals", label: "Approvals", icon: ShieldAlert },
-  { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/web-forms", label: "Web Forms", icon: FormInput },
-  { href: "/marketing", label: "Marketing", icon: Zap },
-  { href: "/chains", label: "Macro Chains", icon: Workflow },
-  { href: "/workbooks", label: "Sheets", icon: Table },
   { href: "/tickets", label: "Support", icon: MessageSquare },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },
-  { href: "/supervisor", label: "Supervisor", icon: Shield },
+  { href: "/audit-logs", label: "Audit Logs", icon: ShieldCheck },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -57,7 +54,7 @@ const SETTINGS_LINKS = [
   { href: "/settings/users", label: "Users" },
   { href: "/settings/dnc", label: "DNC Manager" },
   { href: "/settings/whatsapp", label: "WhatsApp" },
-  { href: "/settings/audit-logs", label: "Audit Logs" },
+  { href: "/audit-logs", label: "Audit Logs" },
 ];
 
 function RealtimeStateMount() {

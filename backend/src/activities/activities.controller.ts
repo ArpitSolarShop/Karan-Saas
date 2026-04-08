@@ -1,9 +1,10 @@
-﻿import { UseGuards } from '@nestjs/common';
+import { UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { ActivitiesService } from './activities.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 @Controller('activities')
 export class ActivitiesController {
   constructor(private readonly activitiesService: ActivitiesService) {}
@@ -17,8 +18,10 @@ export class ActivitiesController {
       type: string;
       description: string;
     },
+    @Req() req: any,
   ) {
     return this.activitiesService.log(
+      req.tenantId || req.user.tenantId,
       body.leadId,
       body.userId,
       body.type,
@@ -27,12 +30,12 @@ export class ActivitiesController {
   }
 
   @Get('lead/:leadId')
-  findByLead(@Param('leadId') leadId: string) {
-    return this.activitiesService.findByLead(leadId);
+  findByLead(@Param('leadId') leadId: string, @Req() req: any) {
+    return this.activitiesService.findByLead(leadId, req.tenantId || req.user.tenantId);
   }
 
   @Get()
-  findAll(@Query('tenantId') tenantId?: string) {
-    return this.activitiesService.findAll(tenantId);
+  findAll(@Req() req: any) {
+    return this.activitiesService.findAll(req.tenantId || req.user.tenantId);
   }
 }

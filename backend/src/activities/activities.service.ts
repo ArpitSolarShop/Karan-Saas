@@ -6,6 +6,7 @@ export class ActivitiesService {
   constructor(private prisma: PrismaService) {}
 
   async log(
+    tenantId: string,
     leadId: string,
     userId: string,
     activityType: string,
@@ -13,6 +14,7 @@ export class ActivitiesService {
   ) {
     return this.prisma.activity.create({
       data: {
+        tenantId,
         leadId,
         userId,
         activityType,
@@ -21,17 +23,17 @@ export class ActivitiesService {
     });
   }
 
-  async findByLead(leadId: string) {
+  async findByLead(leadId: string, tenantId: string) {
     return this.prisma.activity.findMany({
-      where: { leadId },
+      where: { leadId, tenantId },
       include: { user: { select: { firstName: true, lastName: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findAll(tenantId?: string) {
+  async findAll(tenantId: string) {
     return this.prisma.activity.findMany({
-      where: tenantId ? { lead: { tenantId } } : undefined,
+      where: { tenantId },
       include: {
         lead: { select: { name: true } },
         user: { select: { firstName: true, lastName: true } },

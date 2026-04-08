@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AiService } from '../ai/ai.service';
+import { WhatsAppService } from '../communications/providers/whatsapp.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import axios from 'axios';
 
 @Injectable()
@@ -10,17 +13,17 @@ export class WorkflowsService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private ai: AiService,
+    private whatsapp: WhatsAppService,
+    private auditLogs: AuditLogsService,
   ) {}
 
-  private async ensureDevTenant(): Promise<string> {
-    const tenantId = 'dev-tenant-001';
-    return tenantId;
-  }
+  // Strict production isolation: no legacy dev fallbacks.
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
-  async findAll(tenantId?: string) {
+  async findAll(tenantId: string) {
     return this.prisma.workflowRule.findMany({
-      where: tenantId ? { tenantId } : undefined,
+      where: { tenantId },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -31,9 +34,9 @@ export class WorkflowsService {
     condition?: any;
     action: string;
     actionParams?: any;
-    tenantId?: string;
+    tenantId: string;
   }) {
-    const tenantId = data.tenantId || (await this.ensureDevTenant());
+    const tenantId = data.tenantId;
     return this.prisma.workflowRule.create({
       data: {
         tenantId,
@@ -49,6 +52,7 @@ export class WorkflowsService {
 
   async update(
     id: string,
+    tenantId: string,
     data: Partial<{
       name: string;
       isActive: boolean;
@@ -58,13 +62,13 @@ export class WorkflowsService {
     }>,
   ) {
     return this.prisma.workflowRule.update({
-      where: { id },
+      where: { id, tenantId },
       data: data as any,
     });
   }
 
-  async delete(id: string) {
-    return this.prisma.workflowRule.delete({ where: { id } });
+  async delete(id: string, tenantId: string) {
+    return this.prisma.workflowRule.delete({ where: { id, tenantId } });
   }
 
   // ── Engine: execute matching rules ────────────────────────────────────────
@@ -78,11 +82,15 @@ export class WorkflowsService {
       agentId?: string;
       disposition?: string;
       status?: string;
-      tenantId?: string;
+      tenantId: string;
     },
   ) {
     const rules = (await this.prisma.workflowRule.findMany({
-      where: { trigger: trigger as any, isActive: true },
+      where: { 
+        trigger: trigger as any, 
+        isActive: true,
+        tenantId: context.tenantId 
+      },
     })) as any[];
 
     for (const rule of rules) {
@@ -91,6 +99,21 @@ export class WorkflowsService {
         await this.prisma.workflowRule.update({
           where: { id: rule.id },
           data: { runCount: { increment: 1 }, lastRunAt: new Date() } as any,
+        });
+
+        // 200% Feature: Log Automation Execution in Audit Trail
+        await this.auditLogs.logChange({
+          tenantId: context.tenantId,
+          action: 'WORKFLOW_GENESIS',
+          entityType: 'Lead',
+          entityId: context.leadId,
+          details: { 
+            metadata: {
+              ruleName: rule.name, 
+              trigger, 
+              action: rule.action 
+            }
+          },
         });
       } catch (err) {
         this.logger.error(`[Workflow] Rule ${rule.name} failed: ${err.message}`);
@@ -137,13 +160,24 @@ export class WorkflowsService {
 
       case 'SEND_WHATSAPP':
         if (context.leadId && context.phone) {
-          this.logger.log(`[Workflow] WA to ${context.phone}: ${message}`);
+          this.logger.log(`[Workflow] Sending WA to ${context.phone}`);
+          try {
+            const result = await this.whatsapp.sendMessage(context.phone, message);
+            if (result.success) {
+              this.logger.log(`[Workflow] WA sent successfully to ${context.phone}`);
+            } else {
+              this.logger.warn(`[Workflow] WA failed to ${context.phone}`);
+            }
+          } catch (err) {
+            this.logger.error(`[Workflow] WA execution failed: ${err.message}`);
+          }
         }
         break;
 
       case 'CREATE_NOTIFICATION':
         if (context.agentId) {
           await this.notifications.create({
+            tenantId: context.tenantId,
             recipientId: context.agentId,
             type: 'WORKFLOW',
             title: rule.name,
@@ -157,7 +191,7 @@ export class WorkflowsService {
       case 'UPDATE_LEAD_STATUS':
         if (context.leadId && params.status) {
           await this.prisma.lead.update({
-            where: { id: context.leadId },
+            where: { id: context.leadId, tenantId: context.tenantId },
             data: { status: params.status },
           });
         }
@@ -167,7 +201,7 @@ export class WorkflowsService {
         if (context.leadId) {
           await this.prisma.task.create({
             data: {
-              tenantId: context.tenantId || 'dev-tenant-001',
+              tenantId: context.tenantId,
               leadId: context.leadId,
               title: message || `Follow up with ${context.leadName}`,
               status: 'PENDING',
@@ -175,6 +209,35 @@ export class WorkflowsService {
               dueAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
             } as any,
           });
+        }
+        break;
+
+      case 'AI_EVALUATE_LEAD':
+        if (context.leadId) {
+          this.logger.log(`[Workflow] Triggering AI Engine Lead Evaluation for ${context.leadId}`);
+          try {
+             const aiEval = await this.ai.evaluateLeadAction(context);
+             
+             // 1. Log AI output as a Timeline Note
+             await this.prisma.note.create({
+               data: {
+                 content: `🤖 [AI Trifold Engine]\n\nAnalysis: ${aiEval.summary}\nPriority: ${aiEval.suggestedPriority}`,
+                 leadId: context.leadId,
+                 userId: 'SYSTEM',
+                 tenantId: context.tenantId
+               } as any
+             });
+
+             // 2. Set Status (e.g. if priority is HIGH, set INTERESTED)
+             if (aiEval.suggestedPriority === 'HIGH') {
+                await this.prisma.lead.update({
+                  where: { id: context.leadId, tenantId: context.tenantId },
+                  data: { status: 'INTERESTED' }
+                });
+             }
+          } catch (e) {
+             this.logger.error(`[Workflow] AI Evaluation failed: ${e.message}`);
+          }
         }
         break;
 

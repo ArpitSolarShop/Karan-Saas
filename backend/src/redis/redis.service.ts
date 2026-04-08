@@ -27,4 +27,31 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async getQueueLength(queueName: string) {
     return this.redisClient.llen(queueName);
   }
+
+  async set(key: string, value: any, ttlSeconds?: number) {
+    const data = typeof value === 'string' ? value : JSON.stringify(value);
+    if (ttlSeconds) {
+      await this.redisClient.set(key, data, 'EX', ttlSeconds);
+    } else {
+      await this.redisClient.set(key, data);
+    }
+  }
+
+  async get(key: string) {
+    const data = await this.redisClient.get(key);
+    if (!data) return null;
+    try {
+      return JSON.parse(data);
+    } catch {
+      return data;
+    }
+  }
+
+  async incr(key: string) {
+    return this.redisClient.incr(key);
+  }
+
+  async del(key: string) {
+    await this.redisClient.del(key);
+  }
 }

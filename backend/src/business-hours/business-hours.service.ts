@@ -1,7 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { DayOfWeek } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessHoursDto } from './dto/create-business-hours.dto';
 import { UpdateBusinessHoursDto } from './dto/update-business-hours.dto';
+
+const DAY_MAP: DayOfWeek[] = [
+  DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.TUESDAY,
+  DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY,
+];
 
 @Injectable()
 export class BusinessHoursService {
@@ -12,19 +18,23 @@ export class BusinessHoursService {
 
     // Default 7 days if no slots provided
     const defaultSlots = Array.from({ length: 7 }).map((_, i) => ({
-      dayOfWeek: i,
-      isWorkingDay: i >= 1 && i <= 5, // Mon-Fri
+      dayOfWeek: DAY_MAP[i],
+      isClosed: !(i >= 1 && i <= 5), // Mon-Fri are open
       openTime: '09:00',
       closeTime: '17:00',
     }));
+
+    const mappedSlots = slots && slots.length > 0
+      ? slots.map(s => ({ dayOfWeek: DAY_MAP[s.dayOfWeek] || DayOfWeek.MONDAY, openTime: s.openTime, closeTime: s.closeTime, isClosed: !s.isWorkingDay }))
+      : defaultSlots;
 
     return this.prisma.businessHours.create({
       data: {
         ...data,
         slots: {
-          create: slots && slots.length > 0 ? slots : defaultSlots,
+          create: mappedSlots,
         },
-        ...(holidays && holidays.length > 0 ? { holidays: { create: holidays.map(h => ({ ...h, date: new Date(h.date) })) } } : {}),
+        ...(holidays && holidays.length > 0 ? { holidays: { create: holidays.map(h => ({ name: h.name, date: new Date(h.date), isRecurring: h.isRecurringAnnually ?? false })) } } : {}),
       },
       include: {
         slots: true,
@@ -40,7 +50,7 @@ export class BusinessHoursService {
         slots: true,
         holidays: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { name: 'asc' },
     });
   }
 
@@ -61,7 +71,7 @@ export class BusinessHoursService {
   }
 
   async update(id: string, updateBusinessHoursDto: UpdateBusinessHoursDto) {
-    const { slots, holidays, ...data } = updateBusinessHoursDto;
+    const { slots, holidays, tenantId: _tenantId, ...data } = updateBusinessHoursDto;
 
     // For simplistic update, we first delete existing slots/holidays 
     // if new ones are provided. In a real scenario, you'd sync them.
@@ -76,8 +86,8 @@ export class BusinessHoursService {
       where: { id },
       data: {
         ...data,
-        ...(slots ? { slots: { create: slots } } : {}),
-        ...(holidays ? { holidays: { create: holidays.map(h => ({ ...h, date: new Date(h.date) })) } } : {}),
+        ...(slots ? { slots: { create: slots.map(s => ({ dayOfWeek: s.dayOfWeek as any, openTime: s.openTime, closeTime: s.closeTime, isClosed: !s.isWorkingDay })) } } : {}),
+        ...(holidays ? { holidays: { create: holidays.map(h => ({ name: h.name, date: new Date(h.date), isRecurring: h.isRecurringAnnually ?? false })) } } : {}),
       },
       include: {
         slots: true,

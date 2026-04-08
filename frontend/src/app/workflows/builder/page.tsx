@@ -102,7 +102,7 @@ export default function VisualWorkflowBuilder() {
         edges,
         // In a real app, we'd translate this graph to our internal TCA structure
         trigger: nodes.find(n => n.type === 'trigger')?.data.label,
-        action: nodes.find(n => n.type === 'action')?.data.label,
+        action: nodes.find(n => n.type === 'action')?.data.type || nodes.find(n => n.type === 'action')?.data.label,
       };
       await api.post('/workflows', payload);
       alert('Workflow saved successfully!');
@@ -153,6 +153,24 @@ export default function VisualWorkflowBuilder() {
                 >
                   <div className="p-1.5 rounded bg-zinc-800 text-zinc-400 group-hover:text-blue-400">{t.icon}</div>
                   {t.label}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-4">AI Intelligence</h3>
+            <div className="grid gap-2">
+              {[
+                { label: 'AI Evaluate Lead (Llama/Gemma)', icon: <Brain size={14} />, type: 'AI_EVALUATE_LEAD' },
+              ].map((a, idx) => (
+                <button 
+                  key={idx}
+                  onClick={() => addNode('action', a.label, { type: a.type })}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-primary/50 hover:bg-primary/5 transition-all text-sm group text-left shadow-lg shadow-black/20"
+                >
+                  <div className="p-1.5 rounded bg-zinc-800 text-zinc-400 group-hover:text-primary">{a.icon}</div>
+                  {a.label}
                 </button>
               ))}
             </div>

@@ -3,11 +3,15 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Controller, Get, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { ReportsService } from './reports.service';
+import { MonitoringService } from './monitoring.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('reports')
 export class ReportsController {
-  constructor(private service: ReportsService) {}
+  constructor(
+    private service: ReportsService,
+    private monitoring: MonitoringService,
+  ) {}
 
   @Get('agent-performance')
   agentPerformance(
@@ -78,5 +82,15 @@ export class ReportsController {
       `attachment; filename="calls-${Date.now()}.csv"`,
     );
     res.send(csv);
+  }
+
+  @Get('live-wallboard')
+  liveWallboard() {
+    return this.monitoring.getLiveWallboard();
+  }
+
+  @Get('ai-forecast')
+  aiForecast() {
+    return this.service.generateAIStoreForecast();
   }
 }

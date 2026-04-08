@@ -309,6 +309,7 @@ export class CloudApiWebhookController {
           if (systemUser) {
             await this.prisma.activity.create({
               data: {
+                tenantId: instance.tenantId,
                 leadId: lead.id,
                 userId: systemUser.id,
                 activityType: 'WHATSAPP',

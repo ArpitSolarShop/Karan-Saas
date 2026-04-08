@@ -55,5 +55,9 @@ export class CreateLeadDto {
   state?: string;
 
   @IsOptional()
+  @IsString()
+  companyId?: string;
+
+  @IsOptional()
   customFields?: any;
 }

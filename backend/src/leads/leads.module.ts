@@ -6,11 +6,12 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { ActivitiesModule } from '../activities/activities.module';
 import { SearchModule } from '../search/search.module';
 import { AuditModule } from '../audit/audit.module';
+import { DedupeService } from './services/dedupe.service';
 
 @Module({
-  imports: [PrismaModule, ActivitiesModule, SearchModule, AuditModule],
+  imports: [PrismaModule, ActivitiesModule, SearchModule],
   controllers: [LeadsController],
-  providers: [LeadsService, LeadsGateway],
-  exports: [LeadsService, LeadsGateway],
+  providers: [LeadsService, LeadsGateway, DedupeService],
+  exports: [LeadsService, LeadsGateway, DedupeService],
 })
 export class LeadsModule {}

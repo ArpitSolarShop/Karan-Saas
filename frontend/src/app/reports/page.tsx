@@ -9,6 +9,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line,
   PieChart as RechartsPie, Pie, Cell, Legend, CartesianGrid
 } from "recharts";
+import { AIForecast } from "@/components/dashboard/AIForecast";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: BarChart2 },
@@ -109,12 +110,16 @@ export default function ReportsPage() {
       {/* Overview */}
       {tab === "overview" && (
         <div className="space-y-6">
-          {/* KPI cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <MetricCard label="Total Calls" value={totalCalls} color="text-primary" />
-            <MetricCard label="Answered" value={completedCalls} sub={`${totalCalls ? ((completedCalls / totalCalls) * 100).toFixed(0) : 0}% answer rate`} color="text-green-400" />
-            <MetricCard label="Missed / Failed" value={missed?.total ?? "—"} color="text-red-400" />
-            <MetricCard label="Total Leads" value={funnel?.total ?? "—"} />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-4 translate-y-[-8px]">
+               <AIForecast />
+            </div>
+            <div className="lg:col-span-8 grid grid-cols-2 md:grid-cols-2 gap-4">
+              <MetricCard label="Total Calls" value={totalCalls} color="text-primary" />
+              <MetricCard label="Answered" value={completedCalls} sub={`${totalCalls ? ((completedCalls / totalCalls) * 100).toFixed(0) : 0}% answer rate`} color="text-green-400" />
+              <MetricCard label="Missed / Failed" value={missed?.total ?? "—"} color="text-red-400" />
+              <MetricCard label="Total Leads" value={funnel?.total ?? "—"} />
+            </div>
           </div>
 
           {/* Daily call volume chart */}

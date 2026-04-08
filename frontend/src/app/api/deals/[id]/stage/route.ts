@@ -4,7 +4,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   try {
     const { id } = params;
     const body = await req.json();
-    const res = await fetch(\`http://localhost:3001/deals/\${id}/stage\`, {
+    const res = await fetch(`http://localhost:3001/deals/${id}/stage`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)

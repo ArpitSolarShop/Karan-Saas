@@ -1,5 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 import {
   Controller,
   Get,
@@ -8,22 +9,26 @@ import {
   Delete,
   Body,
   Param,
+  Req,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
-  create(@Body() body: any) {
-    return this.tasksService.create(body);
+  create(@Body() body: any, @Req() req: any) {
+    return this.tasksService.create({
+      ...body,
+      tenantId: req.tenantId || req.user.tenantId,
+    }, req.user?.id);
   }
 
   @Get()
-  findAll() {
-    return this.tasksService.findAll();
+  findAll(@Req() req: any) {
+    return this.tasksService.findAll(req.tenantId || req.user.tenantId);
   }
 
   @Get('lead/:leadId')
@@ -32,8 +37,8 @@ export class TasksController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.tasksService.update(id, body);
+  update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.tasksService.update(id, req.tenantId || req.user.tenantId, body, req.user?.id);
   }
 
   @Delete(':id')

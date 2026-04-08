@@ -1,19 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class TasksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogs: AuditLogsService,
+  ) {}
 
   async create(data: {
+    tenantId: string;
     leadId?: string;
     assignedTo: string;
     title: string;
     dueDate: Date;
     notes?: string;
-  }) {
-    return this.prisma.task.create({
+  }, userId?: string) {
+    const task = await this.prisma.task.create({
       data: {
+        tenantId: data.tenantId,
         leadId: data.leadId,
         assignedTo: data.assignedTo,
         title: data.title,
@@ -22,11 +28,25 @@ export class TasksService {
         status: 'PENDING',
       },
     });
+
+    await this.auditLogs.logChange({
+      tenantId: data.tenantId,
+      userId,
+      action: 'TASK_CREATED',
+      entityType: 'Task',
+      entityId: task.id,
+      details: { newValues: task },
+    });
+
+    return task;
   }
 
-  async findAll(assignedTo?: string) {
+  async findAll(tenantId: string, assignedTo?: string) {
     return this.prisma.task.findMany({
-      where: assignedTo ? { assignedTo } : undefined,
+      where: {
+        tenantId,
+        ...(assignedTo ? { assignedTo } : {}),
+      },
       include: {
         lead: { select: { firstName: true, lastName: true, name: true } },
       },
@@ -41,11 +61,26 @@ export class TasksService {
     });
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.task.update({
-      where: { id },
+  async update(id: string, tenantId: string, data: any, userId?: string) {
+    const existing = await this.prisma.task.findFirst({ where: { id, tenantId } });
+    const task = await this.prisma.task.update({
+      where: { id, tenantId },
       data,
     });
+
+    await this.auditLogs.logChange({
+      tenantId,
+      userId,
+      action: 'TASK_UPDATED',
+      entityType: 'Task',
+      entityId: task.id,
+      details: { 
+        oldValues: existing, 
+        newValues: task 
+      },
+    });
+
+    return task;
   }
 
   async remove(id: string) {

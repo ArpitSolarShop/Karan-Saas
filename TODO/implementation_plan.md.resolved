@@ -1,0 +1,140 @@
+# 🏗️ Complete Build Plan: Telephony + Campaign + Agent Management → 100%
+
+## Scope: 3 Areas to Complete
+
+### Area 1: Telephony Engine (14% → 100%)
+### Area 2: Campaign Engine (17% → 100%)  
+### Area 3: Agent Management (10% → 100%)
+
+---
+
+## Phase 1: Database Schema (ALL models first)
+
+Add the following **30 new Prisma models** to `schema.prisma`:
+
+### Telephony Models (12 new)
+1. `Extension` — SIP extensions for agents
+2. `SipTrunk` — SIP provider connections
+3. `OutboundRoute` — Call routing rules
+4. `IvrMenu` — IVR tree definitions
+5. `AcdQueue` — Automatic Call Distribution queues
+6. `QueueMember` — Agent-to-queue assignments
+7. `Skill` — Agent skills (language, product knowledge)
+8. `AgentSkill` — Agent-skill-level mapping
+9. `SkillRule` — Skill-based routing rules
+10. `RingGroup` — Ring groups with members
+11. `RingGroupMember` — Extension-to-ring-group mapping
+12. `TimeCondition` — Business hours routing rules
+
+### Campaign Models (8 new)
+13. `CampaignContactList` — Imported contact lists for campaigns
+14. `CampaignContact` — Individual contacts in a campaign list
+15. `Transmission` — Per-contact communication pipeline (ICTCore pattern)
+16. `CallSpool` — Active/completed call attempts per transmission
+17. `SpoolResult` — Result log for each call attempt
+18. `DncEntry` — Do-Not-Call compliance list
+19. `DialerConfig` — Per-campaign dialer settings (predictive/preview/progressive)
+20. `AgentScript` — Dynamic call scripts with branching
+
+### Agent Management Models (10 new)
+21. `AgentSession` — Login/logout session tracking
+22. `PauseCode` — Break type definitions (Lunch, Meeting, Training)
+23. `AgentPause` — Individual agent pause records
+24. `AgentCapacity` — Max concurrent conversations per agent
+25. `AssignmentPolicy` — Auto-assignment rules (round-robin, fair-dist)
+26. `WallboardConfig` — Saved wallboard layouts
+27. `QualityForm` — Call quality evaluation forms
+28. `QualityEvaluation` — Individual call evaluations
+29. `CsatResponse` — Customer satisfaction survey responses
+30. `CannedResponse` — Quick reply templates
+
+### Enums (8 new)
+- `ExtensionType`, `QueueStrategy`, `DialerMode`, `TransmissionStatus`
+- `SpoolStatus`, `AssignmentMethod`, `PauseType`, `SessionStatus`
+
+---
+
+## Phase 2: Backend — NestJS Modules
+
+### Telephony Module (`src/telephony/`)
+- Full CRUD controllers + services for: Extensions, SIP Trunks, IVR Menus, ACD Queues, Ring Groups, Time Conditions, Skills
+- FreeSWITCH ESL integration service (connect, originate, hangup, transfer, conference)
+- WebRTC signaling gateway (WebSocket for SIP.js ↔ FreeSWITCH)
+- CDR (Call Detail Records) service with real reporting queries
+- Call recording management (list, play, download, search)
+
+### Campaign Module (`src/campaigns/` — enhance existing)
+- Dialer engine service (predictive pacing, preview, progressive, power modes)
+- Transmission pipeline service (create → spool → attempt → result)
+- DNC compliance service (check before every call, import/export DNC lists)
+- Campaign progress tracker (real-time stats via WebSocket)
+- Contact list import service (CSV/Excel → CampaignContact records)
+- Agent script service with branching logic
+
+### Agent Module (`src/agent-management/` — new)
+- Agent session service (login/logout tracking, shift hours)
+- Agent pause/break service (track break time by type)
+- Agent capacity service (max concurrent load management)
+- Auto-assignment service (round-robin, least-busy, skill-based)
+- Wallboard data service (real-time queue stats, agent stats)
+- Quality evaluation service (form builder + evaluation CRUD)
+- CSAT service (post-call survey, ratings)
+- Canned response service (quick reply templates)
+- Agent monitoring gateway (WebSocket for live supervisor view)
+
+---
+
+## Phase 3: Frontend — Next.js Pages
+
+### Telephony Pages
+- `/telephony` — Dashboard overview
+- `/telephony/extensions` — Extension CRUD + SIP config
+- `/telephony/trunks` — SIP trunk management
+- `/telephony/ivr` — Visual IVR builder (React Flow)
+- `/telephony/queues` — ACD queue management
+- `/telephony/ring-groups` — Ring group config
+- `/telephony/recordings` — Call recording player + search
+- `/telephony/cdr` — Call detail records with filters + export
+- `Softphone` component — WebRTC dialer (SIP.js) in AppShell
+
+### Campaign Pages (enhance existing)
+- `/campaigns/[id]/dialer` — Dialer control panel (start/pause/stats)
+- `/campaigns/[id]/contacts` — Contact list with import
+- `/campaigns/[id]/progress` — Real-time progress dashboard
+- `/campaigns/dnc` — DNC list management
+- `/campaigns/scripts` — Script builder with branching UI
+
+### Agent Management Pages
+- `/agent-console` — Unified agent workspace (calls + chat + lead info)
+- `/supervisor/monitoring` — Live agent monitoring dashboard
+- `/supervisor/wallboard` — Big-screen wallboard view
+- `/supervisor/quality` — Quality evaluation forms + grading
+- `/supervisor/csat` — CSAT reports + review
+- `/settings/assignment` — Assignment policy config
+- `/settings/pause-codes` — Break type management
+- `/settings/canned-responses` — Quick reply management
+
+---
+
+## Verification Plan
+
+### Automated
+- `npx prisma validate` — Schema validates
+- `npx prisma db push` — All tables created
+- `npm run start:dev` — Backend starts with 0 errors
+- `npm run build` — Frontend builds with 0 errors
+
+### Manual (Browser)
+- Create extension → assign to agent → make test call
+- Create campaign → import contacts → start dialer → see progress
+- Agent logs in → sees console → takes calls → goes on break
+- Supervisor sees live dashboard with agent statuses
+- Wallboard shows real-time queue metrics
+
+---
+
+## Execution Order
+1. Schema first (all 30 models + enums)
+2. Backend services (all 3 areas in parallel)
+3. Frontend pages (all 3 areas)
+4. Wire everything together + verify

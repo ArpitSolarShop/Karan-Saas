@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import AppShell from "@/components/AppShell";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,6 +21,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`${inter.className} bg-background text-foreground antialiased`}>
         <AuthProvider>
+          <Toaster richColors position="top-right" />
           <AppShell>{children}</AppShell>
         </AuthProvider>
       </body>

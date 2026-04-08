@@ -18,7 +18,8 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Card } from "@/components/ui/card";
-import { Search, Plus, Upload, Phone, Cpu, Database, Activity, Terminal } from "lucide-react";
+import { Search, Plus, Upload, Phone, Cpu, Database, Activity, Terminal, ShieldCheck, Download, Trash2, Zap } from "lucide-react";
+import { toast } from "sonner";
 
 const VirtualList = List as any;
 const SHEET_ID = "sheet-001";
@@ -106,6 +107,35 @@ export default function LeadsTerminal() {
       clearInterval(interval);
     };
   }, []);
+
+  const handleExportRegistry = async () => {
+    try {
+      const res = await api.get('/leads/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `alpha_registry_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      toast.success("Registry export initiated.");
+    } catch {
+      toast.error("Failed to export registry.");
+    }
+  };
+
+  const handleScanDuplicates = async () => {
+    try {
+      const res = await api.get('/leads/dedupe/scan');
+      const total = (res.data.phones?.length || 0) + (res.data.emails?.length || 0) + (res.data.names?.length || 0);
+      if (total > 0) {
+        toast.warning(`Identified ${total} potential duplicate clusters. See Audit Logs for details.`);
+      } else {
+        toast.success("Compliance Check: No duplicates identified in active registry.");
+      }
+    } catch {
+      toast.error("Compliance Check Failed.");
+    }
+  };
 
   const selectCell = useCallback((cellId: string, row?: any) => {
     setActiveCell(cellId);
@@ -301,8 +331,11 @@ export default function LeadsTerminal() {
           <Separator orientation="vertical" className="h-4 bg-border" />
 
           <input type="file" ref={fileInputRef} onChange={(e) => {}} accept=".csv,.json" className="hidden" />
-          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="text-[9px] font-mono font-bold uppercase tracking-widest border-border hover:bg-surface-2 h-8">
-            <Upload size={12} className="mr-2" /> Import
+          <Button variant="outline" size="sm" onClick={handleExportRegistry} className="text-[9px] font-mono font-bold uppercase tracking-widest border-border hover:bg-surface-2 h-8">
+            <Download size={12} className="mr-2" /> Export
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleScanDuplicates} className="text-[9px] font-mono font-bold uppercase tracking-widest border-border hover:bg-surface-2 h-8 text-yellow-500">
+            <Zap size={12} className="mr-2" /> Dedupe
           </Button>
           <Button size="sm" onClick={() => setIsAddLeadDialogOpen(true)} className="bg-primary hover:bg-primary-dark text-white text-[9px] font-black uppercase tracking-widest h-8 px-4">
             <Plus size={12} className="mr-2" /> New Entity

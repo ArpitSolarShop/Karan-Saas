@@ -60,6 +60,9 @@ import { CustomObjectsModule } from './custom-objects/custom-objects.module';
 import { PaymentsModule } from './payments/payments.module';
 import { CustomFieldsModule } from './custom-fields/custom-fields.module';
 import { BusinessHoursModule } from './business-hours/business-hours.module';
+import { TelephonyEngineModule } from './telephony/telephony-engine.module';
+import { CampaignEngineModule } from './campaigns/campaign-engine.module';
+import { AgentManagementModule } from './agent-management/agent-management.module';
 
 @Module({
   imports: [
@@ -125,6 +128,10 @@ import { BusinessHoursModule } from './business-hours/business-hours.module';
     PaymentsModule,
     CustomFieldsModule,
     BusinessHoursModule,
+    // ── Phase 2: Telephony + Campaign + Agent Management ──
+    TelephonyEngineModule,
+    CampaignEngineModule,
+    AgentManagementModule,
   ],
   controllers: [AppController, ScriptsController],
   providers: [AppService, PrismaService, ScriptsService],

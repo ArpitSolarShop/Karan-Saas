@@ -28,7 +28,7 @@ export default function ApprovalsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
         {requests.map(req => (
-          <Card key={req.id} className={\`bg-surface border-border hover:border-primary/50 transition-colors shadow-sm \${req.status === 'PENDING' ? 'border-primary/20 bg-primary/5' : 'opacity-70'}\`}>
+          <Card key={req.id} className={`bg-surface border-border hover:border-primary/50 transition-colors shadow-sm ${req.status === 'PENDING' ? 'border-primary/20 bg-primary/5' : 'opacity-70'}`}>
             <CardHeader className="pb-2">
               <div className="flex justify-between items-start">
                 <Badge variant="outline" className="text-[10px] tracking-widest uppercase bg-surface-2">{req.entity}</Badge>

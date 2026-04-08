@@ -125,7 +125,6 @@ async function main() {
   });
   console.log('✅ Call Script created');
 
-  // ── Workbook + Sheet (Hybrid JSONB) ──
   const workbook = await prisma.workbook.upsert({
     where: { id: 'wb-001' },
     update: {},
@@ -135,7 +134,7 @@ async function main() {
   const sheet = await prisma.sheet.upsert({
     where: { id: 'sheet-001' },
     update: {},
-    create: { id: 'sheet-001', workbookId: workbook.id, name: 'Lead Tracker' },
+    create: { id: 'sheet-001', tenantId: tenant.id, workbookId: workbook.id, name: 'Lead Tracker' },
   });
 
   const cols = [
@@ -154,7 +153,7 @@ async function main() {
     await prisma.sheetColumn.upsert({
       where: { sheetId_key: { sheetId: sheet.id, key: c.key } },
       update: {},
-      create: { sheetId: sheet.id, ...c },
+      create: { sheetId: sheet.id, tenantId: tenant.id, ...c },
     });
   }
 
@@ -162,7 +161,7 @@ async function main() {
     await prisma.sheetRow.upsert({
       where: { sheetId_rowIndex: { sheetId: sheet.id, rowIndex: i + 1 } },
       update: {},
-      create: { sheetId: sheet.id, rowIndex: i + 1, data: { name: l.name, phone: l.phone, email: l.email || '', status: l.status, score: l.score || 0, city: l.city, source: l.source } },
+      create: { sheetId: sheet.id, tenantId: tenant.id, rowIndex: i + 1, data: { name: l.name, phone: l.phone, email: l.email || '', status: l.status, score: l.score || 0, city: l.city, source: l.source } },
     });
   }
   console.log(`✅ Workbook "${workbook.name}" with Sheet "${sheet.name}" (${cols.length} columns, ${leads.length} rows)`);
@@ -170,8 +169,16 @@ async function main() {
   // ── Default View ──
   await prisma.sheetView.upsert({
     where: { id: 'view-001' },
-    update: {},
-    create: { id: 'view-001', sheetId: sheet.id, name: 'All Leads', filters: [], sorts: [{ column: 'name', direction: 'asc' }], hiddenColumns: [] },
+    update: { tenantId: tenant.id },
+    create: { 
+      id: 'view-001', 
+      tenantId: tenant.id,
+      sheetId: sheet.id, 
+      name: 'All Leads', 
+      filters: [], 
+      sorts: [{ column: 'name', direction: 'asc' }], 
+      hiddenColumns: [] 
+    },
   });
   console.log('✅ Default Sheet View created');
 

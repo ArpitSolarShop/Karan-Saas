@@ -14,6 +14,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthGuard } from '@nestjs/passport';
 import { Req } from '@nestjs/common';
+import { TenantGuard } from './tenant.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -27,6 +28,7 @@ export class AuthController {
       password: string;
       firstName: string;
       lastName: string;
+      tenantId: string;
       role?: string;
       extension?: string;
     },
@@ -47,15 +49,16 @@ export class AuthController {
   }
 
   @Get('users')
-  @UseGuards(JwtAuthGuard)
-  async listUsers() {
-    return this.authService.listUsers();
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  async listUsers(@Req() req: any) {
+    return this.authService.listUsers(req.user.tenantId);
   }
 
   @Patch('users/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   async updateUser(
     @Param('id') id: string,
+    @Req() req: any,
     @Body()
     body: {
       role?: string;
@@ -65,13 +68,13 @@ export class AuthController {
       lastName?: string;
     },
   ) {
-    return this.authService.updateUser(id, body);
+    return this.authService.updateUser(id, req.user.tenantId, body);
   }
 
   @Delete('users/:id')
-  @UseGuards(JwtAuthGuard)
-  async deleteUser(@Param('id') id: string) {
-    return this.authService.deleteUser(id);
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  async deleteUser(@Param('id') id: string, @Req() req: any) {
+    return this.authService.deleteUser(id, req.user.tenantId);
   }
 
   @Post('mfa/enroll')

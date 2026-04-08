@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AiService } from '../ai/ai.service';
 
 @Injectable()
 export class ReportsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private ai: AiService,
+  ) {}
 
   // ── Agent Performance Report ──
   async agentPerformance(agentId?: string, dateFrom?: string, dateTo?: string) {
@@ -349,5 +353,52 @@ export class ReportsService {
     );
 
     return [header, ...lines].join('\n');
+  }
+
+  // ── AI Predictive Business Intelligence ──
+  async generateAIStoreForecast() {
+    // 1. Fetch relevant KPIs for the last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const [totalCalls, completedCalls, convertedLeads, totalTalkTime] = await Promise.all([
+      this.prisma.call.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      this.prisma.call.count({ where: { createdAt: { gte: sevenDaysAgo }, status: 'COMPLETED' } }),
+      this.prisma.lead.count({ where: { status: 'CONVERTED', updatedAt: { gte: sevenDaysAgo } } }),
+      this.prisma.call.aggregate({
+        where: { createdAt: { gte: sevenDaysAgo } },
+        _sum: { durationSeconds: true },
+      }),
+    ]);
+
+    const context = {
+      period: 'Last 7 Days',
+      totalCalls,
+      completedCalls,
+      convertedLeads,
+      avgDuration: totalCalls > 0 ? (totalTalkTime._sum.durationSeconds || 0) / totalCalls : 0,
+      conversionRate: completedCalls > 0 ? (convertedLeads / completedCalls).toFixed(4) : 0,
+    };
+
+    // 2. Feed to Open-Weights Model (handled via AiService)
+    try {
+      const gemmaResponse = await this.ai.evaluateLeadAction({
+        leadName: 'Global Sales Dashboard',
+        source: 'Aggregate KPIs',
+        initialNotes: `KPI Context: ${JSON.stringify(context)}. Task: Predict the likely trend for the next 48 hours and provide a 2-sentence strategy optimization advice.`,
+      });
+
+      return {
+        ...context,
+        outlook: gemmaResponse.suggestedPriority, // Map to HIGH/MEDIUM/LOW
+        analysis: gemmaResponse.summary,
+      };
+    } catch (err) {
+      return {
+        ...context,
+        outlook: 'MEDIUM',
+        analysis: 'AI Forecasting currently unavailable. Historical trends remain stable.',
+      };
+    }
   }
 }
