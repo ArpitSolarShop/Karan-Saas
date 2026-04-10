@@ -12,8 +12,8 @@ export class VendorsService {
     });
   }
 
-  async findOne(id: string) {
-    const vendor = await this.prisma.vendor.findUnique({ where: { id } });
+  async findOne(id: string, tenantId: string) {
+    const vendor = await this.prisma.vendor.findFirst({ where: { id, tenantId } });
     if (!vendor) throw new NotFoundException('Vendor not found');
     return vendor;
   }
@@ -22,11 +22,11 @@ export class VendorsService {
     return this.prisma.vendor.create({ data });
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.vendor.update({ where: { id }, data });
+  async update(id: string, tenantId: string, data: any) {
+    return this.prisma.vendor.update({ where: { id, tenantId }, data });
   }
 
-  async remove(id: string) {
-    return this.prisma.vendor.delete({ where: { id } });
+  async remove(id: string, tenantId: string) {
+    return this.prisma.vendor.delete({ where: { id, tenantId } });
   }
 }

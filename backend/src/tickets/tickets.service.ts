@@ -47,10 +47,15 @@ export class TicketsService {
 
   async addMessage(
     ticketId: string,
+    tenantId: string,
     senderId: string | null,
     body: string,
     isInternal: boolean,
   ) {
+    // Verify ticket ownership
+    const ticket = await this.prisma.ticket.findFirst({ where: { id: ticketId, tenantId } });
+    if (!ticket) throw new NotFoundException('Ticket not found');
+
     return this.prisma.ticketMessage.create({
       data: { ticketId, senderId, body, isInternal },
     });

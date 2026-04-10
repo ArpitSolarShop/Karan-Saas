@@ -15,9 +15,11 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { AttachmentsService } from './attachments.service';
 import { StorageService } from '../storage/storage.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
+import { Req } from '@nestjs/common';
 
 @Controller('attachments')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class AttachmentsController {
   constructor(
     private readonly attachmentsService: AttachmentsService,
@@ -37,6 +39,7 @@ export class AttachmentsController {
   @UseInterceptors(FileInterceptor('file'))
   async upload(
     @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
     @Body('leadId') leadId: string,
     @Body('dealId') dealId?: string,
     @Body('quoteId') quoteId?: string,
@@ -46,7 +49,7 @@ export class AttachmentsController {
 
     // Upload to MinIO and get the storage key
     const key = this.storageService.getAttachmentKey(
-      leadId || 'general',
+      req.user.tenantId,
       file.originalname,
     );
     await this.storageService.uploadFile(file.buffer, key, file.mimetype);
@@ -54,7 +57,7 @@ export class AttachmentsController {
 
     // Save metadata to DB
     const attachment = await this.attachmentsService.create({
-      tenantId: 'dev-tenant-001',
+      tenantId: req.user.tenantId,
       leadId,
       dealId,
       quoteId,

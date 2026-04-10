@@ -1,34 +1,37 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 
 @Controller('invoices')
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
 
   @Post()
-  create(@Body() createInvoiceDto: CreateInvoiceDto) {
-    return this.invoicesService.create(createInvoiceDto);
+  async create(@Body() createInvoiceDto: CreateInvoiceDto, @Req() req: any) {
+    return this.invoicesService.create({ ...createInvoiceDto, tenantId: req.user.tenantId });
   }
 
   @Get()
-  findAll(@Query('tenantId') tenantId?: string) {
-    return this.invoicesService.findAll(tenantId);
+  async findAll(@Req() req: any) {
+    return this.invoicesService.findAll(req.user.tenantId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.invoicesService.findOne(id);
+  async findOne(@Param('id') id: string, @Req() req: any) {
+    return this.invoicesService.findOne(id, req.user.tenantId);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateInvoiceDto: UpdateInvoiceDto) {
-    return this.invoicesService.update(id, updateInvoiceDto);
+  async update(@Param('id') id: string, @Body() updateInvoiceDto: UpdateInvoiceDto, @Req() req: any) {
+    return this.invoicesService.update(id, req.user.tenantId, updateInvoiceDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.invoicesService.remove(id);
+  async remove(@Param('id') id: string, @Req() req: any) {
+    return this.invoicesService.remove(id, req.user.tenantId);
   }
 }

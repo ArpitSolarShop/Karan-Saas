@@ -10,8 +10,8 @@ export class ReportsService {
   ) {}
 
   // ── Agent Performance Report ──
-  async agentPerformance(agentId?: string, dateFrom?: string, dateTo?: string) {
-    const where: any = {};
+  async agentPerformance(tenantId: string, agentId?: string, dateFrom?: string, dateTo?: string) {
+    const where: any = { tenantId };
     if (agentId) where.agentId = agentId;
     if (dateFrom || dateTo) {
       where.createdAt = {};
@@ -21,6 +21,7 @@ export class ReportsService {
 
     const agents = await this.prisma.user.findMany({
       where: {
+        tenantId,
         role: { in: ['AGENT', 'TEAM_LEAD'] },
         ...(agentId ? { id: agentId } : {}),
       },
@@ -42,17 +43,17 @@ export class ReportsService {
         assignedLeads,
         convertedLeads,
       ] = await Promise.all([
-        this.prisma.call.count({ where: { agentId: agent.id, ...where } }),
+        this.prisma.call.count({ where: { tenantId, agentId: agent.id, ...where } }),
         this.prisma.call.count({
-          where: { agentId: agent.id, status: 'COMPLETED', ...where },
+          where: { tenantId, agentId: agent.id, status: 'COMPLETED', ...where },
         }),
         this.prisma.call.aggregate({
-          where: { agentId: agent.id, ...where },
+          where: { tenantId, agentId: agent.id, ...where },
           _sum: { talkTimeSeconds: true },
         }),
-        this.prisma.lead.count({ where: { assignedTo: agent.id } }),
+        this.prisma.lead.count({ where: { tenantId, assignedTo: agent.id } }),
         this.prisma.lead.count({
-          where: { assignedTo: agent.id, status: 'CONVERTED' },
+          where: { tenantId, assignedTo: agent.id, status: 'CONVERTED' },
         }),
       ]);
 
@@ -90,9 +91,9 @@ export class ReportsService {
   }
 
   // ── Campaign Report ──
-  async campaignReport(campaignId?: string) {
+  async campaignReport(tenantId: string, campaignId?: string) {
     const campaigns = await this.prisma.campaign.findMany({
-      where: campaignId ? { id: campaignId } : undefined,
+      where: { tenantId, ...(campaignId ? { id: campaignId } : {}) },
       include: {
         _count: { select: { leads: true, calls: true, campaignAgents: true } },
       },
@@ -102,13 +103,13 @@ export class ReportsService {
     for (const campaign of campaigns) {
       const [answeredCalls, convertedLeads, totalTalkTime] = await Promise.all([
         this.prisma.call.count({
-          where: { campaignId: campaign.id, status: 'COMPLETED' },
+          where: { tenantId, campaignId: campaign.id, status: 'COMPLETED' },
         }),
         this.prisma.lead.count({
-          where: { campaignId: campaign.id, status: 'CONVERTED' },
+          where: { tenantId, campaignId: campaign.id, status: 'CONVERTED' },
         }),
         this.prisma.call.aggregate({
-          where: { campaignId: campaign.id },
+          where: { tenantId, campaignId: campaign.id },
           _sum: { talkTimeSeconds: true },
         }),
       ]);
@@ -143,7 +144,7 @@ export class ReportsService {
   }
 
   // ── Lead Funnel ──
-  async leadFunnel() {
+  async leadFunnel(tenantId: string) {
     const statuses = [
       'NEW',
       'CONTACTED',
@@ -157,7 +158,7 @@ export class ReportsService {
     const funnel: any = {};
     for (const status of statuses) {
       funnel[status] = await this.prisma.lead.count({
-        where: { status: status as any },
+        where: { tenantId, status: status as any },
       });
     }
     return {
@@ -167,9 +168,10 @@ export class ReportsService {
   }
 
   // ── Source Analysis ──
-  async sourceAnalysis() {
+  async sourceAnalysis(tenantId: string) {
     const leads = await this.prisma.lead.groupBy({
       by: ['source'],
+      where: { tenantId },
       _count: true,
       orderBy: { _count: { source: 'desc' } },
     });
@@ -180,11 +182,11 @@ export class ReportsService {
   }
 
   // ── Daily Call Volume ──
-  async dailyCallVolume(days = 30) {
+  async dailyCallVolume(tenantId: string, days = 30) {
     const since = new Date();
     since.setDate(since.getDate() - days);
     const calls = await this.prisma.call.findMany({
-      where: { createdAt: { gte: since } },
+      where: { tenantId, createdAt: { gte: since } },
       select: { createdAt: true, status: true },
     });
 
@@ -203,11 +205,12 @@ export class ReportsService {
 
   // ── Disposition Report ──
   async dispositionReport(
+    tenantId: string,
     campaignId?: string,
     dateFrom?: string,
     dateTo?: string,
   ) {
-    const where: any = { dispositionId: { not: null } };
+    const where: any = { tenantId, dispositionId: { not: null } };
     if (campaignId) where.campaignId = campaignId;
     if (dateFrom || dateTo) {
       where.createdAt = {};
@@ -255,8 +258,8 @@ export class ReportsService {
   }
 
   // ── Hourly Breakdown ──
-  async hourlyBreakdown(dateFrom?: string, dateTo?: string) {
-    const where: any = {};
+  async hourlyBreakdown(tenantId: string, dateFrom?: string, dateTo?: string) {
+    const where: any = { tenantId };
     if (dateFrom || dateTo) {
       where.createdAt = {};
       if (dateFrom) where.createdAt.gte = new Date(dateFrom);
@@ -284,11 +287,12 @@ export class ReportsService {
 
   // ── Missed / Failed Calls ──
   async missedCallsReport(
+    tenantId: string,
     agentId?: string,
     dateFrom?: string,
     dateTo?: string,
   ) {
-    const where: any = { status: { in: ['NO_ANSWER', 'FAILED', 'BUSY'] } };
+    const where: any = { tenantId, status: { in: ['NO_ANSWER', 'FAILED', 'BUSY'] } };
     if (agentId) where.agentId = agentId;
     if (dateFrom || dateTo) {
       where.createdAt = {};
@@ -311,11 +315,12 @@ export class ReportsService {
 
   // ── CSV Export (calls) ──
   async exportCallsCsv(
+    tenantId: string,
     dateFrom?: string,
     dateTo?: string,
     agentId?: string,
   ): Promise<string> {
-    const where: any = {};
+    const where: any = { tenantId };
     if (agentId) where.agentId = agentId;
     if (dateFrom || dateTo) {
       where.createdAt = {};
@@ -356,17 +361,17 @@ export class ReportsService {
   }
 
   // ── AI Predictive Business Intelligence ──
-  async generateAIStoreForecast() {
+  async generateAIStoreForecast(tenantId: string) {
     // 1. Fetch relevant KPIs for the last 7 days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
+ 
     const [totalCalls, completedCalls, convertedLeads, totalTalkTime] = await Promise.all([
-      this.prisma.call.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-      this.prisma.call.count({ where: { createdAt: { gte: sevenDaysAgo }, status: 'COMPLETED' } }),
-      this.prisma.lead.count({ where: { status: 'CONVERTED', updatedAt: { gte: sevenDaysAgo } } }),
+      this.prisma.call.count({ where: { tenantId, createdAt: { gte: sevenDaysAgo } } }),
+      this.prisma.call.count({ where: { tenantId, createdAt: { gte: sevenDaysAgo }, status: 'COMPLETED' } }),
+      this.prisma.lead.count({ where: { tenantId, status: 'CONVERTED', updatedAt: { gte: sevenDaysAgo } } }),
       this.prisma.call.aggregate({
-        where: { createdAt: { gte: sevenDaysAgo } },
+        where: { tenantId, createdAt: { gte: sevenDaysAgo } },
         _sum: { durationSeconds: true },
       }),
     ]);

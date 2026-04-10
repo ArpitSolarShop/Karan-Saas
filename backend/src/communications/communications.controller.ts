@@ -277,11 +277,12 @@ export class CommunicationsController {
 
   @Post('broadcast')
   async broadcast(
+    @Req() req: any,
     @Body() body: { phones: string[]; message: string; delayMs?: number },
   ) {
     const results = [];
     for (const phone of body.phones) {
-      const result = await this.baileysEngine.sendMessage(phone, body.message);
+      const result = await this.baileysEngine.sendMessage(phone, body.message, undefined, req.user.tenantId);
       results.push({ phone, sent: result.success, messageId: result.messageId });
       if (body.delayMs) await new Promise(r => setTimeout(r, body.delayMs));
     }

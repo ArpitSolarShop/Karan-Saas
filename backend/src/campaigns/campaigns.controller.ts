@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { CampaignsService } from './campaigns.service';
 import { QueueService } from '../queue/queue.service';
@@ -24,51 +25,52 @@ export class CampaignsController {
   ) {}
 
   @Get()
-  findAll() {
-    return this.service.findAll();
+  async findAll(@Req() req: any) {
+    return this.service.findAll(req.user.tenantId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  async findOne(@Param('id') id: string, @Req() req: any) {
+    return this.service.findOne(id, req.user.tenantId);
   }
 
   @Post()
-  create(@Body() body: any) {
-    return this.service.create(body);
+  async create(@Body() body: any, @Req() req: any) {
+    return this.service.create({ ...body, tenantId: req.user.tenantId });
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.service.update(id, body);
+  async update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.service.update(id, req.user.tenantId, body);
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
-    return this.service.updateStatus(id, body.status);
+  async updateStatus(@Param('id') id: string, @Body() body: { status: string }, @Req() req: any) {
+    return this.service.updateStatus(id, req.user.tenantId, body.status);
   }
 
   @Post(':id/agents')
-  assignAgent(
+  async assignAgent(
     @Param('id') id: string,
     @Body() body: { agentId: string; dailyTarget?: number },
+    @Req() req: any,
   ) {
-    return this.service.assignAgent(id, body.agentId, body.dailyTarget);
+    return this.service.assignAgent(id, req.user.tenantId, body.agentId, body.dailyTarget);
   }
 
   @Delete(':id/agents/:agentId')
-  removeAgent(@Param('id') id: string, @Param('agentId') agentId: string) {
-    return this.service.removeAgent(id, agentId);
+  async removeAgent(@Param('id') id: string, @Param('agentId') agentId: string, @Req() req: any) {
+    return this.service.removeAgent(id, req.user.tenantId, agentId);
   }
 
   @Get(':id/stats')
-  getStats(@Param('id') id: string) {
-    return this.service.getStats(id);
+  async getStats(@Param('id') id: string, @Req() req: any) {
+    return this.service.getStats(id, req.user.tenantId);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  async remove(@Param('id') id: string, @Req() req: any) {
+    return this.service.remove(id, req.user.tenantId);
   }
 
   // ── Dialer Control ──────────────────────────────────────────────────────────
@@ -80,8 +82,8 @@ export class CampaignsController {
   @Post('dialer/:id/start')
   @UseGuards(RolesGuard)
   @Roles('ADMIN', 'MANAGER', 'SUPERVISOR')
-  async startDialer(@Param('id') id: string) {
-    await this.service.updateStatus(id, 'ACTIVE');
+  async startDialer(@Param('id') id: string, @Req() req: any) {
+    await this.service.updateStatus(id, req.user.tenantId, 'ACTIVE');
     await this.queueService.scheduleCampaignDialer(id, 5_000); // tick every 5s
     return { started: true, campaignId: id };
   }
@@ -93,8 +95,8 @@ export class CampaignsController {
   @Post('dialer/:id/pause')
   @UseGuards(RolesGuard)
   @Roles('ADMIN', 'MANAGER', 'SUPERVISOR')
-  async pauseDialer(@Param('id') id: string) {
-    await this.service.updateStatus(id, 'PAUSED');
+  async pauseDialer(@Param('id') id: string, @Req() req: any) {
+    await this.service.updateStatus(id, req.user.tenantId, 'PAUSED');
     await this.queueService.stopCampaignDialer(id);
     return { paused: true, campaignId: id };
   }
@@ -106,20 +108,20 @@ export class CampaignsController {
   @Post('dialer/:id/stop')
   @UseGuards(RolesGuard)
   @Roles('ADMIN', 'MANAGER', 'SUPERVISOR')
-  async stopDialer(@Param('id') id: string) {
-    await this.service.updateStatus(id, 'COMPLETED');
+  async stopDialer(@Param('id') id: string, @Req() req: any) {
+    await this.service.updateStatus(id, req.user.tenantId, 'COMPLETED');
     await this.queueService.stopCampaignDialer(id);
     return { stopped: true, campaignId: id };
   }
 
   @Get('dialer/:id/progress')
-  async getDialerProgress(@Param('id') id: string) {
-    return this.service.getDialerProgress(id);
+  async getDialerProgress(@Param('id') id: string, @Req() req: any) {
+    return this.service.getDialerProgress(id, req.user.tenantId);
   }
 
   @Get('dialer/:id/config')
-  async getDialerConfig(@Param('id') id: string) {
-    const campaign: any = await this.service.findOne(id);
+  async getDialerConfig(@Param('id') id: string, @Req() req: any) {
+    const campaign: any = await this.service.findOne(id, req.user.tenantId);
     const config = campaign?.dialerConfig || {};
     return {
       mode: config.mode || 'PREDICTIVE',
@@ -135,19 +137,19 @@ export class CampaignsController {
 
   /** POST /campaigns/:id/clone — create a DRAFT copy of this campaign */
   @Post(':id/clone')
-  clone(@Param('id') id: string) {
-    return this.service.clone(id);
+  async clone(@Param('id') id: string, @Req() req: any) {
+    return this.service.clone(id, req.user.tenantId);
   }
 
   /** GET /campaigns/import-history — all lead list imports */
   @Get('import-history')
-  importHistory() {
-    return this.service.importHistory();
+  async importHistory(@Req() req: any) {
+    return this.service.importHistory(req.user.tenantId);
   }
 
   /** GET /campaigns/:id/import-history — imports for specific campaign */
   @Get(':id/import-history')
-  campaignImportHistory(@Param('id') id: string) {
-    return this.service.importHistory(id);
+  async campaignImportHistory(@Param('id') id: string, @Req() req: any) {
+    return this.service.importHistory(req.user.tenantId, id);
   }
 }

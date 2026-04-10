@@ -57,21 +57,21 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
     });
 
     for (const instance of instances) {
-      this.logger.log(`Restoring WhatsApp session: ${instance.id} (${instance.name})`);
-      await this.startSession(instance.id);
+      this.logger.log(`Restoring WhatsApp session: ${instance.id} (${instance.name}) [Tenant: ${instance.tenantId}]`);
+      await this.startSession(instance.id, instance.tenantId);
     }
   }
 
   /**
    * Boots up a Baileys WASocket and attaches it to our nested process memory.
    */
-  public async startSession(instanceId: string) {
+  public async startSession(instanceId: string, tenantId?: string) {
     if (this.sessions.has(instanceId)) {
       this.logger.warn(`Session ${instanceId} is already running.`);
       const cachedQr = this.latestQrs.get(instanceId);
-      if (cachedQr) {
+      if (cachedQr && tenantId) {
          this.logger.log(`[${instanceId}] Re-emitting cached QR code to frontend...`);
-         this.gateway.emitQrCode(instanceId, cachedQr);
+         this.gateway.emitQrCode(instanceId, tenantId, cachedQr);
       }
       return;
     }
@@ -81,7 +81,7 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Setting up Baileys session (v${version.join('.')}) for Instance: ${instanceId}`);
 
       // Self-Sufficient mapping of cryptography -> PostgreSQL
-      const { state, saveCreds } = await usePrismaAuthState(this.prisma, instanceId);
+      const { state, saveCreds } = await usePrismaAuthState(this.prisma, instanceId, tenantId || 'unknown');
 
       const pinoLogger = pino({ level: 'silent' });
 
@@ -103,11 +103,11 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
       sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
 
-        if (qr) {
+        if (qr && tenantId) {
           this.latestQrs.set(instanceId, qr);
           this.logger.debug(`[${instanceId}] New QR Code Generated. Emit to Socket.io GUI -> ${qr.substring(0, 25)}...`);
           // Intercept and emit `qr` to NestJS WebSocket Gateway (Frontend Modal)
-          this.gateway.emitQrCode(instanceId, qr);
+          this.gateway.emitQrCode(instanceId, tenantId, qr);
         }
 
         if (connection === 'close') {
@@ -122,13 +122,13 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
 
           if (shouldReconnect) {
              // Delay reconnect by 2 seconds to avoid tight reconnect storms
-             setTimeout(async () => {
-               try {
-                 await this.startSession(instanceId);
-               } catch (err) {
-                 this.logger.error(`[${instanceId}] Critical: Failed to auto-reconnect:`, err);
-               }
-             }, 2000);
+              setTimeout(async () => {
+                try {
+                  await this.startSession(instanceId, tenantId);
+                } catch (err) {
+                  this.logger.error(`[${instanceId}] Critical: Failed to auto-reconnect:`, err);
+                }
+              }, 2000);
           } else {
              // Logged out permanently — clean up DB state
              this.logger.log(`[${instanceId}] Logged out. Removing from memory and DB.`);
@@ -137,7 +137,7 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
                data: { connectionStatus: 'disconnected' },
              });
              await this.prisma.whatsAppAuthState.deleteMany({
-                 where: { instanceId }
+                 where: { instanceId, tenantId }
              });
           }
         }
@@ -149,7 +149,9 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
              where: { id: instanceId },
              data: { connectionStatus: 'connected' },
           });
-          this.gateway.emitConnected(instanceId);
+          if (tenantId) {
+            this.gateway.emitConnected(instanceId, tenantId);
+          }
         }
       });
 
@@ -215,6 +217,7 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
                create: {
                    messageId: msgId,
                    instanceId: instanceId,
+                   tenantId: instance.tenantId,
                    direction: 'INBOUND',
                    remoteJid: jid || 'unknown',
                    messageType: Object.keys(msg.message)[0] || 'unknown',
@@ -227,12 +230,12 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
                 await this.prisma.whatsAppContact.upsert({
                     where: { instanceId_remoteJid: { instanceId, remoteJid: jid } },
                     update: { pushName: msg.pushName },
-                    create: { instanceId, remoteJid: jid, pushName: msg.pushName }
+                    create: { instanceId, tenantId: instance.tenantId, remoteJid: jid, pushName: msg.pushName }
                 });
             }
 
             // Emit to WebSocket Gateway so the UI auto-refreshes
-            this.gateway.emitMessageUpsert(instanceId, {
+            this.gateway.emitMessageUpsert(instanceId, instance.tenantId, {
                id: msgId,
                instanceId,
                direction: 'INBOUND',
@@ -263,20 +266,20 @@ export class BaileysEngineService implements OnModuleInit, OnModuleDestroy {
    * Sends a WhatsApp text message via the first available connected session.
    * If instanceId is provided, it uses that specific session.
    */
-  public async sendMessage(phone: string, message: string, instanceId?: string): Promise<{ success: boolean; messageId?: string }> {
-    // Use the provided instanceId or fall back to first available connected session
+  public async sendMessage(phone: string, message: string, instanceId: string | undefined, tenantId: string): Promise<{ success: boolean; messageId?: string }> {
+    // Use the provided instanceId or fall back to first available connected session for this tenant
     let targetId = instanceId;
     if (!targetId) {
-      for (const [id, sock] of this.sessions.entries()) {
-        if (sock.user) { // sock.user is set when connected
-          targetId = id;
-          break;
-        }
+      const dbInstance = await this.prisma.whatsAppInstance.findFirst({
+        where: { tenantId, connectionStatus: 'connected' }
+      });
+      if (dbInstance && this.sessions.has(dbInstance.id) && this.sessions.get(dbInstance.id)?.user) {
+        targetId = dbInstance.id;
       }
     }
 
     if (!targetId) {
-      this.logger.error('No connected Baileys sessions available to send message.');
+      this.logger.error(`No connected Baileys sessions available to send message for tenant ${tenantId}.`);
       return { success: false };
     }
 

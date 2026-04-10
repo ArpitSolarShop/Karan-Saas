@@ -14,16 +14,23 @@ export class DocumentsService {
     });
   }
 
-  async createFolder(data: any) {
-    return this.prisma.documentFolder.create({ data });
+  async createFolder(tenantId: string, data: any) {
+    return this.prisma.documentFolder.create({ 
+      data: { ...data, tenantId } 
+    });
   }
 
-  async updateFolder(id: string, data: any) {
-    return this.prisma.documentFolder.update({ where: { id }, data });
+  async updateFolder(id: string, tenantId: string, data: any) {
+    return this.prisma.documentFolder.update({ 
+      where: { id, tenantId }, 
+      data 
+    });
   }
 
-  async removeFolder(id: string) {
-    return this.prisma.documentFolder.delete({ where: { id } });
+  async removeFolder(id: string, tenantId: string) {
+    return this.prisma.documentFolder.delete({ 
+      where: { id, tenantId } 
+    });
   }
 
   // ── Documents ──
@@ -35,24 +42,31 @@ export class DocumentsService {
     });
   }
 
-  async findOne(id: string) {
-    const doc = await this.prisma.document.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId: string) {
+    const doc = await this.prisma.document.findFirst({
+      where: { id, tenantId },
       include: { folder: true },
     });
     if (!doc) throw new NotFoundException('Document not found');
     return doc;
   }
 
-  async create(data: any) {
-    return this.prisma.document.create({ data });
+  async create(tenantId: string, data: any) {
+    return this.prisma.document.create({ 
+      data: { ...data, tenantId } 
+    });
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.document.update({ where: { id }, data });
+  async update(id: string, tenantId: string, data: any) {
+    return this.prisma.document.update({ 
+      where: { id, tenantId }, 
+      data 
+    });
   }
 
-  async remove(id: string) {
-    return this.prisma.document.delete({ where: { id } });
+  async remove(id: string, tenantId: string) {
+    return this.prisma.document.delete({ 
+      where: { id, tenantId } 
+    });
   }
 }

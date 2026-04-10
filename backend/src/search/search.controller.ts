@@ -1,8 +1,10 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Req } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 
 @Controller('search')
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 
@@ -11,16 +13,15 @@ export class SearchController {
    * GET /search?q=john&tenantId=xxx&limit=10
    */
   @Get()
-  @UseGuards(JwtAuthGuard)
   async search(
     @Query('q') q: string,
-    @Query('tenantId') tenantId?: string,
+    @Req() req: any,
     @Query('limit') limit?: string,
   ) {
     if (!q || q.trim().length < 2)
       return { leads: [], contacts: [], calls: [], query: q };
     return this.searchService.search(q, {
-      tenantId,
+      tenantId: req.user.tenantId,
       limit: limit ? parseInt(limit) : 10,
     });
   }
@@ -30,13 +31,12 @@ export class SearchController {
    * GET /search/leads?q=john&status=FOLLOW_UP
    */
   @Get('leads')
-  @UseGuards(JwtAuthGuard)
   async searchLeads(
     @Query('q') q: string,
+    @Req() req: any,
     @Query('status') status?: string,
-    @Query('tenantId') tenantId?: string,
   ) {
     if (!q) return { hits: [] };
-    return this.searchService.searchLeads(q, { status, tenantId });
+    return this.searchService.searchLeads(q, { status, tenantId: req.user.tenantId });
   }
 }

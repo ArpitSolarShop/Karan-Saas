@@ -1,22 +1,35 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
 import { SalesOrdersService } from './sales-orders.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 
 @Controller('sales-orders')
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class SalesOrdersController {
   constructor(private readonly salesOrdersService: SalesOrdersService) {}
 
   @Post()
-  create(@Body() dto: any) { return this.salesOrdersService.create(dto); }
+  async create(@Body() dto: any, @Req() req: any) { 
+    return this.salesOrdersService.create({ ...dto, tenantId: req.user.tenantId }); 
+  }
 
   @Get()
-  findAll(@Query('tenantId') tenantId: string) { return this.salesOrdersService.findAll(tenantId); }
+  async findAll(@Req() req: any) { 
+    return this.salesOrdersService.findAll(req.user.tenantId); 
+  }
 
   @Get(':id')
-  findOne(@Param('id') id: string) { return this.salesOrdersService.findOne(id); }
+  async findOne(@Param('id') id: string, @Req() req: any) { 
+    return this.salesOrdersService.findOne(id, req.user.tenantId); 
+  }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: any) { return this.salesOrdersService.update(id, dto); }
+  async update(@Param('id') id: string, @Body() dto: any, @Req() req: any) { 
+    return this.salesOrdersService.update(id, req.user.tenantId, dto); 
+  }
 
   @Delete(':id')
-  remove(@Param('id') id: string) { return this.salesOrdersService.remove(id); }
+  async remove(@Param('id') id: string, @Req() req: any) { 
+    return this.salesOrdersService.remove(id, req.user.tenantId); 
+  }
 }

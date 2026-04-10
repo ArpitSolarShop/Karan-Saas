@@ -13,9 +13,9 @@ export class SalesOrdersService {
     });
   }
 
-  async findOne(id: string) {
-    const order = await this.prisma.salesOrder.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId: string) {
+    const order = await this.prisma.salesOrder.findFirst({
+      where: { id, tenantId },
       include: { company: { select: { name: true } } },
     });
     if (!order) throw new NotFoundException('Sales order not found');
@@ -26,11 +26,11 @@ export class SalesOrdersService {
     return this.prisma.salesOrder.create({ data });
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.salesOrder.update({ where: { id }, data });
+  async update(id: string, tenantId: string, data: any) {
+    return this.prisma.salesOrder.update({ where: { id, tenantId }, data });
   }
 
-  async remove(id: string) {
-    return this.prisma.salesOrder.delete({ where: { id } });
+  async remove(id: string, tenantId: string) {
+    return this.prisma.salesOrder.delete({ where: { id, tenantId } });
   }
 }

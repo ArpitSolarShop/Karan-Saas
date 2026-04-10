@@ -28,31 +28,36 @@ export class TelephonyGateway {
   }
 
   @SubscribeMessage('join_room')
-  handleJoinRoom(client: Socket, @MessageBody() data: { roomId: string }) {
-    client.join(data.roomId);
-    this.logger.log(`Client ${client.id} joined room ${data.roomId}`);
-    return { status: 'OK' };
+  handleJoinRoom(client: Socket, @MessageBody() data: { roomId: string; tenantId: string }) {
+    // Standard room joining with tenant scoping
+    const scopedRoomId = `tenant:${data.tenantId}:${data.roomId}`;
+    client.join(scopedRoomId);
+    this.logger.log(`Client ${client.id} joined scoped room ${scopedRoomId}`);
+    return { status: 'OK', room: scopedRoomId };
   }
 
   @SubscribeMessage('call:initiate')
-  handleCallInitiate(client: Socket, @MessageBody() data: { to: string; agentId: string; metadata?: any }) {
-    this.logger.log(`[Signaling] Call Initiate from ${data.agentId} to ${data.to}`);
+  handleCallInitiate(client: Socket, @MessageBody() data: { to: string; agentId: string; tenantId: string; metadata?: any }) {
+    this.logger.log(`[Signaling] Call Initiate from Tenant ${data.tenantId} Agent ${data.agentId} to ${data.to}`);
     // In real scenario, talk to FreeSWITCH here
-    this.server.to(`agent:${data.agentId}`).emit('call:status', { status: 'CONNECTING', to: data.to, metadata: data.metadata });
+    const agentRoom = `tenant:${data.tenantId}:agent:${data.agentId}`;
+    this.server.to(agentRoom).emit('call:status', { status: 'CONNECTING', to: data.to, metadata: data.metadata });
     return { status: 'OK' };
   }
 
   @SubscribeMessage('call:answer')
-  handleCallAnswer(client: Socket, @MessageBody() data: { agentId: string; callId: string }) {
-    this.logger.log(`[Signaling] Call Answered by ${data.agentId}`);
-    this.server.to(`agent:${data.agentId}`).emit('call:status', { status: 'INCALL', callId: data.callId });
+  handleCallAnswer(client: Socket, @MessageBody() data: { agentId: string; tenantId: string; callId: string }) {
+    this.logger.log(`[Signaling] Call Answered in Tenant ${data.tenantId} by ${data.agentId}`);
+    const agentRoom = `tenant:${data.tenantId}:agent:${data.agentId}`;
+    this.server.to(agentRoom).emit('call:status', { status: 'INCALL', callId: data.callId });
     return { status: 'OK' };
   }
 
   @SubscribeMessage('call:hangup')
-  handleCallHangup(client: Socket, @MessageBody() data: { agentId: string; callId: string }) {
-    this.logger.log(`[Signaling] Call Hangup by ${data.agentId}`);
-    this.server.to(`agent:${data.agentId}`).emit('call:status', { status: 'IDLE', callId: data.callId });
+  handleCallHangup(client: Socket, @MessageBody() data: { agentId: string; tenantId: string; callId: string }) {
+    this.logger.log(`[Signaling] Call Hangup in Tenant ${data.tenantId} by ${data.agentId}`);
+    const agentRoom = `tenant:${data.tenantId}:agent:${data.agentId}`;
+    this.server.to(agentRoom).emit('call:status', { status: 'IDLE', callId: data.callId });
     return { status: 'OK' };
   }
 
@@ -60,10 +65,13 @@ export class TelephonyGateway {
     this.logger.log(`Frontend Disconnected: ${client.id}`);
   }
 
-  broadcastCallEvent(agentId: string, status: string, callData: any) {
+  broadcastCallEvent(tenantId: string, agentId: string, status: string, callData: any) {
     // E.g. notify specific agent or supervisor dash
-    this.server.emit(`agent:${agentId}:call`, { status, callData });
-    this.server.emit('supervisor:live_calls', { agentId, status, callData });
+    const agentRoom = `tenant:${tenantId}:agent:${agentId}:call`;
+    const supervisorRoom = `tenant:${tenantId}:supervisor:live_calls`;
+    
+    this.server.to(agentRoom).emit('call:event', { status, callData });
+    this.server.to(supervisorRoom).emit('call:event', { agentId, status, callData });
   }
 
   @SubscribeMessage('ping')

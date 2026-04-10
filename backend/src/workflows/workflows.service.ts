@@ -162,7 +162,7 @@ export class WorkflowsService {
         if (context.leadId && context.phone) {
           this.logger.log(`[Workflow] Sending WA to ${context.phone}`);
           try {
-            const result = await this.whatsapp.sendMessage(context.phone, message);
+            const result = await this.whatsapp.sendMessage(context.phone, message, context.tenantId);
             if (result.success) {
               this.logger.log(`[Workflow] WA sent successfully to ${context.phone}`);
             } else {

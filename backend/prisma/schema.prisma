@@ -134,6 +134,11 @@ model Tenant {
   conversations     OmniConversation[]
   omniMessages      OmniMessage[]
 
+  whatsAppAuthStates WhatsAppAuthState[]
+  whatsAppMessages   WhatsAppMessage[]
+  whatsAppContacts   WhatsAppContact[]
+  whatsAppTemplates  WhatsAppTemplate[]
+
   // Telephony Engine
   extensions         Extension[]
   sipTrunks          SipTrunk[]
@@ -1026,18 +1031,22 @@ model WhatsAppInstance {
 
 model WhatsAppAuthState {
   id         String           @id @default(cuid())
+  tenantId   String
   instanceId String
   type       String           @db.VarChar(100)
   keyId      String           @db.VarChar(255)
   data       String
   instance   WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
 
   @@unique([instanceId, type, keyId])
+  @@index([tenantId])
   @@map("whatsapp_auth_states")
 }
 
 model WhatsAppMessage {
   id          String             @id @default(cuid())
+  tenantId    String
   instanceId  String
   direction   WaMessageDirection
   remoteJid   String
@@ -1047,20 +1056,25 @@ model WhatsAppMessage {
   status      String             @default("SERVER_ACK")
   timestamp   DateTime           @default(now())
   instance    WhatsAppInstance   @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  tenant      Tenant             @relation(fields: [tenantId], references: [id])
 
   @@index([instanceId, remoteJid])
+  @@index([tenantId])
   @@map("whatsapp_messages")
 }
 
 model WhatsAppContact {
   id         String           @id @default(cuid())
+  tenantId   String
   instanceId String
   remoteJid  String
   pushName   String?
   profilePic String?
   instance   WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
 
   @@unique([instanceId, remoteJid])
+  @@index([tenantId])
   @@map("whatsapp_contacts")
 }
 
@@ -1132,6 +1146,7 @@ model OmniMessage {
 
 model WhatsAppTemplate {
   id         String           @id @default(cuid())
+  tenantId   String
   instanceId String
   templateId String
   name       String
@@ -1142,8 +1157,10 @@ model WhatsAppTemplate {
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
   instance   WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
 
   @@unique([instanceId, name, language])
+  @@index([tenantId])
   @@map("whatsapp_templates")
 }
 

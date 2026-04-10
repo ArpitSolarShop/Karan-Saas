@@ -38,22 +38,25 @@ export class WhatsappGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   /**
    * Broadcasts the Base64 QR code to a specific active frontend instance pairing screen.
+   * Scoped by tenant for security.
    */
-  emitQrCode(instanceId: string, qrCode: string) {
-    this.server.emit(`wa-qr:${instanceId}`, { qrCode });
+  emitQrCode(instanceId: string, tenantId: string, qrCode: string) {
+    this.server.emit(`tenant:${tenantId}:wa-qr:${instanceId}`, { qrCode });
   }
 
   /**
    * Tells the frontend that the instance is officially connected and authorized.
+   * Scoped by tenant for security.
    */
-  emitConnected(instanceId: string) {
-    this.server.emit(`wa-connected:${instanceId}`, { status: 'connected' });
+  emitConnected(instanceId: string, tenantId: string) {
+    this.server.emit(`tenant:${tenantId}:wa-connected:${instanceId}`, { status: 'connected' });
   }
 
   /**
    * Pushes real-time inbound/outbound messages to the Next.js Unified Chat Inbox.
+   * Scoped by tenant for security.
    */
-  emitMessageUpsert(instanceId: string, message: any) {
-    this.server.emit(`wa-message:${instanceId}`, message);
+  emitMessageUpsert(instanceId: string, tenantId: string, message: any) {
+    this.server.emit(`tenant:${tenantId}:wa-message:${instanceId}`, message);
   }
 }

@@ -19,30 +19,30 @@ export class CustomFieldsService {
     });
   }
 
-  async findOne(id: string) {
-    const field = await this.prisma.customFieldDefinition.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId: string) {
+    const field = await this.prisma.customFieldDefinition.findFirst({
+      where: { id, tenantId },
     });
     if (!field) throw new NotFoundException('Custom field definition not found');
     return field;
   }
 
-  async create(dto: CreateCustomFieldDto) {
+  async create(tenantId: string, dto: CreateCustomFieldDto) {
     return this.prisma.customFieldDefinition.create({
-      data: dto,
+      data: { ...dto, tenantId },
     });
   }
 
-  async update(id: string, dto: UpdateCustomFieldDto) {
+  async update(id: string, tenantId: string, dto: UpdateCustomFieldDto) {
     return this.prisma.customFieldDefinition.update({
-      where: { id },
+      where: { id, tenantId },
       data: dto,
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, tenantId: string) {
     return this.prisma.customFieldDefinition.delete({
-      where: { id },
+      where: { id, tenantId },
     });
   }
 

@@ -13,36 +13,40 @@ export class HrLeavesService {
     });
   }
 
-  async findByUser(userId: string) {
+  async findByUser(userId: string, tenantId: string) {
     return this.prisma.leaveRequest.findMany({
-      where: { userId },
+      where: { userId, tenantId },
       orderBy: { startDate: 'desc' },
     });
   }
 
-  async create(data: any) {
-    return this.prisma.leaveRequest.create({ data });
+  async create(tenantId: string, data: any) {
+    return this.prisma.leaveRequest.create({ 
+      data: { ...data, tenantId } 
+    });
   }
 
-  async approve(id: string) {
-    const leave = await this.prisma.leaveRequest.findUnique({ where: { id } });
+  async approve(id: string, tenantId: string) {
+    const leave = await this.prisma.leaveRequest.findFirst({ where: { id, tenantId } });
     if (!leave) throw new NotFoundException('Leave request not found');
     return this.prisma.leaveRequest.update({
-      where: { id },
+      where: { id, tenantId },
       data: { status: 'APPROVED' },
     });
   }
 
-  async reject(id: string, reason?: string) {
-    const leave = await this.prisma.leaveRequest.findUnique({ where: { id } });
+  async reject(id: string, tenantId: string, reason?: string) {
+    const leave = await this.prisma.leaveRequest.findFirst({ where: { id, tenantId } });
     if (!leave) throw new NotFoundException('Leave request not found');
     return this.prisma.leaveRequest.update({
-      where: { id },
+      where: { id, tenantId },
       data: { status: 'REJECTED', reviewNotes: reason },
     });
   }
 
-  async remove(id: string) {
-    return this.prisma.leaveRequest.delete({ where: { id } });
+  async remove(id: string, tenantId: string) {
+    return this.prisma.leaveRequest.delete({ 
+      where: { id, tenantId } 
+    });
   }
 }

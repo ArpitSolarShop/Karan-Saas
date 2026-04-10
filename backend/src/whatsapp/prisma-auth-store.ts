@@ -16,10 +16,11 @@ import { PrismaClient } from '@prisma/client';
 export const usePrismaAuthState = async (
   prisma: PrismaClient,
   instanceId: string,
+  tenantId: string,
 ): Promise<{ state: AuthenticationState; saveCreds: () => Promise<void> }> => {
   const writeData = async (type: string, keyId: string, data: any) => {
     const jsonString = JSON.stringify(data, BufferJSON.replacer);
-    await prisma.whatsAppAuthState.upsert({
+    await (prisma as any).whatsAppAuthState.upsert({
       where: {
         instanceId_type_keyId: {
           instanceId,
@@ -30,6 +31,7 @@ export const usePrismaAuthState = async (
       update: { data: jsonString },
       create: {
         instanceId,
+        tenantId,
         type,
         keyId,
         data: jsonString,
@@ -38,7 +40,7 @@ export const usePrismaAuthState = async (
   };
 
   const readData = async (type: string, keyId: string) => {
-    const result = await prisma.whatsAppAuthState.findUnique({
+    const result = await (prisma as any).whatsAppAuthState.findUnique({
       where: {
         instanceId_type_keyId: {
           instanceId,

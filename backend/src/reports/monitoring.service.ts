@@ -14,39 +14,36 @@ export class MonitoringService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    this.logger.log('[Monitoring] Initializing real-time BI counters...');
-    await this.refreshGlobalMetrics();
-    
-    // Periodically refresh every 60s to ensure consistency with DB
-    setInterval(() => this.refreshGlobalMetrics(), 60000);
+    this.logger.log('[Monitoring] Initializing multi-tenant real-time BI counters...');
+    // Initial refresh will happen on-demand or via a scheduled worker for each tenant
   }
 
   /**
-   * Recalculates heavy metrics from DB and caches them in Redis
+   * Recalculates metrics from DB for a specific tenant and caches them in Redis
    */
-  async refreshGlobalMetrics() {
+  async refreshTenantMetrics(tenantId: string) {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const [totalCallsToday, conversionRate] = await Promise.all([
-        this.prisma.call.count({ where: { createdAt: { gte: today } } }),
-        this.calculateDailyConversion(today),
+        this.prisma.call.count({ where: { tenantId, createdAt: { gte: today } } }),
+        this.calculateDailyConversion(tenantId, today),
       ]);
 
-      await this.redis.set('bi:calls_today', totalCallsToday);
-      await this.redis.set('bi:conversion_today', conversionRate);
+      await this.redis.set(`bi:${tenantId}:calls_today`, totalCallsToday);
+      await this.redis.set(`bi:${tenantId}:conversion_today`, conversionRate);
       
-      this.broadcastUpdate();
+      this.broadcastUpdate(tenantId);
     } catch (err) {
-      this.logger.error(`[Monitoring] Failed to refresh metrics: ${err.message}`);
+      this.logger.error(`[Monitoring] Failed to refresh metrics for tenant ${tenantId}: ${err.message}`);
     }
   }
 
-  private async calculateDailyConversion(since: Date): Promise<string> {
-    const totalLeads = await this.prisma.lead.count({ where: { createdAt: { gte: since } } });
+  private async calculateDailyConversion(tenantId: string, since: Date): Promise<string> {
+    const totalLeads = await this.prisma.lead.count({ where: { tenantId, createdAt: { gte: since } } });
     const convertedLeads = await this.prisma.lead.count({ 
-      where: { createdAt: { gte: since }, status: 'CONVERTED' } 
+      where: { tenantId, createdAt: { gte: since }, status: 'CONVERTED' } 
     });
     
     if (totalLeads === 0) return '0%';
@@ -58,30 +55,34 @@ export class MonitoringService implements OnModuleInit {
    */
   @OnEvent('call.created')
   async handleCallCreated(payload: any) {
-    await this.redis.incr('bi:calls_today');
-    await this.redis.incr('bi:active_calls');
-    this.broadcastUpdate();
+    const tenantId = payload.tenantId;
+    if (!tenantId) return;
+    await this.redis.incr(`bi:${tenantId}:calls_today`);
+    await this.redis.incr(`bi:${tenantId}:active_calls`);
+    this.broadcastUpdate(tenantId);
   }
 
   @OnEvent('call.completed')
   async handleCallCompleted(payload: any) {
+    const tenantId = payload.tenantId;
+    if (!tenantId) return;
     // Basic active calls logic
-    const active = await this.redis.get('bi:active_calls');
+    const active = await this.redis.get(`bi:${tenantId}:active_calls`);
     if (active && active > 0) {
-      await this.redis.set('bi:active_calls', active - 1);
+      await this.redis.set(`bi:${tenantId}:active_calls`, active - 1);
     }
-    this.broadcastUpdate();
+    this.broadcastUpdate(tenantId);
   }
 
   /**
    * Fetches the aggregated BI state for the Wallboard
    */
-  async getLiveWallboard() {
+  async getLiveWallboard(tenantId: string) {
     const [callsToday, activeCalls, conversion, agentsOnline] = await Promise.all([
-      this.redis.get('bi:calls_today'),
-      this.redis.get('bi:active_calls'),
-      this.redis.get('bi:conversion_today'),
-      this.redis.get('bi:agents_online'),
+      this.redis.get(`bi:${tenantId}:calls_today`),
+      this.redis.get(`bi:${tenantId}:active_calls`),
+      this.redis.get(`bi:${tenantId}:conversion_today`),
+      this.redis.get(`bi:${tenantId}:agents_online`),
     ]);
 
     return {
@@ -93,8 +94,8 @@ export class MonitoringService implements OnModuleInit {
     };
   }
 
-  private async broadcastUpdate() {
-    const data = await this.getLiveWallboard();
-    this.eventEmitter.emit('bi.wallboard.update', data);
+  private async broadcastUpdate(tenantId: string) {
+    const data = await this.getLiveWallboard(tenantId);
+    this.eventEmitter.emit(`bi.${tenantId}.wallboard.update`, data);
   }
 }

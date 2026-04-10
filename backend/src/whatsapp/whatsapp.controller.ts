@@ -1,9 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards, Req } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BaileysEngineService } from './baileys.service';
 import { CloudApiService } from './cloud-api.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 
 @Controller('whatsapp')
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class WhatsappController {
   constructor(
     private readonly prisma: PrismaService,
@@ -15,8 +18,9 @@ export class WhatsappController {
   // INSTANCE MANAGEMENT
   // ─────────────────────────────────────────────────
 
-  @Get('instances/:tenantId')
-  async getInstances(@Param('tenantId') tenantId: string) {
+  @Get('instances')
+  async getInstances(@Req() req: any) {
+    const tenantId = req.user.tenantId;
     return this.prisma.whatsAppInstance.findMany({
       where: { tenantId },
       include: {
@@ -31,7 +35,6 @@ export class WhatsappController {
   async createInstance(
     @Body()
     data: {
-      tenantId: string;
       name: string;
       connectionType?: 'CLOUD_API' | 'BAILEYS_NATIVE';
       phoneNumberId?: string;
@@ -41,30 +44,18 @@ export class WhatsappController {
       businessName?: string;
       webhookVerifyToken?: string;
     },
+    @Req() req: any,
   ) {
+    const tenantId = req.user.tenantId;
     const connectionType = data.connectionType || 'BAILEYS_NATIVE';
 
     try {
-      // First, ensure the tenant exists (if using generic 'demo-tenant-id' from frontend placeholder)
-      if (data.tenantId) {
-        const tenantExists = await this.prisma.tenant.findUnique({ where: { id: data.tenantId } });
-        if (!tenantExists) {
-          await this.prisma.tenant.create({
-            data: { 
-              id: data.tenantId, 
-              name: 'Demo Tenant', 
-              subdomain: `demo-${data.tenantId.substring(0, 8)}-${Math.floor(Math.random() * 1000)}` 
-            }
-          });
-        }
-      }
-
-      // Ensure name is strictly unique to prevent P2002 errors
+      // name is strictly unique to prevent P2002 errors
       const uniqueName = data.name + ' - ' + Math.floor(Math.random() * 10000);
 
       const instance = await this.prisma.whatsAppInstance.create({
         data: {
-          tenantId: data.tenantId,
+          tenantId,
           name: uniqueName,
           connectionType,
           connectionStatus: connectionType === 'CLOUD_API' ? 'connected' : 'disconnected',
@@ -92,22 +83,22 @@ export class WhatsappController {
   async handleEmbeddedSignup(
     @Body()
     data: {
-      tenantId: string;
       userAccessToken: string;
       instanceName?: string;
     },
+    @Req() req: any,
   ) {
     return this.cloudApi.exchangeTokenAndProvision(
-      data.tenantId,
+      req.user.tenantId,
       data.userAccessToken,
       data.instanceName,
     );
   }
 
   @Post('instances/:id/connect')
-  async connectInstance(@Param('id') id: string) {
-    const instance = await this.prisma.whatsAppInstance.findUnique({
-      where: { id },
+  async connectInstance(@Param('id') id: string, @Req() req: any) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id, tenantId: req.user.tenantId },
     });
 
     if (!instance) {
@@ -118,7 +109,7 @@ export class WhatsappController {
       // Cloud API instances are "connected" as soon as credentials are valid
       // We can test the connection by fetching phone number details
       try {
-        const details = await this.cloudApi.getPhoneNumberDetails(id);
+        const details = await this.cloudApi.getPhoneNumberDetails(id, req.user.tenantId);
         await this.prisma.whatsAppInstance.update({
           where: { id },
           data: { connectionStatus: 'connected' },
@@ -137,14 +128,14 @@ export class WhatsappController {
     }
 
     // Baileys — starts QR code session
-    await this.baileysEngine.startSession(id);
+    await this.baileysEngine.startSession(id, req.user.tenantId);
     return { success: true, message: 'Session boot sequence initiated.' };
   }
 
   @Delete('instances/:id/disconnect')
-  async disconnectInstance(@Param('id') id: string) {
-    const instance = await this.prisma.whatsAppInstance.findUnique({
-      where: { id },
+  async disconnectInstance(@Param('id') id: string, @Req() req: any) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id, tenantId: req.user.tenantId },
     });
 
     if (!instance) {
@@ -182,9 +173,10 @@ export class WhatsappController {
   @Post('send/text')
   async sendText(
     @Body() data: { instanceId: string; jid: string; text: string },
+    @Req() req: any,
   ) {
-    const instance = await this.prisma.whatsAppInstance.findUnique({
-      where: { id: data.instanceId },
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: data.instanceId, tenantId: req.user.tenantId },
     });
 
     if (!instance) {
@@ -197,12 +189,13 @@ export class WhatsappController {
         data.instanceId,
         data.jid,
         data.text,
+        req.user.tenantId,
       );
       return result;
     }
 
     // ── BAILEYS PATH (instrumented) ──
-    return this.baileysEngine.sendMessage(data.jid, data.text, data.instanceId);
+    return this.baileysEngine.sendMessage(data.jid, data.text, data.instanceId, req.user.tenantId);
   }
 
   @Post('send/template')
@@ -215,12 +208,19 @@ export class WhatsappController {
       languageCode: string;
       components?: any[];
     },
+    @Req() req: any,
   ) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: data.instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+
     return this.cloudApi.sendTemplateMessage(
       data.instanceId,
       data.to,
       data.templateName,
       data.languageCode,
+      req.user.tenantId,
       data.components,
     );
   }
@@ -236,9 +236,10 @@ export class WhatsappController {
       caption?: string;
       filename?: string;
     },
+    @Req() req: any,
   ) {
-    const instance = await this.prisma.whatsAppInstance.findUnique({
-      where: { id: data.instanceId },
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: data.instanceId, tenantId: req.user.tenantId },
     });
 
     if (!instance) {
@@ -254,6 +255,7 @@ export class WhatsappController {
         data.mediaUrl,
         data.caption,
         data.filename,
+        req.user.tenantId,
       );
     }
 
@@ -296,11 +298,18 @@ export class WhatsappController {
       to: string;
       interactive: any;
     },
+    @Req() req: any,
   ) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: data.instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+
     return this.cloudApi.sendInteractiveMessage(
       data.instanceId,
       data.to,
       data.interactive,
+      req.user.tenantId,
     );
   }
 
@@ -308,8 +317,13 @@ export class WhatsappController {
   async markAsRead(
     @Param('wamid') wamid: string,
     @Body() data: { instanceId: string },
+    @Req() req: any,
   ) {
-    return this.cloudApi.markAsRead(data.instanceId, wamid);
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: data.instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+    return this.cloudApi.markAsRead(data.instanceId, wamid, req.user.tenantId);
   }
 
   // ─────────────────────────────────────────────────
@@ -317,13 +331,21 @@ export class WhatsappController {
   // ─────────────────────────────────────────────────
 
   @Get('templates/:instanceId')
-  async getTemplates(@Param('instanceId') instanceId: string) {
-    return this.cloudApi.getTemplates(instanceId);
+  async getTemplates(@Param('instanceId') instanceId: string, @Req() req: any) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+    return this.cloudApi.getTemplates(instanceId, req.user.tenantId);
   }
 
   @Post('templates/:instanceId/sync')
-  async syncTemplates(@Param('instanceId') instanceId: string) {
-    return this.cloudApi.syncTemplates(instanceId);
+  async syncTemplates(@Param('instanceId') instanceId: string, @Req() req: any) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+    return this.cloudApi.syncTemplates(instanceId, req.user.tenantId);
   }
 
   @Post('templates/:instanceId')
@@ -336,16 +358,26 @@ export class WhatsappController {
       language: string;
       components: any[];
     },
+    @Req() req: any,
   ) {
-    return this.cloudApi.createTemplate(instanceId, data);
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+    return this.cloudApi.createTemplate(instanceId, data, req.user.tenantId);
   }
 
   @Delete('templates/:instanceId/:templateName')
   async deleteTemplate(
     @Param('instanceId') instanceId: string,
     @Param('templateName') templateName: string,
+    @Req() req: any,
   ) {
-    return this.cloudApi.deleteTemplate(instanceId, templateName);
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+    return this.cloudApi.deleteTemplate(instanceId, templateName, req.user.tenantId);
   }
 
   // ─────────────────────────────────────────────────
@@ -353,13 +385,21 @@ export class WhatsappController {
   // ─────────────────────────────────────────────────
 
   @Get('phone-numbers/:instanceId')
-  async getPhoneNumbers(@Param('instanceId') instanceId: string) {
-    return this.cloudApi.getPhoneNumbers(instanceId);
+  async getPhoneNumbers(@Param('instanceId') instanceId: string, @Req() req: any) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+    return this.cloudApi.getPhoneNumbers(instanceId, req.user.tenantId);
   }
 
   @Get('business-profile/:instanceId')
-  async getBusinessProfile(@Param('instanceId') instanceId: string) {
-    return this.cloudApi.getBusinessProfile(instanceId);
+  async getBusinessProfile(@Param('instanceId') instanceId: string, @Req() req: any) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+    return this.cloudApi.getBusinessProfile(instanceId, req.user.tenantId);
   }
 
   @Post('business-profile/:instanceId')
@@ -374,8 +414,13 @@ export class WhatsappController {
       websites?: string[];
       vertical?: string;
     },
+    @Req() req: any,
   ) {
-    return this.cloudApi.updateBusinessProfile(instanceId, data);
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+    return this.cloudApi.updateBusinessProfile(instanceId, data, req.user.tenantId);
   }
 
   // ─────────────────────────────────────────────────
@@ -385,12 +430,19 @@ export class WhatsappController {
   @Get('messages/:instanceId')
   async getMessages(
     @Param('instanceId') instanceId: string,
+    @Req() req: any,
     @Query('jid') jid?: string,
     @Query('limit') limit?: string,
   ) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+
     return this.prisma.whatsAppMessage.findMany({
       where: {
         instanceId,
+        tenantId: req.user.tenantId,
         ...(jid ? { remoteJid: jid } : {}),
       },
       orderBy: { timestamp: 'asc' },
@@ -399,9 +451,14 @@ export class WhatsappController {
   }
 
   @Get('contacts/:instanceId')
-  async getContacts(@Param('instanceId') instanceId: string) {
+  async getContacts(@Param('instanceId') instanceId: string, @Req() req: any) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: instanceId, tenantId: req.user.tenantId },
+    });
+    if (!instance) return { success: false, message: 'Instance not found or unauthorized.' };
+
     return this.prisma.whatsAppContact.findMany({
-      where: { instanceId },
+      where: { instanceId, tenantId: req.user.tenantId },
       orderBy: { pushName: 'asc' },
     });
   }

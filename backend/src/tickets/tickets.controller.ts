@@ -10,9 +10,10 @@ import {
 } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 
 @Controller('tickets')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
 
@@ -33,12 +34,13 @@ export class TicketsController {
 
   @Post(':id/messages')
   async addMessage(
-    @Param('id') id: string,
+    @Param('id') ticketId: string,
     @Req() req: any,
-    @Body() body: any,
+    @Body() body: { body: string; isInternal: boolean },
   ) {
     return this.ticketsService.addMessage(
-      id,
+      ticketId,
+      req.user.tenantId,
       req.user.id,
       body.body,
       body.isInternal,

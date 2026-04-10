@@ -82,7 +82,7 @@ export class CommunicationsService {
     switch (type) {
       case 'WHATSAPP':
         target = lead.phone;
-        const waResult = await this.whatsapp.sendMessage(target, message);
+        const waResult = await this.whatsapp.sendMessage(target, message, tenantId);
         success = waResult.success;
         break;
       case 'EMAIL':
@@ -96,7 +96,7 @@ export class CommunicationsService {
         break;
       case 'SMS':
         target = lead.phone;
-        const smsResult = await this.whatsapp.sendMessage(target, `[SMS] ${message}`);
+        const smsResult = await this.whatsapp.sendMessage(target, `[SMS] ${message}`, tenantId);
         success = smsResult.success;
         break;
     }
@@ -124,7 +124,7 @@ export class CommunicationsService {
 
       if (resolvedUserId && resolvedUserId !== 'SYSTEM') {
         await this.activities.log(
-          lead.tenantId || 'dev-tenant-001',
+          lead.tenantId,
           targetLeadId,
           resolvedUserId,
           type,

@@ -22,27 +22,27 @@ export class TasksController {
   create(@Body() body: any, @Req() req: any) {
     return this.tasksService.create({
       ...body,
-      tenantId: req.tenantId || req.user.tenantId,
+      tenantId: req.user.tenantId,
     }, req.user?.id);
   }
 
   @Get()
   findAll(@Req() req: any) {
-    return this.tasksService.findAll(req.tenantId || req.user.tenantId);
+    return this.tasksService.findAll(req.user.tenantId);
   }
 
   @Get('lead/:leadId')
-  findByLead(@Param('leadId') leadId: string) {
-    return this.tasksService.findByLead(leadId);
+  findByLead(@Req() req: any, @Param('leadId') leadId: string) {
+    return this.tasksService.findByLead(leadId, req.user.tenantId);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() body: any, @Req() req: any) {
-    return this.tasksService.update(id, req.tenantId || req.user.tenantId, body, req.user?.id);
+    return this.tasksService.update(id, req.user.tenantId, body, req.user?.id);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.tasksService.remove(id);
+  remove(@Req() req: any, @Param('id') id: string) {
+    return this.tasksService.remove(id, req.user.tenantId);
   }
 }

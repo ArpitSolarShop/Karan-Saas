@@ -115,7 +115,7 @@ export class DialerProcessor extends WorkerHost {
             },
           });
 
-          this.gateway.broadcastCallEvent(agentId, 'PROGRESSIVE_DIALING', {
+          this.gateway.broadcastCallEvent(tenantId, agentId, 'PROGRESSIVE_DIALING', {
             leadId,
             phone: lead.phone,
           });

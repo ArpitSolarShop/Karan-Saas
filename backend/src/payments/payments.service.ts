@@ -50,29 +50,33 @@ export class PaymentsService {
     }
   }
 
-  async findAll(tenantId?: string) {
+  async findAll(tenantId: string) {
     return this.prisma.payment.findMany({
-      where: tenantId ? { tenantId } : undefined,
+      where: { tenantId },
       include: {
-        invoice: { select: { number: true, total: true } },
+        invoice: {
+          select: { number: true },
+        },
       },
-      orderBy: { paymentDate: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findOne(id: string) {
-    const payment = await this.prisma.payment.findUnique({
-      where: { id },
-      include: { invoice: true },
+  async findOne(id: string, tenantId: string) {
+    const payment = await this.prisma.payment.findFirst({
+      where: { id, tenantId },
+      include: {
+        invoice: true,
+      },
     });
     if (!payment) throw new NotFoundException('Payment not found');
     return payment;
   }
 
-  async remove(id: string) {
-    const payment = await this.prisma.payment.findUnique({ where: { id } });
+  async remove(id: string, tenantId: string) {
+    const payment = await this.prisma.payment.findUnique({ where: { id, tenantId } });
     const result = await this.prisma.payment.delete({
-      where: { id },
+      where: { id, tenantId },
     });
 
     if (payment?.invoiceId) {

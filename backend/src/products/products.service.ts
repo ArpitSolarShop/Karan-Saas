@@ -10,9 +10,9 @@ export class ProductsService {
 
   // --- Product Methods ---
 
-  async findAll(tenantId?: string) {
+  async findAll(tenantId: string) {
     return this.prisma.product.findMany({
-      where: tenantId ? { tenantId } : undefined,
+      where: { tenantId },
       include: {
         category: true,
       },
@@ -20,9 +20,9 @@ export class ProductsService {
     });
   }
 
-  async findOne(id: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId: string) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, tenantId },
       include: { category: true },
     });
     if (!product) throw new NotFoundException('Product not found');
@@ -35,16 +35,16 @@ export class ProductsService {
     });
   }
 
-  async update(id: string, updateProductDto: UpdateProductDto) {
+  async update(id: string, tenantId: string, updateProductDto: UpdateProductDto) {
     return this.prisma.product.update({
-      where: { id },
+      where: { id, tenantId },
       data: updateProductDto,
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, tenantId: string) {
     return this.prisma.product.delete({
-      where: { id },
+      where: { id, tenantId },
     });
   }
 
@@ -86,9 +86,9 @@ export class ProductsService {
     });
   }
 
-  async removeCategory(id: string) {
+  async removeCategory(id: string, tenantId: string) {
     return this.prisma.productCategory.delete({
-      where: { id },
+      where: { id, tenantId },
     });
   }
 }

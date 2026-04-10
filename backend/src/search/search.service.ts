@@ -97,11 +97,9 @@ export class SearchService implements OnModuleInit {
   }
 
   // ── Universal search ──
-  async search(query: string, options?: { tenantId?: string; limit?: number }) {
-    const filter = options?.tenantId
-      ? `tenantId = '${options.tenantId}'`
-      : undefined;
-    const limit = options?.limit || 10;
+  async search(query: string, options: { tenantId: string; limit?: number }) {
+    const filter = `tenantId = '${options.tenantId}'`;
+    const limit = options.limit || 10;
 
     const [leads, contacts, calls] = await Promise.allSettled([
       this.client.index('leads').search(query, { filter, limit }),
@@ -119,14 +117,13 @@ export class SearchService implements OnModuleInit {
 
   async searchLeads(
     query: string,
-    filters?: { status?: string; tenantId?: string },
+    filters: { status?: string; tenantId: string },
   ) {
-    const filterParts: string[] = [];
-    if (filters?.status) filterParts.push(`status = '${filters.status}'`);
-    if (filters?.tenantId) filterParts.push(`tenantId = '${filters.tenantId}'`);
+    const filterParts: string[] = [`tenantId = '${filters.tenantId}'`];
+    if (filters.status) filterParts.push(`status = '${filters.status}'`);
 
     return this.client.index('leads').search(query, {
-      filter: filterParts.join(' AND ') || undefined,
+      filter: filterParts.join(' AND '),
       limit: 20,
     });
   }

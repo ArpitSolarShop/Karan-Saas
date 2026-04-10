@@ -1,16 +1,16 @@
-﻿import { UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { TenantGuard } from '../auth/tenant.guard';
 import { ScriptsService } from './scripts.service';
 
 @UseGuards(JwtAuthGuard)
-@Controller('scripts')
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class ScriptsController {
   constructor(private readonly scriptsService: ScriptsService) {}
 
   @Get()
-  findAll(@Query('tenantId') tenantId: string) {
-    return this.scriptsService.findAll(tenantId || 'dev-tenant-001');
+  async findAll(@Req() req: any) {
+    return this.scriptsService.findAll(req.user.tenantId);
   }
 
   @Get('campaign/:campaignId')

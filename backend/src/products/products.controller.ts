@@ -1,59 +1,62 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 
 @Controller('products')
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   // --- Products ---
 
   @Post()
-  create(@Body() createProductDto: CreateProductDto) {
-    return this.productsService.create(createProductDto);
+  async create(@Body() createProductDto: CreateProductDto, @Req() req: any) {
+    return this.productsService.create({ ...createProductDto, tenantId: req.user.tenantId });
   }
 
   @Get()
-  findAll(@Query('tenantId') tenantId?: string) {
-    return this.productsService.findAll(tenantId);
+  async findAll(@Req() req: any) {
+    return this.productsService.findAll(req.user.tenantId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.productsService.findOne(id);
+  async findOne(@Param('id') id: string, @Req() req: any) {
+    return this.productsService.findOne(id, req.user.tenantId);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
-    return this.productsService.update(id, updateProductDto);
+  async update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto, @Req() req: any) {
+    return this.productsService.update(id, req.user.tenantId, updateProductDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.productsService.remove(id);
+  async remove(@Param('id') id: string, @Req() req: any) {
+    return this.productsService.remove(id, req.user.tenantId);
   }
 
   // --- Categories ---
 
   @Get('categories')
-  findAllCategories(@Query('tenantId') tenantId: string) {
-    return this.productsService.findAllCategories(tenantId);
+  async findAllCategories(@Req() req: any) {
+    return this.productsService.findAllCategories(req.user.tenantId);
   }
 
   @Get('category-tree')
-  getCategoryTree(@Query('tenantId') tenantId: string) {
-    return this.productsService.getCategoryTree(tenantId);
+  async getCategoryTree(@Req() req: any) {
+    return this.productsService.getCategoryTree(req.user.tenantId);
   }
 
   @Post('categories')
-  createCategory(@Body() createCategoryDto: CreateCategoryDto) {
-    return this.productsService.createCategory(createCategoryDto);
+  async createCategory(@Body() createCategoryDto: CreateCategoryDto, @Req() req: any) {
+    return this.productsService.createCategory({ ...createCategoryDto, tenantId: req.user.tenantId });
   }
 
   @Delete('categories/:id')
-  removeCategory(@Param('id') id: string) {
-    return this.productsService.removeCategory(id);
+  async removeCategory(@Param('id') id: string, @Req() req: any) {
+    return this.productsService.removeCategory(id, req.user.tenantId);
   }
 }

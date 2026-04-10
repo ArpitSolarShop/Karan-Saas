@@ -7,9 +7,8 @@ import { UpdateCalendarEventDto } from './dto/update-calendar-event.dto';
 export class CalendarService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(tenantId?: string, startDate?: string, endDate?: string) {
-    const where: any = {};
-    if (tenantId) where.tenantId = tenantId;
+  async findAll(tenantId: string, startDate?: string, endDate?: string) {
+    const where: any = { tenantId };
     
     if (startDate && endDate) {
       where.startDatetime = { gte: new Date(startDate) };
@@ -25,21 +24,22 @@ export class CalendarService {
     });
   }
 
-  async findOne(id: string) {
-    const event = await this.prisma.calendarEvent.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId: string) {
+    const event = await this.prisma.calendarEvent.findFirst({
+      where: { id, tenantId },
       include: { attendees: true },
     });
     if (!event) throw new NotFoundException('Event not found');
     return event;
   }
 
-  async create(createCalendarEventDto: CreateCalendarEventDto) {
+  async create(tenantId: string, createCalendarEventDto: CreateCalendarEventDto) {
     const { attendees, ...eventData } = createCalendarEventDto;
 
     return this.prisma.calendarEvent.create({
       data: {
         ...eventData,
+        tenantId,
         startDatetime: new Date(eventData.startDatetime),
         endDatetime: new Date(eventData.endDatetime),
         ...(attendees && attendees.length > 0
@@ -56,14 +56,11 @@ export class CalendarService {
     });
   }
 
-  async update(id: string, updateCalendarEventDto: UpdateCalendarEventDto) {
-    const { attendees, startDatetime, endDatetime, tenantId, userId, ...eventData } = updateCalendarEventDto as any;
-
-    // Handle updates for nested attendees specifically or just update base data
-    // Here we focus on base event update. For full attendee sync, consider deleting and recreating or using a sync method.
+  async update(id: string, tenantId: string, updateCalendarEventDto: UpdateCalendarEventDto) {
+    const { attendees, startDatetime, endDatetime, userId, ...eventData } = updateCalendarEventDto as any;
 
     return this.prisma.calendarEvent.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
         ...eventData,
         ...(startDatetime && { startDatetime: new Date(startDatetime) }),
@@ -72,9 +69,9 @@ export class CalendarService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, tenantId: string) {
     return this.prisma.calendarEvent.delete({
-      where: { id },
+      where: { id, tenantId },
     });
   }
 }

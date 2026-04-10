@@ -7,9 +7,9 @@ import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 export class InvoicesService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(tenantId?: string) {
+  async findAll(tenantId: string) {
     return this.prisma.invoice.findMany({
-      where: tenantId ? { tenantId } : undefined,
+      where: { tenantId },
       include: {
         company: { select: { name: true } },
       },
@@ -17,9 +17,9 @@ export class InvoicesService {
     });
   }
 
-  async findOne(id: string) {
-    const invoice = await this.prisma.invoice.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId: string) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, tenantId },
       include: {
         company: true,
         lineItems: { include: { product: true } },
@@ -79,19 +79,20 @@ export class InvoicesService {
     });
   }
 
-  async update(id: string, updateInvoiceDto: UpdateInvoiceDto) {
-    const { tenantId, createdBy, lineItems, ...updateData } = updateInvoiceDto as any;
-    // Note: status updates might trigger other logic (e.g. payment recording)
-    // For now simple update
+  async update(id: string, tenantId: string, updateInvoiceDto: UpdateInvoiceDto) {
+    const { lineItems, ...updateData } = updateInvoiceDto as any;
+    // Ensure ownership before update
+    await this.prisma.invoice.findFirstOrThrow({ where: { id, tenantId } });
+
     return this.prisma.invoice.update({
-      where: { id },
+      where: { id, tenantId },
       data: updateData,
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, tenantId: string) {
     return this.prisma.invoice.delete({
-      where: { id },
+      where: { id, tenantId },
     });
   }
 }

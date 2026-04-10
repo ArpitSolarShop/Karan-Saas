@@ -54,9 +54,9 @@ export class TasksService {
     });
   }
 
-  async findByLead(leadId: string) {
+  async findByLead(leadId: string, tenantId: string) {
     return this.prisma.task.findMany({
-      where: { leadId },
+      where: { leadId, tenantId },
       orderBy: { dueDate: 'asc' },
     });
   }
@@ -83,9 +83,9 @@ export class TasksService {
     return task;
   }
 
-  async remove(id: string) {
+  async remove(id: string, tenantId: string) {
     return this.prisma.task.delete({
-      where: { id },
+      where: { id, tenantId },
     });
   }
 }

@@ -1,31 +1,50 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 
 @Controller('projects')
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Post()
-  create(@Body() dto: any) { return this.projectsService.create(dto); }
+  create(@Req() req: any, @Body() dto: any) { 
+    return this.projectsService.create(req.user.tenantId, dto); 
+  }
 
   @Get()
-  findAll(@Query('tenantId') tenantId: string) { return this.projectsService.findAll(tenantId); }
+  findAll(@Req() req: any) { 
+    return this.projectsService.findAll(req.user.tenantId); 
+  }
 
   @Get(':id')
-  findOne(@Param('id') id: string) { return this.projectsService.findOne(id); }
+  findOne(@Req() req: any, @Param('id') id: string) { 
+    return this.projectsService.findOne(id, req.user.tenantId); 
+  }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: any) { return this.projectsService.update(id, dto); }
+  update(@Req() req: any, @Param('id') id: string, @Body() dto: any) { 
+    return this.projectsService.update(id, req.user.tenantId, dto); 
+  }
 
   @Delete(':id')
-  remove(@Param('id') id: string) { return this.projectsService.remove(id); }
+  remove(@Req() req: any, @Param('id') id: string) { 
+    return this.projectsService.remove(id, req.user.tenantId); 
+  }
 
   @Post(':id/milestones')
-  createMilestone(@Param('id') id: string, @Body() dto: any) { return this.projectsService.createMilestone(id, dto); }
+  createMilestone(@Req() req: any, @Param('id') id: string, @Body() dto: any) { 
+    return this.projectsService.createMilestone(id, req.user.tenantId, dto); 
+  }
 
   @Patch('milestones/:mid')
-  updateMilestone(@Param('mid') mid: string, @Body() dto: any) { return this.projectsService.updateMilestone(mid, dto); }
+  updateMilestone(@Req() req: any, @Param('mid') mid: string, @Body() dto: any) { 
+    return this.projectsService.updateMilestone(mid, req.user.tenantId, dto); 
+  }
 
   @Delete('milestones/:mid')
-  removeMilestone(@Param('mid') mid: string) { return this.projectsService.removeMilestone(mid); }
+  removeMilestone(@Req() req: any, @Param('mid') mid: string) { 
+    return this.projectsService.removeMilestone(mid, req.user.tenantId); 
+  }
 }

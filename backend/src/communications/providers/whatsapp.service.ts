@@ -7,16 +7,8 @@ export class WhatsAppService {
 
   constructor(private readonly baileysEngine: BaileysEngineService) {}
 
-  async sendMessage(phone: string, message: string): Promise<{ success: boolean; messageId?: string }> {
-    const activeSessions = this.baileysEngine.getActiveSessions();
-    if (activeSessions.length === 0) {
-      this.logger.error(
-        'No active Baileys sessions. Connect a WhatsApp device in Settings first.',
-      );
-      return { success: false };
-    }
-    // Route via the primary (first connected) session
-    this.logger.log(`Routing WhatsApp message to ${phone} via Baileys Engine`);
-    return this.baileysEngine.sendMessage(phone, message, activeSessions[0]);
+  async sendMessage(phone: string, message: string, tenantId: string): Promise<{ success: boolean; messageId?: string }> {
+    this.logger.log(`Routing WhatsApp message to ${phone} via Baileys Engine for tenant ${tenantId}`);
+    return this.baileysEngine.sendMessage(phone, message, undefined, tenantId);
   }
 }

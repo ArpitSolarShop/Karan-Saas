@@ -254,6 +254,7 @@ export class CloudApiWebhookController {
         create: {
           messageId: wamid,
           instanceId,
+          tenantId: instance.tenantId,
           direction: 'INBOUND',
           remoteJid: from,
           messageType: msgType,
@@ -277,6 +278,7 @@ export class CloudApiWebhookController {
           },
           create: {
             instanceId,
+            tenantId: instance.tenantId,
             remoteJid: from,
             pushName: contactInfo.profile?.name || null,
           },
@@ -284,7 +286,7 @@ export class CloudApiWebhookController {
       }
 
       // Emit to Socket.io Gateway for real-time frontend update
-      this.gateway.emitMessageUpsert(instanceId, {
+      this.gateway.emitMessageUpsert(instanceId, instance.tenantId, {
         id: wamid,
         instanceId,
         direction: 'INBOUND',

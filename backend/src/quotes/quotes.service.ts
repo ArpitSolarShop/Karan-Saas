@@ -6,9 +6,9 @@ import PDFDocument from 'pdfkit';
 export class QuotesService {
   constructor(private prisma: PrismaService) {}
 
-  async findAllByLead(leadId: string) {
+  async findAllByLead(leadId: string, tenantId: string) {
     return this.prisma.quote.findMany({
-      where: { leadId },
+      where: { leadId, tenantId },
       include: {
         author: { select: { firstName: true, lastName: true } },
         deal: { select: { name: true } },
@@ -17,9 +17,9 @@ export class QuotesService {
     });
   }
 
-  async findOne(id: string) {
-    const quote = await this.prisma.quote.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId: string) {
+    const quote = await this.prisma.quote.findFirst({
+      where: { id, tenantId },
       include: {
         lead: true,
         author: { select: { firstName: true, lastName: true } },
@@ -47,16 +47,16 @@ export class QuotesService {
     });
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, tenantId: string, data: any) {
     return this.prisma.quote.update({
-      where: { id },
+      where: { id, tenantId },
       data,
     });
   }
 
   /** Generate a PDF buffer for a quote */
-  async generatePdf(id: string): Promise<Buffer> {
-    const quote = await this.findOne(id);
+  async generatePdf(id: string, tenantId: string): Promise<Buffer> {
+    const quote = await this.findOne(id, tenantId);
     const lineItems: any[] = Array.isArray(quote.lineItems)
       ? (quote.lineItems as any[])
       : [];

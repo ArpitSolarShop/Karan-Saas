@@ -13,7 +13,7 @@ const DAY_MAP: DayOfWeek[] = [
 export class BusinessHoursService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createBusinessHoursDto: CreateBusinessHoursDto) {
+  async create(tenantId: string, createBusinessHoursDto: CreateBusinessHoursDto) {
     const { slots, holidays, ...data } = createBusinessHoursDto;
 
     // Default 7 days if no slots provided
@@ -31,6 +31,7 @@ export class BusinessHoursService {
     return this.prisma.businessHours.create({
       data: {
         ...data,
+        tenantId,
         slots: {
           create: mappedSlots,
         },
@@ -54,9 +55,9 @@ export class BusinessHoursService {
     });
   }
 
-  async findOne(id: string) {
-    const businessHours = await this.prisma.businessHours.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId: string) {
+    const businessHours = await this.prisma.businessHours.findFirst({
+      where: { id, tenantId },
       include: {
         slots: true,
         holidays: true,
@@ -70,11 +71,13 @@ export class BusinessHoursService {
     return businessHours;
   }
 
-  async update(id: string, updateBusinessHoursDto: UpdateBusinessHoursDto) {
+  async update(id: string, tenantId: string, updateBusinessHoursDto: UpdateBusinessHoursDto) {
     const { slots, holidays, tenantId: _tenantId, ...data } = updateBusinessHoursDto;
 
+    // Verify ownership
+    await this.findOne(id, tenantId);
+
     // For simplistic update, we first delete existing slots/holidays 
-    // if new ones are provided. In a real scenario, you'd sync them.
     if (slots) {
       await this.prisma.businessHourSlot.deleteMany({ where: { businessHoursId: id } });
     }
@@ -83,7 +86,7 @@ export class BusinessHoursService {
     }
 
     return this.prisma.businessHours.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
         ...data,
         ...(slots ? { slots: { create: slots.map(s => ({ dayOfWeek: s.dayOfWeek as any, openTime: s.openTime, closeTime: s.closeTime, isClosed: !s.isWorkingDay })) } } : {}),
@@ -96,9 +99,9 @@ export class BusinessHoursService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, tenantId: string) {
     return this.prisma.businessHours.delete({
-      where: { id },
+      where: { id, tenantId },
     });
   }
 }

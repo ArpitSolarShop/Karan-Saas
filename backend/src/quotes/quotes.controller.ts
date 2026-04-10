@@ -1,27 +1,27 @@
-import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Controller, Get, Post, Patch, Param, Body, Res } from '@nestjs/common';
+import { TenantGuard } from '../auth/tenant.guard';
+import { Controller, Get, Post, Patch, Param, Body, Res, UseGuards, Req } from '@nestjs/common';
 import { QuotesService } from './quotes.service';
 import type { Response } from 'express';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 @Controller('quotes')
 export class QuotesController {
   constructor(private readonly quotesService: QuotesService) {}
 
   @Get('lead/:leadId')
-  findAllByLead(@Param('leadId') leadId: string) {
-    return this.quotesService.findAllByLead(leadId);
+  async findAllByLead(@Param('leadId') leadId: string, @Req() req: any) {
+    return this.quotesService.findAllByLead(leadId, req.user.tenantId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.quotesService.findOne(id);
+  async findOne(@Param('id') id: string, @Req() req: any) {
+    return this.quotesService.findOne(id, req.user.tenantId);
   }
 
   @Get(':id/pdf')
-  async getPdf(@Param('id') id: string, @Res() res: Response) {
-    const pdfBuffer = await this.quotesService.generatePdf(id);
+  async getPdf(@Param('id') id: string, @Res() res: Response, @Req() req: any) {
+    const pdfBuffer = await this.quotesService.generatePdf(id, req.user.tenantId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
@@ -31,8 +31,8 @@ export class QuotesController {
   }
 
   @Post(':id/pdf')
-  async postPdf(@Param('id') id: string, @Res() res: Response) {
-    const pdfBuffer = await this.quotesService.generatePdf(id);
+  async postPdf(@Param('id') id: string, @Res() res: Response, @Req() req: any) {
+    const pdfBuffer = await this.quotesService.generatePdf(id, req.user.tenantId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
@@ -42,12 +42,12 @@ export class QuotesController {
   }
 
   @Post()
-  create(@Body() data: any) {
-    return this.quotesService.create(data);
+  async create(@Body() data: any, @Req() req: any) {
+    return this.quotesService.create({ ...data, tenantId: req.user.tenantId });
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() data: any) {
-    return this.quotesService.update(id, data);
+  async update(@Param('id') id: string, @Body() data: any, @Req() req: any) {
+    return this.quotesService.update(id, req.user.tenantId, data);
   }
 }

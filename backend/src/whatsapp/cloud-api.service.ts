@@ -39,9 +39,9 @@ export class CloudApiService {
    * Fetch instance credentials from DB.
    * Throws if the instance is not a CLOUD_API type or is missing credentials.
    */
-  private async getInstanceCredentials(instanceId: string) {
-    const instance = await this.prisma.whatsAppInstance.findUnique({
-      where: { id: instanceId },
+  private async getInstanceCredentials(instanceId: string, tenantId: string) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { id: instanceId, tenantId },
     });
 
     if (!instance) {
@@ -110,8 +110,9 @@ export class CloudApiService {
     instanceId: string,
     to: string,
     text: string,
+    tenantId: string,
   ): Promise<any> {
-    const instance = await this.getInstanceCredentials(instanceId);
+    const instance = await this.getInstanceCredentials(instanceId, tenantId);
     const url = `${this.getBaseUrl(instance.phoneNumberId!)}/messages`;
 
     const payload = {
@@ -139,6 +140,7 @@ export class CloudApiService {
       data: {
         messageId,
         instanceId,
+        tenantId,
         direction: 'OUTBOUND',
         remoteJid: to.replace(/\D/g, ''),
         messageType: 'text',
@@ -160,9 +162,10 @@ export class CloudApiService {
     to: string,
     templateName: string,
     languageCode: string,
+    tenantId: string,
     components?: any[],
   ): Promise<any> {
-    const instance = await this.getInstanceCredentials(instanceId);
+    const instance = await this.getInstanceCredentials(instanceId, tenantId);
     const url = `${this.getBaseUrl(instance.phoneNumberId!)}/messages`;
 
     const payload: any = {
@@ -194,6 +197,7 @@ export class CloudApiService {
       data: {
         messageId,
         instanceId,
+        tenantId,
         direction: 'OUTBOUND',
         remoteJid: to.replace(/\D/g, ''),
         messageType: 'template',
@@ -222,8 +226,9 @@ export class CloudApiService {
     mediaUrl: string,
     caption?: string,
     filename?: string,
+    tenantId?: string,
   ): Promise<any> {
-    const instance = await this.getInstanceCredentials(instanceId);
+    const instance = await this.getInstanceCredentials(instanceId, tenantId || 'system');
     const url = `${this.getBaseUrl(instance.phoneNumberId!)}/messages`;
 
     const mediaPayload: any = { link: mediaUrl };
@@ -253,6 +258,7 @@ export class CloudApiService {
       data: {
         messageId,
         instanceId,
+        tenantId: instance.tenantId,
         direction: 'OUTBOUND',
         remoteJid: to.replace(/\D/g, ''),
         messageType: mediaType,
@@ -274,8 +280,9 @@ export class CloudApiService {
     instanceId: string,
     to: string,
     interactive: any,
+    tenantId: string,
   ): Promise<any> {
-    const instance = await this.getInstanceCredentials(instanceId);
+    const instance = await this.getInstanceCredentials(instanceId, tenantId);
     const url = `${this.getBaseUrl(instance.phoneNumberId!)}/messages`;
 
     const payload = {
@@ -299,6 +306,7 @@ export class CloudApiService {
       data: {
         messageId,
         instanceId,
+        tenantId,
         direction: 'OUTBOUND',
         remoteJid: to.replace(/\D/g, ''),
         messageType: 'interactive',
@@ -313,8 +321,8 @@ export class CloudApiService {
   /**
    * Mark a message as read (blue ticks).
    */
-  async markAsRead(instanceId: string, wamid: string): Promise<any> {
-    const instance = await this.getInstanceCredentials(instanceId);
+  async markAsRead(instanceId: string, wamid: string, tenantId: string): Promise<any> {
+    const instance = await this.getInstanceCredentials(instanceId, tenantId);
     const url = `${this.getBaseUrl(instance.phoneNumberId!)}/messages`;
 
     const payload = {
@@ -333,8 +341,8 @@ export class CloudApiService {
   /**
    * Fetch all templates from Meta and sync to local DB.
    */
-  async syncTemplates(instanceId: string): Promise<any[]> {
-    const instance = await this.getInstanceCredentials(instanceId);
+  async syncTemplates(instanceId: string, tenantId: string): Promise<any[]> {
+    const instance = await this.getInstanceCredentials(instanceId, tenantId);
     if (!instance.wabaId) {
       throw new Error(`Instance ${instanceId} has no WABA ID configured.`);
     }
@@ -366,6 +374,7 @@ export class CloudApiService {
         },
         create: {
           instanceId,
+          tenantId,
           templateId: tmpl.id,
           name: tmpl.name,
           category: tmpl.category,
@@ -385,9 +394,9 @@ export class CloudApiService {
   /**
    * Get all locally-cached templates for an instance.
    */
-  async getTemplates(instanceId: string) {
-    return this.prisma.whatsAppTemplate.findMany({
-      where: { instanceId },
+  async getTemplates(instanceId: string, tenantId: string) {
+    return (this.prisma as any).whatsAppTemplate.findMany({
+      where: { instanceId, tenantId },
       orderBy: { name: 'asc' },
     });
   }
@@ -403,8 +412,9 @@ export class CloudApiService {
       language: string;
       components: any[];
     },
+    tenantId: string,
   ): Promise<any> {
-    const instance = await this.getInstanceCredentials(instanceId);
+    const instance = await this.getInstanceCredentials(instanceId, tenantId);
     if (!instance.wabaId) {
       throw new Error(`Instance ${instanceId} has no WABA ID configured.`);
     }
@@ -425,9 +435,10 @@ export class CloudApiService {
     );
 
     // Cache locally
-    await this.prisma.whatsAppTemplate.create({
+    await (this.prisma as any).whatsAppTemplate.create({
       data: {
         instanceId,
+        tenantId,
         templateId: result.id,
         name: templateData.name,
         category: templateData.category.toUpperCase(),
@@ -449,8 +460,9 @@ export class CloudApiService {
   async deleteTemplate(
     instanceId: string,
     templateName: string,
+    tenantId: string,
   ): Promise<any> {
-    const instance = await this.getInstanceCredentials(instanceId);
+    const instance = await this.getInstanceCredentials(instanceId, tenantId);
     if (!instance.wabaId) {
       throw new Error(`Instance ${instanceId} has no WABA ID configured.`);
     }
@@ -460,11 +472,11 @@ export class CloudApiService {
       url,
       instance.accessToken!,
       'DELETE',
-    );
+      );
 
     // Remove from local DB
-    await this.prisma.whatsAppTemplate.deleteMany({
-      where: { instanceId, name: templateName },
+    await (this.prisma as any).whatsAppTemplate.deleteMany({
+      where: { instanceId, tenantId, name: templateName },
     });
 
     return result;
@@ -477,8 +489,8 @@ export class CloudApiService {
   /**
    * Get all phone numbers registered to a WABA.
    */
-  async getPhoneNumbers(instanceId: string): Promise<any> {
-    const instance = await this.getInstanceCredentials(instanceId);
+  async getPhoneNumbers(instanceId: string, tenantId: string): Promise<any> {
+    const instance = await this.getInstanceCredentials(instanceId, tenantId);
     if (!instance.wabaId) {
       throw new Error(`Instance ${instanceId} has no WABA ID configured.`);
     }
@@ -490,8 +502,8 @@ export class CloudApiService {
   /**
    * Get details of a specific phone number.
    */
-  async getPhoneNumberDetails(instanceId: string): Promise<any> {
-    const instance = await this.getInstanceCredentials(instanceId);
+  async getPhoneNumberDetails(instanceId: string, tenantId: string): Promise<any> {
+    const instance = await this.getInstanceCredentials(instanceId, tenantId);
     const url = `${this.getBaseUrl(instance.phoneNumberId!)}`;
     return this.graphApiRequest(url, instance.accessToken!, 'GET');
   }
@@ -499,8 +511,8 @@ export class CloudApiService {
   /**
    * Get the business profile for a phone number.
    */
-  async getBusinessProfile(instanceId: string): Promise<any> {
-    const instance = await this.getInstanceCredentials(instanceId);
+  async getBusinessProfile(instanceId: string, tenantId: string): Promise<any> {
+    const instance = await this.getInstanceCredentials(instanceId, tenantId);
     const url = `${this.getBaseUrl(instance.phoneNumberId!)}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical`;
     return this.graphApiRequest(url, instance.accessToken!, 'GET');
   }
@@ -518,8 +530,9 @@ export class CloudApiService {
       websites?: string[];
       vertical?: string;
     },
+    tenantId: string,
   ): Promise<any> {
-    const instance = await this.getInstanceCredentials(instanceId);
+    const instance = await this.getInstanceCredentials(instanceId, tenantId);
     const url = `${this.getBaseUrl(instance.phoneNumberId!)}/whatsapp_business_profile`;
 
     const payload = {
