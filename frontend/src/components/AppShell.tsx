@@ -294,7 +294,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Navigation — grouped mega-menu dropdowns */}
-          <nav className="hidden lg:flex items-center gap-1 bg-surface-2/50 p-1 rounded-xl border border-border/50">
+          <nav className="hidden lg:flex items-center gap-1 bg-surface-2/50 p-1 rounded-xl border border-border/50 relative z-[100]">
             {/* Dashboard direct link */}
             <Link
               href="/"
