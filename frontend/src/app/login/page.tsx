@@ -19,7 +19,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email.trim(), password.trim());
       router.push("/");
     } catch (err: any) {
       setError(err?.response?.data?.message || "Invalid credentials");

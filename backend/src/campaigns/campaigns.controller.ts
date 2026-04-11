@@ -36,7 +36,7 @@ export class CampaignsController {
 
   @Post()
   async create(@Body() body: any, @Req() req: any) {
-    return this.service.create({ ...body, tenantId: req.user.tenantId });
+    return this.service.create(req.user.tenantId, { ...body });
   }
 
   @Patch(':id')

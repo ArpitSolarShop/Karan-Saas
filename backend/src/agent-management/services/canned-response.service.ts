@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class CannedResponseService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: { shortCode: string; content: string; category?: string; isGlobal?: boolean; userId?: string; tenantId: string }) {
+  async create(tenantId: string, data: { shortCode: string; content: string; category?: string; isGlobal?: boolean; userId?: string; tenantId: string }) {
     return this.prisma.cannedResponse.create({ data });
   }
 
@@ -15,10 +15,10 @@ export class CannedResponseService {
     return this.prisma.cannedResponse.findMany({ where, orderBy: { shortCode: 'asc' } });
   }
 
-  async findOne(id: string) {
-    const cr = await this.prisma.cannedResponse.findUnique({ where: { id } });
-    if (!cr) throw new NotFoundException(`Canned response ${id} not found`);
-    return cr;
+  async findOne(tenantId: string, id: string) {
+      const cr = await this.prisma.cannedResponse.findFirst({ where: { id, tenantId } });
+      if (!cr) throw new NotFoundException(`Canned response ${id} not found`);
+      return cr;
   }
 
   async search(tenantId: string, query: string) {
@@ -27,12 +27,12 @@ export class CannedResponseService {
     });
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.cannedResponse.update({ where: { id }, data });
+  async update(tenantId: string, id: string, data: any) {
+      return this.prisma.cannedResponse.update({ where: { id, tenantId }, data });
   }
 
-  async remove(id: string) {
-    return this.prisma.cannedResponse.update({ where: { id }, data: { isActive: false } });
+  async remove(tenantId: string, id: string) {
+      return this.prisma.cannedResponse.update({ where: { id, tenantId }, data: { isActive: false } });
   }
 
   async getCategories(tenantId: string) {

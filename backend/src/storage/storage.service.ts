@@ -32,7 +32,8 @@ export class StorageService {
   private async ensureBucketExists() {
     try {
       await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
-    } catch {
+    } catch (checkErr: any) {
+      this.logger.debug(`[Storage] Bucket does not exist or not accessible: ${checkErr.message}. Attempting creation.`);
       try {
         await this.s3.send(new CreateBucketCommand({ Bucket: this.bucket }));
         this.logger.log(`[Storage] Bucket '${this.bucket}' created`);

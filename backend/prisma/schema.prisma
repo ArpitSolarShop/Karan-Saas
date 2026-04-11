@@ -152,11 +152,20 @@ model Tenant {
 
   // Campaign Engine
   campaignContactLists CampaignContactList[]
+  campaignContacts    CampaignContact[]
   dialerConfigs      DialerConfig[]
   transmissions      Transmission[]
   callSpools         CallSpool[]
+  spoolResults       SpoolResult[]
   dncEntries         DncEntry[]
   agentScripts       AgentScript[]
+
+  // Telephony Join Models
+  queueMembers       QueueMember[]
+  agentSkills        AgentSkill[]
+  skillRules         SkillRule[]
+  queueSkills        QueueSkill[]
+  ringGroupMembers   RingGroupMember[]
 
   // Agent Management
   agentSessions      AgentSession[]
@@ -2363,9 +2372,13 @@ model QueueMember {
   extension   Extension @relation(fields: [extensionId], references: [id])
   penalty     Int       @default(0)
   paused      Boolean   @default(false)
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
   createdAt   DateTime  @default(now())
 
+  @@unique([id, tenantId])
   @@unique([queueId, extensionId])
+  @@index([tenantId])
   @@map("queue_members")
 }
 
@@ -2392,8 +2405,12 @@ model AgentSkill {
   skillId String
   skill   Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
   level   Int    @default(50)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
+  @@unique([id, tenantId])
   @@unique([agentId, skillId])
+  @@index([tenantId])
   @@map("agent_skills")
 }
 
@@ -2404,7 +2421,11 @@ model SkillRule {
   skill    Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
   minLevel Int    @default(1)
   timeout  Int    @default(30)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
+  @@unique([id, tenantId])
+  @@index([tenantId])
   @@map("skill_rules")
 }
 
@@ -2414,8 +2435,12 @@ model QueueSkill {
   queue   AcdQueue @relation(fields: [queueId], references: [id], onDelete: Cascade)
   skillId String
   skill   Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
 
+  @@unique([id, tenantId])
   @@unique([queueId, skillId])
+  @@index([tenantId])
   @@map("queue_skills")
 }
 
@@ -2445,8 +2470,12 @@ model RingGroupMember {
   ringGroup   RingGroup @relation(fields: [ringGroupId], references: [id], onDelete: Cascade)
   extensionId String
   extension   Extension @relation(fields: [extensionId], references: [id])
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
 
+  @@unique([id, tenantId])
   @@unique([ringGroupId, extensionId])
+  @@index([tenantId])
   @@map("ring_group_members")
 }
 
@@ -2577,6 +2606,8 @@ model CampaignContact {
 
   listId       String
   list         CampaignContactList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  tenantId     String
+  tenant       Tenant             @relation(fields: [tenantId], references: [id])
   leadId       String?
   transmissions Transmission[]
   createdAt    DateTime           @default(now())
@@ -2584,6 +2615,7 @@ model CampaignContact {
 
   @@index([listId, status])
   @@index([phone])
+  @@index([tenantId])
   @@map("campaign_contacts")
 }
 
@@ -2677,9 +2709,12 @@ model SpoolResult {
   resultData  Json      @default("{}")
   dispositionCode String?
   notes       String?
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
   createdAt   DateTime  @default(now())
 
   @@index([spoolId])
+  @@index([tenantId])
   @@map("spool_results")
 }
 

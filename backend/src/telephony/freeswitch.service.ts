@@ -71,7 +71,7 @@ export class FreeswitchService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async originateCall(extension: string, destination: string): Promise<string> {
+  async originateCall(tenantId: string, extension: string, destination: string): Promise<string> {
     return new Promise((resolve, reject) => {
       if (!this.connection) return reject('No FreeSWITCH connection');
       
@@ -90,22 +90,22 @@ export class FreeswitchService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async bridgeCall(uuid1: string, uuid2: string) {
+  async bridgeCall(tenantId: string, uuid1: string, uuid2: string) {
     if (!this.connection) return;
     this.connection.api(`uuid_bridge ${uuid1} ${uuid2}`);
   }
 
-  async playAudio(uuid: string, filePath: string) {
+  async playAudio(tenantId: string, uuid: string, filePath: string) {
     if (!this.connection) return;
     this.connection.api(`uuid_broadcast ${uuid} ${filePath} aleg`);
   }
 
-  async hangup(uuid: string) {
+  async hangup(tenantId: string, uuid: string) {
     if (!this.connection) return;
     this.connection.api(`uuid_kill ${uuid}`);
   }
 
-  async transfer(uuid: string, extension: string) {
+  async transfer(tenantId: string, uuid: string, extension: string) {
     if (!this.connection) return;
     this.connection.api(`uuid_transfer ${uuid} ${extension}`);
   }

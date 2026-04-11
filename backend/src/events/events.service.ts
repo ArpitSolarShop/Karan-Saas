@@ -13,37 +13,37 @@ export class EventsService {
     });
   }
 
-  async findOne(id: string) {
-    const event = await this.prisma.event.findUnique({
-      where: { id },
+  async findOne(tenantId: string, id: string) {
+    const event = await this.prisma.event.findFirst({
+      where: { id, tenantId },
       include: { registrations: { include: { lead: { select: { firstName: true, lastName: true, email: true } } } } },
     });
     if (!event) throw new NotFoundException('Event not found');
     return event;
   }
 
-  async create(data: any) {
-    return this.prisma.event.create({ data });
+  async create(tenantId: string, data: any) {
+    return this.prisma.event.create({ data: { ...data, tenantId } });
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.event.update({ where: { id }, data });
+  async update(tenantId: string, id: string, data: any) {
+    return this.prisma.event.update({ where: { id, tenantId }, data });
   }
 
-  async remove(id: string) {
-    return this.prisma.event.delete({ where: { id } });
+  async remove(tenantId: string, id: string) {
+    return this.prisma.event.delete({ where: { id, tenantId } });
   }
 
   // Registration
-  async register(eventId: string, data: any) {
+  async register(tenantId: string, eventId: string, data: any) {
     return this.prisma.eventRegistration.create({
-      data: { ...data, eventId },
+      data: { ...data, eventId, tenantId },
     });
   }
 
-  async cancelRegistration(id: string) {
+  async cancelRegistration(tenantId: string, id: string) {
     return this.prisma.eventRegistration.update({
-      where: { id },
+      where: { id, tenantId },
       data: { status: 'CANCELLED' },
     });
   }

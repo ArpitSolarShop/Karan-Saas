@@ -5,10 +5,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class DncService {
   constructor(private prisma: PrismaService) {}
 
-  async addEntry(data: { phone: string; source?: string; reason?: string; campaignId?: string; addedBy?: string; tenantId: string }) {
+  async addEntry(tenantId: string, data: { phone: string; source?: string; reason?: string; campaignId?: string; addedBy?: string }) {
     return this.prisma.dncEntry.upsert({
-      where: { tenantId_phone: { tenantId: data.tenantId, phone: data.phone } },
-      create: data,
+      where: { tenantId_phone: { tenantId, phone: data.phone } },
+      create: { ...data, tenantId },
       update: { source: data.source, reason: data.reason, isActive: true },
     });
   }
@@ -17,7 +17,7 @@ export class DncService {
     const results = { added: 0, skipped: 0, errors: 0 };
     for (const entry of entries) {
       try {
-        await this.addEntry({ phone: entry.phone, reason: entry.reason, source: 'BULK_IMPORT', tenantId, addedBy });
+        await this.addEntry(tenantId, { phone: entry.phone, reason: entry.reason, source: 'BULK_IMPORT', addedBy });
         results.added++;
       } catch { results.skipped++; }
     }
@@ -53,12 +53,12 @@ export class DncService {
     return { records, total, page, limit };
   }
 
-  async remove(id: string) {
-    return this.prisma.dncEntry.update({ where: { id }, data: { isActive: false } });
+  async remove(tenantId: string, id: string) {
+      return this.prisma.dncEntry.update({ where: { id, tenantId }, data: { isActive: false } });
   }
 
-  async hardDelete(id: string) {
-    return this.prisma.dncEntry.delete({ where: { id } });
+  async hardDelete(tenantId: string, id: string) {
+      return this.prisma.dncEntry.delete({ where: { id, tenantId } });
   }
 
   async getStats(tenantId: string) {

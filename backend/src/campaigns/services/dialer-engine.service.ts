@@ -7,7 +7,7 @@ export class DialerEngineService {
 
   constructor(private prisma: PrismaService) {}
 
-  async getDialerConfig(campaignId: string) {
+  async getDialerConfig(tenantId: string, campaignId: string) {
     return this.prisma.dialerConfig.findUnique({
       where: { campaignId },
       include: { queue: { select: { name: true, strategy: true } } },
@@ -22,7 +22,7 @@ export class DialerEngineService {
     });
   }
 
-  async startDialer(campaignId: string) {
+  async startDialer(tenantId: string, campaignId: string) {
     const config = await this.prisma.dialerConfig.findUnique({ where: { campaignId } });
     if (!config) throw new Error('No dialer config found for campaign');
 
@@ -35,7 +35,7 @@ export class DialerEngineService {
     return { status: 'STARTED', mode: config.mode, campaignId };
   }
 
-  async pauseDialer(campaignId: string) {
+  async pauseDialer(tenantId: string, campaignId: string) {
     await this.prisma.campaign.update({
       where: { id: campaignId },
       data: { status: 'PAUSED' },
@@ -44,7 +44,7 @@ export class DialerEngineService {
     return { status: 'PAUSED', campaignId };
   }
 
-  async stopDialer(campaignId: string) {
+  async stopDialer(tenantId: string, campaignId: string) {
     await this.prisma.campaign.update({
       where: { id: campaignId },
       data: { status: 'COMPLETED' },
@@ -53,7 +53,7 @@ export class DialerEngineService {
     return { status: 'STOPPED', campaignId };
   }
 
-  async getCampaignProgress(campaignId: string) {
+  async getCampaignProgress(tenantId: string, campaignId: string) {
     const [total, completed, failed, pending, dnc] = await Promise.all([
       this.prisma.campaignContact.count({ where: { list: { campaignId } } }),
       this.prisma.campaignContact.count({ where: { list: { campaignId }, status: 'COMPLETED' } }),
@@ -75,7 +75,7 @@ export class DialerEngineService {
   }
 
   // Predictive pacing calculation (VICIdial algorithm adapted)
-  calculatePacing(activeAgents: number, avgCallDuration: number, dropRateLimit: number, callsPerAgent: number): number {
+  calculatePacing(tenantId: string, activeAgents: number, avgCallDuration: number, dropRateLimit: number, callsPerAgent: number): number {
     if (activeAgents === 0) return 0;
     const targetCalls = Math.ceil(activeAgents * callsPerAgent);
     const maxDropRate = dropRateLimit / 100;

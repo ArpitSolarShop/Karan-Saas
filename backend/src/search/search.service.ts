@@ -73,7 +73,8 @@ export class SearchService implements OnModuleInit {
       return this.client
         .index('leads')
         .addDocuments([{ ...lead, id: lead.id }]);
-    } catch {
+    } catch (err: any) {
+      this.logger.error(`[Search] Failed to index lead: ${err.message}`);
       return null;
     }
   }
@@ -83,7 +84,8 @@ export class SearchService implements OnModuleInit {
       return this.client
         .index('leads')
         .updateDocuments([{ ...lead, id: lead.id }]);
-    } catch {
+    } catch (err: any) {
+      this.logger.error(`[Search] Failed to update lead index: ${err.message}`);
       return null;
     }
   }
@@ -91,7 +93,8 @@ export class SearchService implements OnModuleInit {
   async deleteLeadFromIndex(leadId: string) {
     try {
       return this.client.index('leads').deleteDocument(leadId);
-    } catch {
+    } catch (err: any) {
+      this.logger.error(`[Search] Failed to delete lead from index: ${err.message}`);
       return null;
     }
   }
@@ -140,7 +143,8 @@ export class SearchService implements OnModuleInit {
   }) {
     try {
       return this.client.index('calls').addDocuments([call]);
-    } catch {
+    } catch (err: any) {
+      this.logger.error(`[Search] Failed to index call transcript: ${err.message}`);
       return null;
     }
   }

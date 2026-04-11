@@ -19,7 +19,7 @@ export function LiveMetricsHub() {
   useEffect(() => {
     // 1. Fetch initial snapshot
     const fetchSnapshot = async () => {
-       const token = localStorage.getItem('token');
+       const token = localStorage.getItem('crm_token');
        try {
          const res = await fetch(`${API_URL}/reports/live-wallboard`, {
             headers: { 'Authorization': `Bearer ${token}` }

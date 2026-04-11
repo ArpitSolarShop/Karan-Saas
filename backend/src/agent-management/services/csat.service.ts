@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class CsatService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: { rating: number; feedbackMessage?: string; callId?: string; conversationId?: string; contactId?: string; agentId?: string; channel?: string; tenantId: string }) {
+  async create(tenantId: string, data: { rating: number; feedbackMessage?: string; callId?: string; conversationId?: string; contactId?: string; agentId?: string; channel?: string; tenantId: string }) {
     return this.prisma.csatResponse.create({ data });
   }
 
@@ -37,7 +37,7 @@ export class CsatService {
     return { totalResponses: responses.length, avgRating: Math.round(avgRating * 10) / 10, distribution, csatScore };
   }
 
-  async getAgentCsat(agentId: string) {
+  async getAgentCsat(tenantId: string, agentId: string) {
     const responses = await this.prisma.csatResponse.findMany({ where: { agentId }, select: { rating: true } });
     if (responses.length === 0) return { totalResponses: 0, avgRating: 0, csatScore: 0 };
 

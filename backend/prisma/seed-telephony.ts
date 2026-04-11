@@ -101,6 +101,7 @@ async function main() {
         ...c,
         status: 'PENDING',
         priority: 1,
+        tenantId,
       }
     });
   }

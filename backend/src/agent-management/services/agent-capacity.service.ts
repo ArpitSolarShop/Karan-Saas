@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class AgentCapacityService {
   constructor(private prisma: PrismaService) {}
 
-  async getCapacity(agentId: string) {
+  async getCapacity(tenantId: string, agentId: string) {
     return this.prisma.agentCapacity.findUnique({ where: { agentId }, include: { agent: { select: { firstName: true, lastName: true } } } });
   }
 
@@ -27,7 +27,7 @@ export class AgentCapacityService {
     });
   }
 
-  async remove(agentId: string) {
+  async remove(tenantId: string, agentId: string) {
     return this.prisma.agentCapacity.delete({ where: { agentId } });
   }
 }

@@ -12,10 +12,10 @@ export class TenantGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const tenantId = request.headers['x-tenant-id'];
+    const tenantId = request.user?.tenantId || request.headers['x-tenant-id'];
 
     if (!tenantId) {
-      throw new UnauthorizedException('Tenant context missing. Please provide X-Tenant-ID header.');
+      throw new UnauthorizedException('Tenant context missing. Ensure JWT is valid or provide X-Tenant-ID header.');
     }
 
     // Verify tenant exists

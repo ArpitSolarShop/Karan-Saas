@@ -9,14 +9,14 @@ export class DealsService {
     private auditLogs: AuditLogsService,
   ) {}
 
-  async create(data: any, userId?: string) {
+  async create(tenantId: string, data: any, userId?: string) {
     // Basic forecasting based on stage probability if probability not explicitly sent
     if (!data.probability) {
       data.probability = this.getProbabilityForStage(data.stage || 'PROSPECTING');
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const deal = await tx.deal.create({ data });
+      const deal = await tx.deal.create({ data: { ...data, tenantId } });
 
       // 200% Feature: Unified Audit Engine
       await this.auditLogs.logChange({
@@ -32,9 +32,9 @@ export class DealsService {
     });
   }
 
-  async findAll(tenantId?: string) {
+  async findAll(tenantId: string) {
     const deals = await this.prisma.deal.findMany({
-      where: tenantId ? { tenantId } : undefined,
+      where: { tenantId },
       orderBy: { createdAt: 'desc' },
       include: {
         owner: { select: { firstName: true, lastName: true } },
@@ -50,9 +50,9 @@ export class DealsService {
     }));
   }
 
-  async findOne(id: string) {
-    const deal = await this.prisma.deal.findUnique({
-      where: { id },
+  async findOne(tenantId: string, id: string) {
+    const deal = await this.prisma.deal.findFirst({
+      where: { id, tenantId },
       include: {
         owner: { select: { firstName: true, lastName: true } },
         lead: true,
@@ -68,8 +68,8 @@ export class DealsService {
     };
   }
 
-  async update(id: string, data: any, userId?: string) {
-    const existingDeal = await this.prisma.deal.findUnique({ where: { id } });
+  async update(tenantId: string, id: string, data: any, userId?: string) {
+    const existingDeal = await this.prisma.deal.findFirst({ where: { id, tenantId } });
     if (!existingDeal) throw new NotFoundException('Deal not found');
 
     // Auto-update probability if stage changed and no specific probability provided
@@ -100,7 +100,9 @@ export class DealsService {
     });
   }
 
-  async remove(id: string) {
+  async remove(tenantId: string, id: string) {
+    const existingDeal = await this.prisma.deal.findFirst({ where: { id, tenantId } });
+    if (!existingDeal) throw new NotFoundException('Deal not found');
     return this.prisma.deal.delete({ where: { id } });
   }
 

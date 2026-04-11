@@ -18,7 +18,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Card } from "@/components/ui/card";
-import { Search, Plus, Upload, Phone, Cpu, Database, Activity, Terminal, ShieldCheck, Download, Trash2, Zap } from "lucide-react";
+import { Search, Plus, Upload, Phone, Cpu, Database, Activity, Terminal, ShieldCheck, Download, Trash2, Zap, BrainCircuit, MessageCircle, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 const VirtualList = List as any;
@@ -37,6 +37,7 @@ export default function LeadsTerminal() {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [callActive, setCallActive] = useState(false);
+  const [dialNumber, setDialNumber] = useState("");
   const [activeLead, setActiveLead] = useState<any>(null);
   const [isCommDrawerOpen, setIsCommDrawerOpen] = useState(false);
   const [isAIOverlayOpen, setIsAIOverlayOpen] = useState(false);
@@ -225,9 +226,19 @@ export default function LeadsTerminal() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isGridFocused, editingCell, commitEdit, moveActiveCell]);
 
-  const handleCallLead = () => {
-    if (activeLead) {
+  const handleCallLead = (phone?: string) => {
+    if (phone || activeLead?.phone) {
+      setDialNumber(phone || activeLead?.phone || "");
       setCallActive(true);
+    }
+  };
+
+  const handleQuickAction = (row: any, action: "CALL" | "WHATSAPP" | "EMAIL") => {
+    const rowData = row?.data || {};
+    setActiveLead({ ...rowData, id: row.id });
+    setIsCommDrawerOpen(true);
+    if (action === "CALL") {
+      handleCallLead(rowData.phone);
     }
   };
 
@@ -272,6 +283,30 @@ export default function LeadsTerminal() {
               </div>
             );
           })}
+          {/* Row-level quick action icons */}
+          <div className="flex items-center gap-0.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <button
+              onClick={(e) => { e.stopPropagation(); handleQuickAction(row, "CALL"); }}
+              className="p-1 rounded hover:bg-emerald-500/20 text-text-muted hover:text-emerald-400 transition-colors"
+              title="Call"
+            >
+              <Phone size={11} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleQuickAction(row, "WHATSAPP"); }}
+              className="p-1 rounded hover:bg-green-500/20 text-text-muted hover:text-green-400 transition-colors"
+              title="WhatsApp"
+            >
+              <MessageCircle size={11} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleQuickAction(row, "EMAIL"); }}
+              className="p-1 rounded hover:bg-blue-500/20 text-text-muted hover:text-blue-400 transition-colors"
+              title="Email"
+            >
+              <Mail size={11} />
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -336,6 +371,17 @@ export default function LeadsTerminal() {
           </Button>
           <Button variant="outline" size="sm" onClick={handleScanDuplicates} className="text-[9px] font-mono font-bold uppercase tracking-widest border-border hover:bg-surface-2 h-8 text-yellow-500">
             <Zap size={12} className="mr-2" /> Dedupe
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsAIOverlayOpen(!isAIOverlayOpen)}
+            className={cn(
+              "text-[9px] font-mono font-bold uppercase tracking-widest border-border h-8",
+              isAIOverlayOpen ? "bg-primary/20 text-primary border-primary/40" : "hover:bg-surface-2 text-text-muted"
+            )}
+          >
+            <BrainCircuit size={12} className="mr-2" /> AI Copilot
           </Button>
           <Button size="sm" onClick={() => setIsAddLeadDialogOpen(true)} className="bg-primary hover:bg-primary-dark text-white text-[9px] font-black uppercase tracking-widest h-8 px-4">
             <Plus size={12} className="mr-2" /> New Entity
@@ -458,7 +504,7 @@ export default function LeadsTerminal() {
         isOpen={isCommDrawerOpen} 
         onClose={() => setIsCommDrawerOpen(false)} 
         activeLead={activeLead} 
-        onCall={handleCallLead}
+        onCall={(phone) => handleCallLead(phone)}
       />
 
       <AddLeadDialog 

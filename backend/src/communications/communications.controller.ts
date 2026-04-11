@@ -1,5 +1,6 @@
 import { UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 import { Controller, Post, Get, Body, Res, Param, Query } from '@nestjs/common';
 import type { Response } from 'express';
 import { CommunicationsService } from './communications.service';
@@ -9,7 +10,7 @@ import { InboxService } from './inbox.service';
 import { ConversationService } from './conversation.service';
 import * as QRCode from 'qrcode';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 @Controller('communications')
 export class CommunicationsController {
   constructor(

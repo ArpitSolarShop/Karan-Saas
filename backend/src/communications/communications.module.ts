@@ -21,6 +21,13 @@ import { PrismaModule } from '../prisma/prisma.module';
     WhatsAppService,
     EmailService,
   ],
-  exports: [CommunicationsService, InboxService, ConversationService, CommunicationsGateway],
+  exports: [
+    CommunicationsService,
+    InboxService,
+    ConversationService,
+    CommunicationsGateway,
+    WhatsAppService,
+    EmailService,
+  ],
 })
 export class CommunicationsModule {}

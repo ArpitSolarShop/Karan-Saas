@@ -1,45 +1,46 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { SkillsService } from '../services/skills.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { TenantGuard } from "../../auth/tenant.guard";
 
 @Controller('telephony/skills')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class SkillsController {
   constructor(private readonly service: SkillsService) {}
 
   @Post()
-  create(@Body() body: any) { return this.service.create(body); }
+  create(@Req() req: any, @Body() body: any) { return this.service.create(req.user.tenantId, body); }
 
   @Get()
-  findAll(@Query('tenantId') tenantId: string) { return this.service.findAll(tenantId); }
+  findAll(@Req() req: any) { return this.service.findAll(req.user.tenantId); }
 
   @Get(':id')
-  findOne(@Param('id') id: string) { return this.service.findOne(id); }
+  findOne(@Req() req: any, @Param('id') id: string) { return this.service.findOne(req.user.tenantId, id); }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: any) { return this.service.update(id, body); }
+  update(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.update(req.user.tenantId, id, body); }
 
   @Delete(':id')
-  remove(@Param('id') id: string) { return this.service.remove(id); }
+  remove(@Req() req: any, @Param('id') id: string) { return this.service.remove(req.user.tenantId, id); }
 
   @Post('assign')
-  assignToAgent(@Body() body: { agentId: string; skillId: string; level?: number }) {
-    return this.service.assignToAgent(body.agentId, body.skillId, body.level);
+  assignToAgent(@Req() req: any, @Body() body: { agentId: string; skillId: string; level?: number }) {
+    return this.service.assignToAgent(req.user.tenantId, body.agentId, body.skillId, body.level);
   }
 
   @Delete('agent/:agentId/skill/:skillId')
-  removeFromAgent(@Param('agentId') agentId: string, @Param('skillId') skillId: string) {
-    return this.service.removeFromAgent(agentId, skillId);
+  removeFromAgent(@Req() req: any, @Param('agentId') agentId: string, @Param('skillId') skillId: string) {
+    return this.service.removeFromAgent(req.user.tenantId, agentId, skillId);
   }
 
   @Get('agent/:agentId')
-  getAgentSkills(@Param('agentId') agentId: string) {
-    return this.service.getAgentSkills(agentId);
+  getAgentSkills(@Req() req: any, @Param('agentId') agentId: string) {
+    return this.service.getAgentSkills(req.user.tenantId, agentId);
   }
 
   @Post('rules')
-  createRule(@Body() body: any) { return this.service.createRule(body); }
+  createRule(@Req() req: any, @Body() body: any) { return this.service.createRule(req.user.tenantId, body); }
 
   @Delete('rules/:id')
-  deleteRule(@Param('id') id: string) { return this.service.deleteRule(id); }
+  deleteRule(@Req() req: any, @Param('id') id: string) { return this.service.deleteRule(req.user.tenantId, id); }
 }

@@ -5,17 +5,20 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class AcdQueuesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: {
+  async create(tenantId: string, data: {
     name: string; strategy?: any; timeout?: number; wrapUpTime?: number;
     maxWaitTime?: number; maxCallers?: number; serviceLevelSec?: number;
-    tenantId: string;
   }) {
     return this.prisma.acdQueue.create({
       data: {
-        name: data.name, strategy: data.strategy ?? 'RING_ALL',
-        timeout: data.timeout ?? 30, wrapUpTime: data.wrapUpTime ?? 15,
-        maxWaitTime: data.maxWaitTime ?? 300, maxCallers: data.maxCallers ?? 0,
-        serviceLevelSec: data.serviceLevelSec ?? 60, tenantId: data.tenantId,
+        ...data,
+        tenantId,
+        strategy: data.strategy ?? 'RING_ALL',
+        timeout: data.timeout ?? 30,
+        wrapUpTime: data.wrapUpTime ?? 15,
+        maxWaitTime: data.maxWaitTime ?? 300,
+        maxCallers: data.maxCallers ?? 0,
+        serviceLevelSec: data.serviceLevelSec ?? 60,
       },
       include: { members: { include: { extension: true } }, skills: { include: { skill: true } } },
     });
@@ -33,55 +36,54 @@ export class AcdQueuesService {
     });
   }
 
-  async findOne(id: string) {
-    const queue = await this.prisma.acdQueue.findUnique({
-      where: { id },
-      include: {
-        members: { include: { extension: { include: { user: { select: { firstName: true, lastName: true, agentStatus: true } } } } } },
-        skills: { include: { skill: true } },
-      },
-    });
-    if (!queue) throw new NotFoundException(`Queue ${id} not found`);
-    return queue;
+  async findOne(tenantId: string, id: string) {
+      const queue = await this.prisma.acdQueue.findFirst({ where: { id, tenantId },
+        include: {
+          members: { include: { extension: { include: { user: { select: { firstName: true, lastName: true, agentStatus: true } } } } } },
+          skills: { include: { skill: true } },
+        },
+      });
+      if (!queue) throw new NotFoundException(`Queue ${id} not found`);
+      return queue;
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.acdQueue.update({ where: { id }, data });
+  async update(tenantId: string, id: string, data: any) {
+      return this.prisma.acdQueue.update({ where: { id, tenantId }, data });
   }
 
-  async remove(id: string) {
-    return this.prisma.acdQueue.delete({ where: { id } });
+  async remove(tenantId: string, id: string) {
+      return this.prisma.acdQueue.delete({ where: { id, tenantId } });
   }
 
   // Member management
-  async addMember(queueId: string, extensionId: string, penalty = 0) {
+  async addMember(tenantId: string, queueId: string, extensionId: string, penalty = 0) {
     return this.prisma.queueMember.create({
-      data: { queueId, extensionId, penalty },
+      data: { queueId, extensionId, penalty, tenantId },
       include: { extension: true },
     });
   }
 
-  async removeMember(queueId: string, extensionId: string) {
-    return this.prisma.queueMember.delete({
-      where: { queueId_extensionId: { queueId, extensionId } },
+  async removeMember(tenantId: string, queueId: string, extensionId: string) {
+    return this.prisma.queueMember.deleteMany({
+      where: { queueId, extensionId, tenantId },
     });
   }
 
-  async toggleMemberPause(queueId: string, extensionId: string, paused: boolean) {
-    return this.prisma.queueMember.update({
-      where: { queueId_extensionId: { queueId, extensionId } },
+  async toggleMemberPause(tenantId: string, queueId: string, extensionId: string, paused: boolean) {
+    return this.prisma.queueMember.updateMany({
+      where: { queueId, extensionId, tenantId },
       data: { paused },
     });
   }
 
   // Skill management for queue
-  async addSkill(queueId: string, skillId: string) {
-    return this.prisma.queueSkill.create({ data: { queueId, skillId } });
+  async addSkill(tenantId: string, queueId: string, skillId: string) {
+    return this.prisma.queueSkill.create({ data: { queueId, skillId, tenantId } });
   }
 
-  async removeSkill(queueId: string, skillId: string) {
-    return this.prisma.queueSkill.delete({
-      where: { queueId_skillId: { queueId, skillId } },
+  async removeSkill(tenantId: string, queueId: string, skillId: string) {
+    return this.prisma.queueSkill.deleteMany({
+      where: { queueId, skillId, tenantId },
     });
   }
 

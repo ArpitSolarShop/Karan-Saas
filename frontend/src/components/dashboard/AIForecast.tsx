@@ -13,7 +13,7 @@ export function AIForecast() {
   useEffect(() => {
     async function fetchForecast() {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('crm_token');
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/reports/ai-forecast`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });

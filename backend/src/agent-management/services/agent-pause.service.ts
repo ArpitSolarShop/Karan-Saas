@@ -6,7 +6,7 @@ export class AgentPauseService {
   constructor(private prisma: PrismaService) {}
 
   // Pause Codes CRUD
-  async createPauseCode(data: { code: string; name: string; type?: any; maxDuration?: number; isPaid?: boolean; color?: string; tenantId: string }) {
+  async createPauseCode(tenantId: string, data: { code: string; name: string; type?: any; maxDuration?: number; isPaid?: boolean; color?: string; tenantId: string }) {
     return this.prisma.pauseCode.create({ data });
   }
 
@@ -18,12 +18,12 @@ export class AgentPauseService {
     });
   }
 
-  async updatePauseCode(id: string, data: any) {
-    return this.prisma.pauseCode.update({ where: { id }, data });
+  async updatePauseCode(tenantId: string, id: string, data: any) {
+      return this.prisma.pauseCode.update({ where: { id, tenantId }, data });
   }
 
-  async deletePauseCode(id: string) {
-    return this.prisma.pauseCode.update({ where: { id }, data: { isActive: false } });
+  async deletePauseCode(tenantId: string, id: string) {
+      return this.prisma.pauseCode.update({ where: { id, tenantId }, data: { isActive: false } });
   }
 
   // Agent pause operations
@@ -48,7 +48,7 @@ export class AgentPauseService {
     return pause;
   }
 
-  async endPause(pauseId: string) {
+  async endPause(tenantId: string, pauseId: string) {
     const pause = await this.prisma.agentPause.findUnique({ where: { id: pauseId }, include: { session: true } });
     if (!pause) return null;
 
@@ -65,14 +65,14 @@ export class AgentPauseService {
     return updated;
   }
 
-  async getActivePause(sessionId: string) {
+  async getActivePause(tenantId: string, sessionId: string) {
     return this.prisma.agentPause.findFirst({
       where: { sessionId, endedAt: null },
       include: { pauseCode: true },
     });
   }
 
-  async getPauseHistory(sessionId: string) {
+  async getPauseHistory(tenantId: string, sessionId: string) {
     return this.prisma.agentPause.findMany({
       where: { sessionId },
       include: { pauseCode: true },

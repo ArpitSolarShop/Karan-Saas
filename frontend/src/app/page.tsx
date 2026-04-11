@@ -40,7 +40,7 @@ export default function DashboardModular() {
   useEffect(() => {
     async function fetchChartData() {
        try {
-         const token = localStorage.getItem('token');
+         const token = localStorage.getItem('crm_token');
          const res = await fetch(`${API_URL}/reports/daily-call-volume?days=14`, {
             headers: { 'Authorization': `Bearer ${token}` }
          });

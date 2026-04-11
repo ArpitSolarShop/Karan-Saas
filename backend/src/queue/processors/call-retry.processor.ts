@@ -2,13 +2,17 @@ import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { PrismaService } from '../../prisma/prisma.service';
+import { QueueService } from '../queue.service';
 import { QUEUES } from '../queue.constants';
 
 @Processor('call-retry')
 export class CallRetryProcessor {
   private readonly logger = new Logger(CallRetryProcessor.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private queueService: QueueService,
+  ) {}
 
   @Process('retry')
   async handleRetry(job: any) {
@@ -41,7 +45,9 @@ export class CallRetryProcessor {
       return;
     }
 
-    // TODO Sprint 3: TelephonyService.initiateCall(lead.phone, undefined, campaignId)
+    // Queue the call back into the dialer queue
+    await this.queueService.addDialerJob({ leadId, campaignId, agentId: job.data.agentId });
+
     this.logger.log(
       `[Retry] Re-queued call for lead ${leadId} (attempt ${todayAttempts + 1})`,
     );

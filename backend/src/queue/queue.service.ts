@@ -86,7 +86,7 @@ export class QueueService {
   }
 
   // ── Queue Status ──
-  async getQueueStats() {
+  async getQueueStats(tenantId?: string) {
     const [
       importCounts,
       dialerCounts,

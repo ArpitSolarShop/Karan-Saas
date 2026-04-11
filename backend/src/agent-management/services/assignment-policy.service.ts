@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class AssignmentPolicyService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: { name: string; method?: any; entityType?: string; priority?: number; conditions?: any; tenantId: string }) {
+  async create(tenantId: string, data: { name: string; method?: any; entityType?: string; priority?: number; conditions?: any; tenantId: string }) {
     return this.prisma.assignmentPolicy.create({ data });
   }
 
@@ -13,16 +13,16 @@ export class AssignmentPolicyService {
     return this.prisma.assignmentPolicy.findMany({ where: { tenantId }, orderBy: { priority: 'asc' } });
   }
 
-  async findOne(id: string) {
-    return this.prisma.assignmentPolicy.findUnique({ where: { id } });
+  async findOne(tenantId: string, id: string) {
+      return this.prisma.assignmentPolicy.findFirst({ where: { id, tenantId } });
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.assignmentPolicy.update({ where: { id }, data });
+  async update(tenantId: string, id: string, data: any) {
+      return this.prisma.assignmentPolicy.update({ where: { id, tenantId }, data });
   }
 
-  async remove(id: string) {
-    return this.prisma.assignmentPolicy.delete({ where: { id } });
+  async remove(tenantId: string, id: string) {
+      return this.prisma.assignmentPolicy.delete({ where: { id, tenantId } });
   }
 
   // Core assignment logic

@@ -14,50 +14,58 @@ export class CustomObjectsService {
     });
   }
 
-  async findOneSchema(id: string) {
-    const schema = await this.prisma.customObjectSchema.findUnique({
-      where: { id },
+  async findOneSchema(tenantId: string, id: string) {
+    const schema = await this.prisma.customObjectSchema.findFirst({
+      where: { id, tenantId },
       include: { records: { take: 50, orderBy: { createdAt: 'desc' } } },
     });
     if (!schema) throw new NotFoundException('Custom object schema not found');
     return schema;
   }
 
-  async createSchema(data: any) {
-    return this.prisma.customObjectSchema.create({ data });
+  async createSchema(tenantId: string, data: any) {
+    return this.prisma.customObjectSchema.create({ data: { ...data, tenantId } });
   }
 
-  async updateSchema(id: string, data: any) {
-    return this.prisma.customObjectSchema.update({ where: { id }, data });
+  async updateSchema(tenantId: string, id: string, data: any) {
+    return this.prisma.customObjectSchema.update({ where: { id, tenantId }, data });
   }
 
-  async removeSchema(id: string) {
-    await this.prisma.customObjectRecord.deleteMany({ where: { schemaId: id } });
-    return this.prisma.customObjectSchema.delete({ where: { id } });
+  async removeSchema(tenantId: string, id: string) {
+    await this.prisma.customObjectRecord.deleteMany({ where: { schema: { id, tenantId } } });
+    return this.prisma.customObjectSchema.delete({ where: { id, tenantId } });
   }
 
   // ── Records ──
-  async findAllRecords(schemaId: string) {
+  async findAllRecords(tenantId: string, schemaId: string) {
+    const schema = await this.prisma.customObjectSchema.findFirst({ where: { id: schemaId, tenantId }});
+    if (!schema) throw new NotFoundException('Schema not found');
     return this.prisma.customObjectRecord.findMany({
       where: { schemaId },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async createRecord(schemaId: string, data: any) {
+  async createRecord(tenantId: string, schemaId: string, data: any) {
+    const schema = await this.prisma.customObjectSchema.findFirst({ where: { id: schemaId, tenantId }});
+    if (!schema) throw new NotFoundException('Schema not found');
     return this.prisma.customObjectRecord.create({
       data: { schemaId, data: data.data || data },
     });
   }
 
-  async updateRecord(id: string, data: any) {
+  async updateRecord(tenantId: string, id: string, data: any) {
+    const record = await this.prisma.customObjectRecord.findFirst({ where: { id, schema: { tenantId } }});
+    if (!record) throw new NotFoundException('Record not found');
     return this.prisma.customObjectRecord.update({
       where: { id },
       data: { data: data.data || data },
     });
   }
 
-  async removeRecord(id: string) {
+  async removeRecord(tenantId: string, id: string) {
+    const record = await this.prisma.customObjectRecord.findFirst({ where: { id, schema: { tenantId } }});
+    if (!record) throw new NotFoundException('Record not found');
     return this.prisma.customObjectRecord.delete({ where: { id } });
   }
 }

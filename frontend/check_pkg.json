@@ -1,0 +1,9 @@
+{
+  "name": "temp-check",
+  "scripts": {
+    "check": "node check_console.js"
+  },
+  "dependencies": {
+    "puppeteer": "latest"
+  }
+}

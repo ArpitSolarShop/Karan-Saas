@@ -26,7 +26,7 @@ export class AgentSessionService {
     return session;
   }
 
-  async logout(sessionId: string) {
+  async logout(tenantId: string, sessionId: string) {
     const session = await this.prisma.agentSession.update({
       where: { id: sessionId },
       data: { status: 'ENDED', logoutAt: new Date() },
@@ -50,7 +50,7 @@ export class AgentSessionService {
     return session;
   }
 
-  async getActiveSession(agentId: string) {
+  async getActiveSession(tenantId: string, agentId: string) {
     return this.prisma.agentSession.findFirst({
       where: { agentId, status: 'ACTIVE' },
       include: { pauses: { include: { pauseCode: true }, orderBy: { startedAt: 'desc' } } },
@@ -69,7 +69,7 @@ export class AgentSessionService {
     });
   }
 
-  async getSessionHistory(agentId: string, from?: Date, to?: Date, page = 1, limit = 20) {
+  async getSessionHistory(tenantId: string, agentId: string, from?: Date, to?: Date, page = 1, limit = 20) {
     const where: any = { agentId };
     if (from || to) { where.loginAt = {}; if (from) where.loginAt.gte = from; if (to) where.loginAt.lte = to; }
 
@@ -84,7 +84,7 @@ export class AgentSessionService {
     return { records, total, page, limit };
   }
 
-  async updateSessionStats(sessionId: string, data: { callsHandled?: number; totalTalkTime?: number }) {
+  async updateSessionStats(tenantId: string, sessionId: string, data: { callsHandled?: number; totalTalkTime?: number }) {
     return this.prisma.agentSession.update({
       where: { id: sessionId },
       data: {

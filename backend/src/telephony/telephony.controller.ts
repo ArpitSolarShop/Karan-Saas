@@ -36,7 +36,8 @@ export class TelephonyController {
     },
     @Req() req: any,
   ) {
-    const callUUID = await this.telephonyService.initiateCall({ ...body, tenantId: req.user.tenantId });
+    const { tenantId, ...rest } = body as any;
+    const callUUID = await this.telephonyService.initiateCall(req.user.tenantId, { ...body });
     return { callUUID, message: 'Call initiated via FreeSWITCH' };
   }
 
@@ -44,9 +45,9 @@ export class TelephonyController {
   @Post('transfer')
   async transfer(@Body() body: { callUUID: string; targetExtension: string }, @Req() req: any) {
     await this.telephonyService.transferCall(
+      req.user.tenantId,
       body.callUUID,
       body.targetExtension,
-      req.user.tenantId,
     );
     return { success: true };
   }
@@ -54,14 +55,14 @@ export class TelephonyController {
   /** Hang up a specific call (supervisor or agent) */
   @Post('hangup')
   async hangup(@Body() body: { callUUID: string }, @Req() req: any) {
-    await this.telephonyService.hangupCall(body.callUUID, req.user.tenantId);
+    await this.telephonyService.hangupCall(req.user.tenantId, body.callUUID);
     return { success: true };
   }
 
   /** Mute / unmute a call leg */
   @Post('mute')
   async mute(@Body() body: { callUUID: string; mute: boolean }, @Req() req: any) {
-    await this.telephonyService.muteCall(body.callUUID, body.mute, req.user.tenantId);
+    await this.telephonyService.muteCall(req.user.tenantId, body.callUUID, body.mute);
     return { success: true };
   }
 
@@ -76,9 +77,9 @@ export class TelephonyController {
     @Req() req: any,
   ) {
     await this.telephonyService.whisperToAgent(
+      req.user.tenantId,
       body.callUUID,
       body.supervisorExtension,
-      req.user.tenantId,
     );
     return { success: true, message: 'Whisper mode activated' };
   }
@@ -89,9 +90,9 @@ export class TelephonyController {
   @Roles('ADMIN', 'MANAGER', 'SUPERVISOR')
   async barge(@Body() body: { callUUID: string; supervisorExtension: string }, @Req() req: any) {
     await this.telephonyService.bargeIn(
+      req.user.tenantId,
       body.callUUID,
       body.supervisorExtension,
-      req.user.tenantId,
     );
     return { success: true, message: 'Barged into call' };
   }
@@ -101,14 +102,14 @@ export class TelephonyController {
   /** Start recording a call */
   @Post('record/start')
   async startRecord(@Body() body: { callUUID: string }, @Req() req: any) {
-    const path = await this.telephonyService.startRecording(body.callUUID, req.user.tenantId);
+    const path = await this.telephonyService.startRecording(req.user.tenantId, body.callUUID);
     return { recording: true, path };
   }
 
   /** Stop recording */
   @Post('record/stop')
   async stopRecord(@Body() body: { callUUID: string }, @Req() req: any) {
-    await this.telephonyService.stopRecording(body.callUUID, req.user.tenantId);
+    await this.telephonyService.stopRecording(req.user.tenantId, body.callUUID);
     return { recording: false };
   }
 
@@ -120,18 +121,18 @@ export class TelephonyController {
    */
   @Get('sip-config')
   getSipConfig(@Query('agentId') agentId: string, @Req() req: any) {
-    return this.telephonyService.getSipConfig(agentId, req.user.tenantId);
+    return this.telephonyService.getSipConfig(req.user.tenantId, agentId);
   }
 
   /** Get only TURN credentials (for WebRTC ICE) */
   @Get('turn-credentials')
   getTurnCredentials(@Query('agentId') agentId: string, @Req() req: any) {
-    return this.telephonyService.getTurnCredentials(agentId, req.user.tenantId);
+    return this.telephonyService.getTurnCredentials(req.user.tenantId, agentId);
   }
 
   /** Health — returns FreeSWITCH ESL connection status */
   @Get('status')
-  getStatus() {
+  getStatus(@Req() req: any) {
     return {
       freeSWITCH: this.telephonyService.isConnected
         ? 'connected'
@@ -175,7 +176,7 @@ export class TelephonyController {
   /** Drop pre-recorded voicemail into live call via FreeSWITCH ESL */
   @Post('voicemail/drop')
   async voicemailDrop(@Body() body: { callUUID: string; filePath: string }, @Req() req: any) {
-    await this.telephonyService.voicemailDrop(body.callUUID, body.filePath, req.user.tenantId);
+    await this.telephonyService.voicemailDrop(req.user.tenantId, body.callUUID, body.filePath);
     return { success: true };
   }
 

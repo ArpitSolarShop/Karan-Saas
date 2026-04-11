@@ -7,18 +7,19 @@ export class TransmissionService {
 
   constructor(private prisma: PrismaService) {}
 
-  async create(data: { contactId: string; campaignId: string; serviceType?: string; tenantId: string; retriesAllowed?: number }) {
+  async create(tenantId: string, data: { contactId: string; campaignId: string; serviceType?: string; retriesAllowed?: number }) {
     return this.prisma.transmission.create({
       data: {
-        contactId: data.contactId, campaignId: data.campaignId,
-        serviceType: data.serviceType ?? 'VOICE', tenantId: data.tenantId,
+        ...data,
+        tenantId,
+        serviceType: data.serviceType ?? 'VOICE',
         retriesAllowed: data.retriesAllowed ?? 3,
       },
     });
   }
 
-  async findByCampaign(campaignId: string, status?: string, page = 1, limit = 50) {
-    const where: any = { campaignId };
+  async findByCampaign(tenantId: string, campaignId: string, status?: string, page = 1, limit = 50) {
+    const where: any = { campaignId, tenantId };
     if (status) where.status = status;
 
     const [records, total] = await Promise.all([
@@ -36,31 +37,32 @@ export class TransmissionService {
     return { records, total, page, limit };
   }
 
-  async createSpool(data: { transmissionId: string; phoneDialed?: string; agentId?: string; tenantId: string }) {
-    return this.prisma.callSpool.create({ data });
+  async createSpool(tenantId: string, data: { transmissionId: string; phoneDialed?: string; agentId?: string }) {
+    return this.prisma.callSpool.create({ data: { ...data, tenantId } });
   }
 
-  async updateSpoolStatus(spoolId: string, status: any, extra?: any) {
+  async updateSpoolStatus(tenantId: string, spoolId: string, status: any, extra?: any) {
     return this.prisma.callSpool.update({
-      where: { id: spoolId },
+      where: { id: spoolId, tenantId } as any,
       data: { status, ...extra },
     });
   }
 
-  async addSpoolResult(spoolId: string, data: { resultType: string; resultData?: any; dispositionCode?: string; notes?: string }) {
+  async addSpoolResult(tenantId: string, spoolId: string, data: { resultType: string; resultData?: any; dispositionCode?: string; notes?: string }) {
     return this.prisma.spoolResult.create({
-      data: { spoolId, ...data },
+      data: { ...data, spoolId, tenantId },
     });
   }
 
-  async getTransmissionStats(campaignId: string) {
+  async getTransmissionStats(tenantId: string, campaignId: string) {
+    const where = { campaignId, tenantId };
     const [total, pending, processing, completed, failed, retry] = await Promise.all([
-      this.prisma.transmission.count({ where: { campaignId } }),
-      this.prisma.transmission.count({ where: { campaignId, status: 'PENDING' } }),
-      this.prisma.transmission.count({ where: { campaignId, status: 'PROCESSING' } }),
-      this.prisma.transmission.count({ where: { campaignId, status: 'COMPLETED' } }),
-      this.prisma.transmission.count({ where: { campaignId, status: 'FAILED' } }),
-      this.prisma.transmission.count({ where: { campaignId, status: 'RETRY' } }),
+      this.prisma.transmission.count({ where }),
+      this.prisma.transmission.count({ where: { ...where, status: 'PENDING' } }),
+      this.prisma.transmission.count({ where: { ...where, status: 'PROCESSING' } }),
+      this.prisma.transmission.count({ where: { ...where, status: 'COMPLETED' } }),
+      this.prisma.transmission.count({ where: { ...where, status: 'FAILED' } }),
+      this.prisma.transmission.count({ where: { ...where, status: 'RETRY' } }),
     ]);
 
     return { total, pending, processing, completed, failed, retry };

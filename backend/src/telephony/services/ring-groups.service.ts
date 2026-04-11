@@ -5,9 +5,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class RingGroupsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: { name: string; number: string; strategy?: any; ringTime?: number; tenantId: string }) {
+  async create(tenantId: string, data: { name: string; number: string; strategy?: any; ringTime?: number }) {
     return this.prisma.ringGroup.create({
-      data: { name: data.name, number: data.number, strategy: data.strategy ?? 'RING_ALL', ringTime: data.ringTime ?? 20, tenantId: data.tenantId },
+      data: { ...data, strategy: data.strategy ?? 'RING_ALL', ringTime: data.ringTime ?? 20, tenantId },
       include: { members: { include: { extension: true } } },
     });
   }
@@ -20,27 +20,26 @@ export class RingGroupsService {
     });
   }
 
-  async findOne(id: string) {
-    const rg = await this.prisma.ringGroup.findUnique({
-      where: { id }, include: { members: { include: { extension: true } } },
-    });
-    if (!rg) throw new NotFoundException(`Ring Group ${id} not found`);
-    return rg;
+  async findOne(tenantId: string, id: string) {
+      const rg = await this.prisma.ringGroup.findFirst({ where: { id, tenantId }, include: { members: { include: { extension: true } } },
+      });
+      if (!rg) throw new NotFoundException(`Ring Group ${id} not found`);
+      return rg;
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.ringGroup.update({ where: { id }, data });
+  async update(tenantId: string, id: string, data: any) {
+      return this.prisma.ringGroup.update({ where: { id, tenantId }, data });
   }
 
-  async remove(id: string) {
-    return this.prisma.ringGroup.delete({ where: { id } });
+  async remove(tenantId: string, id: string) {
+      return this.prisma.ringGroup.delete({ where: { id, tenantId } });
   }
 
-  async addMember(ringGroupId: string, extensionId: string) {
-    return this.prisma.ringGroupMember.create({ data: { ringGroupId, extensionId }, include: { extension: true } });
+  async addMember(tenantId: string, ringGroupId: string, extensionId: string) {
+    return this.prisma.ringGroupMember.create({ data: { ringGroupId, extensionId, tenantId }, include: { extension: true } });
   }
 
-  async removeMember(ringGroupId: string, extensionId: string) {
-    return this.prisma.ringGroupMember.delete({ where: { ringGroupId_extensionId: { ringGroupId, extensionId } } });
+  async removeMember(tenantId: string, ringGroupId: string, extensionId: string) {
+    return this.prisma.ringGroupMember.deleteMany({ where: { ringGroupId, extensionId, tenantId } });
   }
 }

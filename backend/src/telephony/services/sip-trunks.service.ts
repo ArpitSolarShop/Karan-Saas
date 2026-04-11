@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class SipTrunksService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: {
+  async create(tenantId: string, data: {
     name: string; host: string; port?: number; username?: string;
     password?: string; transport?: string; codecs?: string[];
     maxChannels?: number; provider?: string; tenantId: string;
@@ -30,24 +30,23 @@ export class SipTrunksService {
     });
   }
 
-  async findOne(id: string) {
-    const trunk = await this.prisma.sipTrunk.findUnique({
-      where: { id }, include: { outboundRoutes: true },
-    });
-    if (!trunk) throw new NotFoundException(`SIP Trunk ${id} not found`);
-    return trunk;
+  async findOne(tenantId: string, id: string) {
+      const trunk = await this.prisma.sipTrunk.findFirst({ where: { id, tenantId }, include: { outboundRoutes: true },
+      });
+      if (!trunk) throw new NotFoundException(`SIP Trunk ${id} not found`);
+      return trunk;
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.sipTrunk.update({ where: { id }, data, include: { outboundRoutes: true } });
+  async update(tenantId: string, id: string, data: any) {
+      return this.prisma.sipTrunk.update({ where: { id, tenantId }, data, include: { outboundRoutes: true } });
   }
 
-  async remove(id: string) {
-    return this.prisma.sipTrunk.delete({ where: { id } });
+  async remove(tenantId: string, id: string) {
+      return this.prisma.sipTrunk.delete({ where: { id, tenantId } });
   }
 
   // Outbound Routes
-  async createRoute(data: { name: string; pattern: string; priority?: number; prefix?: string; trunkId: string; tenantId: string }) {
+  async createRoute(tenantId: string, data: { name: string; pattern: string; priority?: number; prefix?: string; trunkId: string; tenantId: string }) {
     return this.prisma.outboundRoute.create({ data });
   }
 
@@ -58,7 +57,7 @@ export class SipTrunksService {
     });
   }
 
-  async deleteRoute(id: string) {
-    return this.prisma.outboundRoute.delete({ where: { id } });
+  async deleteRoute(tenantId: string, id: string) {
+      return this.prisma.outboundRoute.delete({ where: { id, tenantId } });
   }
 }

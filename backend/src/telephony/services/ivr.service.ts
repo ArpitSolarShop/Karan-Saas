@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class IvrService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: {
+  async create(tenantId: string, data: {
     name: string; description?: string; greeting?: string;
     timeout?: number; retries?: number; nodes?: any; tenantId: string;
   }) {
@@ -16,17 +16,17 @@ export class IvrService {
     return this.prisma.ivrMenu.findMany({ where: { tenantId }, orderBy: { name: 'asc' } });
   }
 
-  async findOne(id: string) {
-    const ivr = await this.prisma.ivrMenu.findUnique({ where: { id } });
-    if (!ivr) throw new NotFoundException(`IVR Menu ${id} not found`);
-    return ivr;
+  async findOne(tenantId: string, id: string) {
+      const ivr = await this.prisma.ivrMenu.findFirst({ where: { id, tenantId } });
+      if (!ivr) throw new NotFoundException(`IVR Menu ${id} not found`);
+      return ivr;
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.ivrMenu.update({ where: { id }, data });
+  async update(tenantId: string, id: string, data: any) {
+      return this.prisma.ivrMenu.update({ where: { id, tenantId }, data });
   }
 
-  async remove(id: string) {
-    return this.prisma.ivrMenu.delete({ where: { id } });
+  async remove(tenantId: string, id: string) {
+      return this.prisma.ivrMenu.delete({ where: { id, tenantId } });
   }
 }

@@ -2,8 +2,10 @@ const { Project, SyntaxKind } = require('ts-morph');
 const path = require('path');
 
 const project = new Project({
-  tsConfigFilePath: path.join(__dirname, 'tsconfig.json'),
+  tsConfigFilePath: path.join(__dirname, '../tsconfig.json'),
 });
+
+const baseDir = path.join(__dirname, '..');
 
 const directoriesToHarden = [
   'src/telephony',
@@ -14,7 +16,7 @@ const directoriesToHarden = [
 async function hardenServices() {
   console.log('--- Hardening Services ---');
   for (const dir of directoriesToHarden) {
-    const serviceFiles = project.getSourceFiles(path.join(__dirname, dir, '**/*.service.ts'));
+    const serviceFiles = project.getSourceFiles(path.join(baseDir, dir, '**/*.service.ts'));
     for (const sourceFile of serviceFiles) {
       console.log(`Processing ${sourceFile.getBaseName()}`);
       let modified = false;
@@ -72,7 +74,7 @@ async function hardenServices() {
 async function hardenControllers() {
   console.log('--- Hardening Controllers ---');
   for (const dir of directoriesToHarden) {
-    const controllerFiles = project.getSourceFiles(path.join(__dirname, dir, '**/*.controller.ts'));
+    const controllerFiles = project.getSourceFiles(path.join(baseDir, dir, '**/*.controller.ts'));
     for (const sourceFile of controllerFiles) {
       console.log(`Processing ${sourceFile.getBaseName()}`);
       let modified = false;
@@ -132,9 +134,7 @@ async function hardenControllers() {
         for (const method of methods) {
           if (!method.getDecorator('Get') && !method.getDecorator('Post') && !method.getDecorator('Patch') && !method.getDecorator('Put') && !method.getDecorator('Delete')) continue;
 
-          // Replace @Query('tenantId') with @Req() req: any
-          const params = method.getParameters();
-          const queryTenantParam = params.find(p => {
+          const queryTenantParam = method.getParameters().find(p => {
              const dec = p.getDecorator('Query');
              return dec && dec.getArguments().some(a => a.getText().includes('tenantId'));
           });
@@ -144,7 +144,7 @@ async function hardenControllers() {
             modified = true;
           }
 
-          const reqParam = params.find(p => p.getDecorator('Req'));
+          const reqParam = method.getParameters().find(p => p.getDecorator('Req'));
           if (!reqParam) {
             method.insertParameter(0, {
                decorators: [{ name: 'Req', arguments: [] }],

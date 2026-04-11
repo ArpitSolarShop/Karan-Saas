@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class CdrService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: any) {
+  async create(tenantId: string, data: any) {
     return this.prisma.cdr.create({ data });
   }
 
@@ -38,8 +38,8 @@ export class CdrService {
     return { records, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async findOne(id: string) {
-    return this.prisma.cdr.findUnique({ where: { id } });
+  async findOne(tenantId: string, id: string) {
+      return this.prisma.cdr.findFirst({ where: { id, tenantId } });
   }
 
   async getStats(tenantId: string, from?: Date, to?: Date) {

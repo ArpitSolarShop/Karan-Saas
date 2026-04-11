@@ -1,24 +1,25 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { WallboardService } from '../services/wallboard.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { TenantGuard } from "../../auth/tenant.guard";
 
 @Controller('agent-management/wallboard')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class WallboardController {
   constructor(private readonly service: WallboardService) {}
 
   @Get('live')
-  getLiveData(@Query('tenantId') tenantId: string) { return this.service.getLiveData(tenantId); }
+  getLiveData(@Req() req: any) { return this.service.getLiveData(req.user.tenantId); }
 
   @Get('configs')
-  getConfigs(@Query('tenantId') tenantId: string) { return this.service.getConfigs(tenantId); }
+  getConfigs(@Req() req: any) { return this.service.getConfigs(req.user.tenantId); }
 
   @Post('configs')
-  createConfig(@Body() body: any) { return this.service.createConfig(body); }
+  createConfig(@Req() req: any, @Body() body: any) { return this.service.createConfig(req.user.tenantId, body); }
 
   @Patch('configs/:id')
-  updateConfig(@Param('id') id: string, @Body() body: any) { return this.service.updateConfig(id, body); }
+  updateConfig(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.updateConfig(req.user.tenantId, id, body); }
 
   @Delete('configs/:id')
-  deleteConfig(@Param('id') id: string) { return this.service.deleteConfig(id); }
+  deleteConfig(@Req() req: any, @Param('id') id: string) { return this.service.deleteConfig(req.user.tenantId, id); }
 }

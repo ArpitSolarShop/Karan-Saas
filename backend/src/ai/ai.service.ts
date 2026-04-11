@@ -165,9 +165,9 @@ export class AiService {
   /**
    * Get transcript for a specific call.
    */
-  async getTranscript(callId: string) {
-    return (this.prisma as any).callTranscript.findUnique({
-      where: { callId },
+  async getTranscript(tenantId: string, callId: string) {
+    return (this.prisma as any).callTranscript.findFirst({
+      where: { callId, call: { tenantId } },
     });
   }
 
@@ -175,9 +175,9 @@ export class AiService {
    * Score a lead using AI heuristics and call history.
    * Returns 0–100.
    */
-  async scoreLead(leadId: string): Promise<number> {
-    const lead = await this.prisma.lead.findUnique({
-      where: { id: leadId },
+  async scoreLead(tenantId: string, leadId: string): Promise<number> {
+    const lead = await this.prisma.lead.findFirst({
+      where: { id: leadId, tenantId },
       include: {
         calls: { 
           include: { transcript: true },

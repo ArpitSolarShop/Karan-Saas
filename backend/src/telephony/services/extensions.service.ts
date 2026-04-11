@@ -5,7 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class ExtensionsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: {
+  async create(tenantId: string, data: {
     number: string; name: string; type?: any; password: string;
     callerIdName?: string; callerIdNum?: string; userId?: string;
     voicemailEnabled?: boolean; callRecording?: boolean; tenantId: string;
@@ -38,29 +38,27 @@ export class ExtensionsService {
     });
   }
 
-  async findOne(id: string) {
-    const ext = await this.prisma.extension.findUnique({
-      where: { id },
-      include: {
-        user: { select: { firstName: true, lastName: true, email: true } },
-        queueMembers: { include: { queue: true } },
-        ringGroupMembers: { include: { ringGroup: true } },
-      },
-    });
-    if (!ext) throw new NotFoundException(`Extension ${id} not found`);
-    return ext;
+  async findOne(tenantId: string, id: string) {
+      const ext = await this.prisma.extension.findFirst({ where: { id, tenantId },
+        include: {
+          user: { select: { firstName: true, lastName: true, email: true } },
+          queueMembers: { include: { queue: true } },
+          ringGroupMembers: { include: { ringGroup: true } },
+        },
+      });
+      if (!ext) throw new NotFoundException(`Extension ${id} not found`);
+      return ext;
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.extension.update({
-      where: { id },
-      data,
-      include: { user: { select: { firstName: true, lastName: true, email: true } } },
-    });
+  async update(tenantId: string, id: string, data: any) {
+      return this.prisma.extension.update({ where: { id, tenantId },
+        data,
+        include: { user: { select: { firstName: true, lastName: true, email: true } } },
+      });
   }
 
-  async remove(id: string) {
-    return this.prisma.extension.delete({ where: { id } });
+  async remove(tenantId: string, id: string) {
+      return this.prisma.extension.delete({ where: { id, tenantId } });
   }
 
   async getStats(tenantId: string) {

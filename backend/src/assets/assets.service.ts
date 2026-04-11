@@ -13,29 +13,32 @@ export class AssetsService {
     });
   }
 
-  async findOne(id: string) {
-    const asset = await this.prisma.asset.findUnique({
-      where: { id },
+  async findOne(tenantId: string, id: string) {
+    const asset = await this.prisma.asset.findFirst({
+      where: { id, tenantId },
       include: { reservations: { orderBy: { startTime: 'desc' }, take: 20 } },
     });
     if (!asset) throw new NotFoundException('Asset not found');
     return asset;
   }
 
-  async create(data: any) {
-    return this.prisma.asset.create({ data });
+  async create(tenantId: string, data: any) {
+    return this.prisma.asset.create({ data: { ...data, tenantId } });
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.asset.update({ where: { id }, data });
+  async update(tenantId: string, id: string, data: any) {
+    return this.prisma.asset.update({ where: { id, tenantId }, data });
   }
 
-  async remove(id: string) {
-    return this.prisma.asset.delete({ where: { id } });
+  async remove(tenantId: string, id: string) {
+    return this.prisma.asset.delete({ where: { id, tenantId } });
   }
 
   // Reservations
-  async reserve(assetId: string, data: any) {
+  async reserve(tenantId: string, userId: string, assetId: string, data: any) {
+    const asset = await this.prisma.asset.findFirst({ where: { id: assetId, tenantId }});
+    if (!asset) throw new NotFoundException('Asset not found');
+
     // Check for conflicts
     const conflicts = await this.prisma.assetReservation.findMany({
       where: {
@@ -49,18 +52,22 @@ export class AssetsService {
     if (conflicts.length > 0) throw new BadRequestException('Time slot already reserved');
 
     return this.prisma.assetReservation.create({
-      data: { ...data, assetId, status: 'ACTIVE' },
+      data: { ...data, assetId, userId, status: 'ACTIVE' },
     });
   }
 
-  async cancelReservation(id: string) {
+  async cancelReservation(tenantId: string, id: string) {
+    const reservation = await this.prisma.assetReservation.findFirst({ where: { id, asset: { tenantId } }});
+    if (!reservation) throw new NotFoundException('Reservation not found');
     return this.prisma.assetReservation.update({
       where: { id },
       data: { status: 'CANCELLED' },
     });
   }
 
-  async getReservations(assetId: string) {
+  async getReservations(tenantId: string, assetId: string) {
+    const asset = await this.prisma.asset.findFirst({ where: { id: assetId, tenantId }});
+    if (!asset) throw new NotFoundException('Asset not found');
     return this.prisma.assetReservation.findMany({
       where: { assetId },
       include: { user: { select: { firstName: true, lastName: true } } },

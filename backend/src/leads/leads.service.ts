@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Lead, LeadStatus } from '@prisma/client';
 import { LeadsGateway } from './leads.gateway';
@@ -11,6 +11,8 @@ import { DedupeService } from './services/dedupe.service';
 
 @Injectable()
 export class LeadsService {
+  private readonly logger = new Logger(LeadsService.name);
+
   constructor(
     private prisma: PrismaService,
     private leadsGateway: LeadsGateway,
@@ -104,9 +106,39 @@ export class LeadsService {
     return lead;
   }
 
-  async update(id: string, tenantId: string, data: any) {
-    const oldLead = await this.prisma.lead.findUnique({ where: { id, tenantId } });
-    if (!oldLead) throw new Error('Lead not found in this tenant context.');
+  async update(originalId: string, tenantId: string, data: any) {
+    let oldLead = await this.prisma.lead.findUnique({ where: { id: originalId, tenantId } });
+    let id = originalId;
+
+    if (!oldLead) {
+      // Fallback: If it's a SheetRow ID, try to find or create the Lead
+      const sheetRow = await this.prisma.sheetRow.findUnique({ where: { id: originalId, tenantId } });
+      if (sheetRow) {
+        const rowData = sheetRow.data as any;
+        const phone = rowData.phone || rowData.phone_primary || rowData.phone_number || null;
+        if (phone) {
+          oldLead = await this.prisma.lead.findFirst({ where: { phone: String(phone), tenantId } });
+        }
+        if (!oldLead) {
+          oldLead = await this.create({
+            tenantId,
+            name: rowData.name || 'Imported Lead',
+            phone: phone ? String(phone) : '',
+            email: rowData.email || null,
+            status: data.status || 'NEW',
+            source: 'Spreadsheet Update',
+            score: data.score || 0,
+          });
+        }
+        if (oldLead) {
+          id = oldLead.id;
+        } else {
+          throw new Error('Lead not found and could not resolve from Sheet Row.');
+        }
+      } else {
+        throw new Error('Lead not found in this tenant context.');
+      }
+    }
     const lead = await this.prisma.lead.update({ where: { id, tenantId }, data });
     
     this.leadsGateway.broadcastUpdate('leadUpdated', lead);
@@ -186,8 +218,8 @@ export class LeadsService {
         const workbook = xlsx.read(buffer, { type: 'buffer' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         rawData = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
-      } catch {
-        throw new Error('Failed to parse Excel/CSV file.');
+      } catch (err: any) {
+        throw new Error(`Failed to parse Excel/CSV file: ${err.message}`);
       }
     }
 
@@ -338,7 +370,9 @@ export class LeadsService {
       for (const id of ids) {
         try {
           await this.search.deleteLeadFromIndex(id);
-        } catch { }
+        } catch (err: any) {
+          this.logger.warn(`Failed to delete lead from search index: ${err.message}`);
+        }
       }
       return { deleted: ids.length };
     }

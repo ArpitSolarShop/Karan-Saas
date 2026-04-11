@@ -1,27 +1,28 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { AgentScriptsService } from '../services/agent-scripts.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { TenantGuard } from "../../auth/tenant.guard";
 
 @Controller('campaigns/scripts')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class AgentScriptsController {
   constructor(private readonly service: AgentScriptsService) {}
 
   @Post()
-  create(@Body() body: any) { return this.service.create(body); }
+  create(@Req() req: any, @Body() body: any) { return this.service.create(req.user.tenantId, body); }
 
   @Get()
-  findAll(@Query('tenantId') tenantId: string) { return this.service.findAll(tenantId); }
+  findAll(@Req() req: any) { return this.service.findAll(req.user.tenantId); }
 
   @Get(':id')
-  findOne(@Param('id') id: string) { return this.service.findOne(id); }
+  findOne(@Req() req: any, @Param('id') id: string) { return this.service.findOne(req.user.tenantId, id); }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: any) { return this.service.update(id, body); }
+  update(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.update(req.user.tenantId, id, body); }
 
   @Delete(':id')
-  remove(@Param('id') id: string) { return this.service.remove(id); }
+  remove(@Req() req: any, @Param('id') id: string) { return this.service.remove(req.user.tenantId, id); }
 
   @Post(':id/duplicate')
-  duplicate(@Param('id') id: string) { return this.service.duplicate(id); }
+  duplicate(@Req() req: any, @Param('id') id: string) { return this.service.duplicate(req.user.tenantId, id); }
 }

@@ -1,6 +1,6 @@
 cd frontend; npm run dev
 cd backend; npm run start:dev
-docker-compose up -d
+docker compose up -d
 
 
 

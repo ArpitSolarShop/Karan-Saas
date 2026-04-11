@@ -39,6 +39,10 @@ export class AuthController {
   @Post('login')
   @HttpCode(200)
   async login(@Body() body: { email: string; password: string }) {
+    console.log('\n--- 🔴 INCOMING LOGIN REQUEST 🔴 ---');
+    console.log(`Email received:    "${body.email}" (Length: ${body.email?.length})`);
+    console.log(`Password received: "${body.password}" (Length: ${body.password?.length})`);
+    console.log('--------------------------------------\n');
     return this.authService.login(body.email, body.password);
   }
 

@@ -50,15 +50,15 @@ export class WallboardService {
     return this.prisma.wallboardConfig.findMany({ where: { tenantId }, orderBy: { name: 'asc' } });
   }
 
-  async createConfig(data: { name: string; layout?: any; refreshRate?: number; tenantId: string; createdBy?: string }) {
+  async createConfig(tenantId: string, data: { name: string; layout?: any; refreshRate?: number; tenantId: string; createdBy?: string }) {
     return this.prisma.wallboardConfig.create({ data });
   }
 
-  async updateConfig(id: string, data: any) {
-    return this.prisma.wallboardConfig.update({ where: { id }, data });
+  async updateConfig(tenantId: string, id: string, data: any) {
+      return this.prisma.wallboardConfig.update({ where: { id, tenantId }, data });
   }
 
-  async deleteConfig(id: string) {
-    return this.prisma.wallboardConfig.delete({ where: { id } });
+  async deleteConfig(tenantId: string, id: string) {
+      return this.prisma.wallboardConfig.delete({ where: { id, tenantId } });
   }
 }

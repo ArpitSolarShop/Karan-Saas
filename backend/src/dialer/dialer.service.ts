@@ -62,13 +62,13 @@ export class DialerService {
 
   // ── Existing Manual Stubs ───────────────────────────────────────────────
 
-  async getNextLead(campaignId: string, agentId: string) {
+  async getNextLead(tenantId: string, campaignId: string, agentId: string) {
     const queueName = `campaign:${campaignId}:queue`;
     let leadData = await this.redis.popFromQueue(queueName);
 
     if (!leadData) {
       const leads = await this.prisma.lead.findMany({
-        where: { campaignId, status: 'NEW', isDnc: false },
+        where: { campaignId, tenantId, status: 'NEW', isDnc: false },
         orderBy: [{ score: 'desc' }, { priority: 'asc' }],
         take: 50,
       });
@@ -81,8 +81,8 @@ export class DialerService {
     return leadData;
   }
 
-  async startCall(leadId: string, agentId: string, mode: CallType = 'PREVIEW') {
-    const lead = await this.prisma.lead.findUnique({ where: { id: leadId } });
+  async startCall(tenantId: string, leadId: string, agentId: string, mode: CallType = 'PREVIEW') {
+    const lead = await this.prisma.lead.findFirst({ where: { id: leadId, tenantId } });
     if (!lead) throw new NotFoundException('Lead not found');
 
     const isAmd = Math.random() < 0.2;
@@ -114,8 +114,8 @@ export class DialerService {
     return { call, isAmd };
   }
 
-  async endCall(callId: string, dispositionId: string, notes?: string) {
-    const call = await this.prisma.call.findUnique({ where: { id: callId } });
+  async endCall(tenantId: string, callId: string, dispositionId: string, notes?: string) {
+    const call = await this.prisma.call.findFirst({ where: { id: callId, tenantId } });
     if (!call) throw new NotFoundException('Call not found');
 
     const endedAt = new Date();

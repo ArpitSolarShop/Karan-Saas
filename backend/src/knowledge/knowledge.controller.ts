@@ -11,9 +11,10 @@ import {
 } from '@nestjs/common';
 import { KnowledgeService } from './knowledge.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantGuard } from '../auth/tenant.guard';
 
 @Controller('knowledge')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class KnowledgeController {
   constructor(private readonly knowledgeService: KnowledgeService) {}
 

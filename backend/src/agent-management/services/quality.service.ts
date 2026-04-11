@@ -6,7 +6,7 @@ export class QualityService {
   constructor(private prisma: PrismaService) {}
 
   // Quality Forms
-  async createForm(data: { name: string; description?: string; sections?: any; maxScore?: number; tenantId: string }) {
+  async createForm(tenantId: string, data: { name: string; description?: string; sections?: any; maxScore?: number; tenantId: string }) {
     return this.prisma.qualityForm.create({ data });
   }
 
@@ -18,22 +18,22 @@ export class QualityService {
     });
   }
 
-  async findOneForm(id: string) {
-    const form = await this.prisma.qualityForm.findUnique({ where: { id }, include: { evaluations: { take: 10, orderBy: { createdAt: 'desc' } } } });
-    if (!form) throw new NotFoundException(`Form ${id} not found`);
-    return form;
+  async findOneForm(tenantId: string, id: string) {
+      const form = await this.prisma.qualityForm.findFirst({ where: { id, tenantId }, include: { evaluations: { take: 10, orderBy: { createdAt: 'desc' } } } });
+      if (!form) throw new NotFoundException(`Form ${id} not found`);
+      return form;
   }
 
-  async updateForm(id: string, data: any) {
-    return this.prisma.qualityForm.update({ where: { id }, data });
+  async updateForm(tenantId: string, id: string, data: any) {
+      return this.prisma.qualityForm.update({ where: { id, tenantId }, data });
   }
 
-  async deleteForm(id: string) {
-    return this.prisma.qualityForm.update({ where: { id }, data: { isActive: false } });
+  async deleteForm(tenantId: string, id: string) {
+      return this.prisma.qualityForm.update({ where: { id, tenantId }, data: { isActive: false } });
   }
 
   // Evaluations
-  async createEvaluation(data: {
+  async createEvaluation(tenantId: string, data: {
     formId: string; callId?: string; agentId: string; evaluatorId: string;
     scores: any; totalScore: number; maxScore: number; comments?: string; tenantId: string;
   }) {
@@ -59,7 +59,7 @@ export class QualityService {
     return { records, total, page, limit };
   }
 
-  async getAgentQualityStats(agentId: string) {
+  async getAgentQualityStats(tenantId: string, agentId: string) {
     const evals = await this.prisma.qualityEvaluation.findMany({ where: { agentId } });
     if (evals.length === 0) return { totalEvaluations: 0, avgPercentage: 0 };
 

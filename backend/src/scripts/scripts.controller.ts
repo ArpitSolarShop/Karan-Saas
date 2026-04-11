@@ -3,7 +3,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../auth/tenant.guard';
 import { ScriptsService } from './scripts.service';
 
-@UseGuards(JwtAuthGuard)
+@Controller('scripts')
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class ScriptsController {
   constructor(private readonly scriptsService: ScriptsService) {}

@@ -6,23 +6,23 @@ import * as XLSX from 'xlsx';
 export class CampaignContactsService {
   constructor(private prisma: PrismaService) {}
 
-  async createList(data: { name: string; campaignId: string; tenantId: string; description?: string }) {
-    return this.prisma.campaignContactList.create({ data, include: { _count: { select: { contacts: true } } } });
+  async createList(tenantId: string, data: { name: string; campaignId: string; description?: string }) {
+    return this.prisma.campaignContactList.create({ data: { ...data, tenantId }, include: { _count: { select: { contacts: true } } } });
   }
 
-  async findLists(campaignId: string) {
+  async findLists(tenantId: string, campaignId: string) {
     return this.prisma.campaignContactList.findMany({
-      where: { campaignId },
+      where: { campaignId, tenantId },
       include: { _count: { select: { contacts: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async deleteList(id: string) {
-    return this.prisma.campaignContactList.delete({ where: { id } });
+  async deleteList(tenantId: string, id: string) {
+      return this.prisma.campaignContactList.delete({ where: { id, tenantId } });
   }
 
-  async importFromBuffer(listId: string, buffer: Buffer) {
+  async importFromBuffer(tenantId: string, listId: string, buffer: Buffer) {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
@@ -39,25 +39,25 @@ export class CampaignContactsService {
       customData: row,
     })).filter(c => c.phone); // Require at least a phone number
 
-    return this.importContacts(listId, contacts);
+    return this.importContacts(tenantId, listId, contacts);
   }
 
-  async importContacts(listId: string, contacts: { firstName?: string; lastName?: string; phone: string; phoneAlt?: string; email?: string; company?: string; customData?: any }[]) {
+  async importContacts(tenantId: string, listId: string, contacts: { firstName?: string; lastName?: string; phone: string; phoneAlt?: string; email?: string; company?: string; customData?: any }[]) {
     const results = { imported: 0, errors: 0 };
     for (const contact of contacts) {
       try {
-        await this.prisma.campaignContact.create({ data: { ...contact, listId } });
+        await this.prisma.campaignContact.create({ data: { ...contact, listId, tenantId } });
         results.imported++;
       } catch { results.errors++; }
     }
     // Update list counts
-    const total = await this.prisma.campaignContact.count({ where: { listId } });
-    await this.prisma.campaignContactList.update({ where: { id: listId }, data: { totalCount: total, activeCount: total } });
+    const total = await this.prisma.campaignContact.count({ where: { listId, tenantId } });
+    await this.prisma.campaignContactList.update({ where: { id: listId, tenantId }, data: { totalCount: total, activeCount: total } });
     return results;
   }
 
-  async findContacts(listId: string, page = 1, limit = 50, status?: string) {
-    const where: any = { listId };
+  async findContacts(tenantId: string, listId: string, page = 1, limit = 50, status?: string) {
+    const where: any = { listId, tenantId };
     if (status) where.status = status;
 
     const [records, total] = await Promise.all([
@@ -67,28 +67,28 @@ export class CampaignContactsService {
     return { records, total, page, limit };
   }
 
-  async updateContact(id: string, data: any) {
-    return this.prisma.campaignContact.update({ where: { id }, data });
+  async updateContact(tenantId: string, id: string, data: any) {
+      return this.prisma.campaignContact.update({ where: { id, tenantId }, data });
   }
 
-  async deleteContact(id: string) {
-    return this.prisma.campaignContact.delete({ where: { id } });
+  async deleteContact(tenantId: string, id: string) {
+      return this.prisma.campaignContact.delete({ where: { id, tenantId } });
   }
 
-  async getContactStats(campaignId: string) {
+  async getContactStats(tenantId: string, campaignId: string) {
     const lists = await this.prisma.campaignContactList.findMany({
-      where: { campaignId },
+      where: { campaignId, tenantId },
       select: { id: true },
     });
     const listIds = lists.map(l => l.id);
     if (listIds.length === 0) return { total: 0, pending: 0, completed: 0, failed: 0, dnc: 0 };
 
     const [total, pending, completed, failed, dnc] = await Promise.all([
-      this.prisma.campaignContact.count({ where: { listId: { in: listIds } } }),
-      this.prisma.campaignContact.count({ where: { listId: { in: listIds }, status: 'PENDING' } }),
-      this.prisma.campaignContact.count({ where: { listId: { in: listIds }, status: 'COMPLETED' } }),
-      this.prisma.campaignContact.count({ where: { listId: { in: listIds }, status: 'FAILED' } }),
-      this.prisma.campaignContact.count({ where: { listId: { in: listIds }, isDnc: true } }),
+      this.prisma.campaignContact.count({ where: { listId: { in: listIds }, tenantId } }),
+      this.prisma.campaignContact.count({ where: { listId: { in: listIds }, status: 'PENDING', tenantId } }),
+      this.prisma.campaignContact.count({ where: { listId: { in: listIds }, status: 'COMPLETED', tenantId } }),
+      this.prisma.campaignContact.count({ where: { listId: { in: listIds }, status: 'FAILED', tenantId } }),
+      this.prisma.campaignContact.count({ where: { listId: { in: listIds }, isDnc: true, tenantId } }),
     ]);
     return { total, pending, completed, failed, dnc };
   }

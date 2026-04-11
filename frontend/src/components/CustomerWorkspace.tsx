@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import useSWR, { mutate } from "swr";
 import { fetcher } from "@/lib/api";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -33,18 +34,22 @@ import {
   ThumbsDown,
   Minus,
   Building2,
+  StickyNote,
+  Tag,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CompanySelect from "@/components/companies/CompanySelect";
 import Timeline from "@/components/leads/Timeline";
 import { toast } from "sonner";
 import Link from "next/link";
+import { formatDistanceToNow } from "date-fns";
 
 interface CustomerWorkspaceProps {
   isOpen: boolean;
   onClose: () => void;
   activeLead: any;
-  onCall?: () => void;
+  onCall?: (phone: string) => void;
 }
 
 const CHANNEL_ICONS: Record<string, any> = {
@@ -59,14 +64,23 @@ const CHANNEL_COLORS: Record<string, string> = {
   SMS: "#0078D4",
 };
 
+const DISPOSITION_OPTIONS = [
+  { code: "INTERESTED", label: "Interested", color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
+  { code: "CALLBACK", label: "Callback", color: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  { code: "NOT_INTERESTED", label: "Not Interested", color: "bg-red-500/15 text-red-400 border-red-500/30" },
+  { code: "CONVERTED", label: "Converted", color: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+  { code: "DNC", label: "DNC", color: "bg-rose-600/15 text-rose-400 border-rose-600/30" },
+];
+
 export default function CustomerWorkspace({
   isOpen,
   onClose,
   activeLead,
   onCall,
 }: CustomerWorkspaceProps) {
+  const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
-  const [channelTab, setChannelTab] = useState<"messages" | "quotes" | "timeline">(
+  const [channelTab, setChannelTab] = useState<"messages" | "notes" | "quotes" | "timeline">(
     "messages"
   );
   const [sendChannel, setSendChannel] = useState<"WHATSAPP" | "SMS" | "EMAIL">(
@@ -76,6 +90,8 @@ export default function CustomerWorkspace({
   const [isSending, setIsSending] = useState(false);
   const [resolvedLeadId, setResolvedLeadId] = useState<string | null>(null);
   const [score, setScore] = useState(activeLead?.score || 0);
+  const [noteText, setNoteText] = useState("");
+  const [isSavingNote, setIsSavingNote] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const effectiveLeadId = resolvedLeadId || activeLead?.id;
@@ -105,6 +121,12 @@ export default function CustomerWorkspace({
     fetcher
   );
 
+  const { data: notes, mutate: mutateNotes } = useSWR(
+    effectiveLeadId ? `/notes/lead/${effectiveLeadId}` : null,
+    fetcher,
+    { refreshInterval: 5000 }
+  );
+
   const messages = (threadMessages || []).sort(
     (a: any, b: any) =>
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -117,6 +139,36 @@ export default function CustomerWorkspace({
       await api.patch(`/leads/${effectiveLeadId}`, { score: newScore });
       mutate(`/sheets/sheet-001/rows`);
     } catch {}
+  };
+
+  const handleDisposition = async (code: string) => {
+    if (!effectiveLeadId) return;
+    try {
+      await api.patch(`/leads/${effectiveLeadId}`, { status: code });
+      mutate(`/sheets/sheet-001/rows`);
+      toast.success(`Disposition set: ${code}`);
+    } catch {
+      toast.error("Failed to set disposition");
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!noteText.trim() || !effectiveLeadId || isSavingNote) return;
+    setIsSavingNote(true);
+    try {
+      await api.post("/notes", {
+        leadId: effectiveLeadId,
+        note: noteText.trim(),
+        agentId: user?.id || "SYSTEM",
+      });
+      setNoteText("");
+      mutateNotes();
+      toast.success("Note added");
+    } catch {
+      toast.error("Failed to add note");
+    } finally {
+      setIsSavingNote(false);
+    }
   };
 
   const autoResize = () => {
@@ -136,7 +188,7 @@ export default function CustomerWorkspace({
     try {
       const response = await api.post("/communications/send", {
         leadId: activeLead.id,
-        userId: "SYSTEM",
+        userId: user?.id || "SYSTEM",
         type: sendChannel,
         message: text,
       });
@@ -159,7 +211,6 @@ export default function CustomerWorkspace({
       await api.patch(`/leads-v2/${activeLead.id}`, { companyId: companyId || null });
       toast.success(companyId ? "Account linked" : "Account unlinked");
       mutate(`/sheets/sheet-001/rows`);
-      // Also mutate the communications thread if needed, but the lead object in parent should update via SWR
     } catch (error) {
       toast.error("Failed to update account link");
     }
@@ -254,8 +305,9 @@ export default function CustomerWorkspace({
           <Button
             variant="ghost"
             size="icon"
-            onClick={onCall}
+            onClick={() => onCall?.(activeLead.phone || "")}
             className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-full h-8 w-8 transition-colors"
+            title="Call this lead"
           >
             <Phone size={18} />
           </Button>
@@ -270,12 +322,12 @@ export default function CustomerWorkspace({
       </header>
 
       {/* ── Intelligence Gauge ── */}
-      <div className="px-6 py-5 bg-[#0f172a] border-b border-white/5 relative overflow-hidden shrink-0">
+      <div className="px-6 py-4 bg-[#0f172a] border-b border-white/5 relative overflow-hidden shrink-0">
         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
            <Zap size={80} className="text-primary"/>
         </div>
         
-        <div className="flex items-end justify-between relative z-10 mb-4">
+        <div className="flex items-end justify-between relative z-10 mb-3">
            <div>
               <h4 className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Alpha Score Index</h4>
               <p className="text-[9px] text-muted-foreground uppercase font-mono mt-1">Priority Class: {score > 80 ? 'CRITICAL' : score > 50 ? 'HIGH' : 'STANDARD'}</p>
@@ -286,7 +338,7 @@ export default function CustomerWorkspace({
            </div>
         </div>
 
-        <div className="space-y-3 relative z-10">
+        <div className="space-y-2 relative z-10">
           <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden border border-white/5">
              <div 
                className={cn("h-full transition-all duration-500 ease-out shadow-lg", 
@@ -306,9 +358,27 @@ export default function CustomerWorkspace({
             }
             className="w-full h-1 opacity-0 absolute inset-0 cursor-pointer"
           />
-          <div className="flex justify-between items-center text-[8px] font-black text-white/30 uppercase tracking-widest">
-             <span>Qualification: {score > 40 ? 'VERIFIED' : 'PENDING'}</span>
-             <span>Last Adjusted: Just now</span>
+        </div>
+
+        {/* Quick Disposition Strip */}
+        <div className="mt-3 relative z-10">
+          <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-2 flex items-center gap-1">
+            <Tag size={8}/> Quick Disposition
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {DISPOSITION_OPTIONS.map((d) => (
+              <button
+                key={d.code}
+                onClick={() => handleDisposition(d.code)}
+                className={cn(
+                  "px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider border transition-all hover:scale-105 active:scale-95",
+                  d.color,
+                  activeLead.status === d.code && "ring-1 ring-white/40 shadow-lg"
+                )}
+              >
+                {d.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -316,20 +386,22 @@ export default function CustomerWorkspace({
       {/* ── Tab Bar ── */}
       <div className="bg-[#1a1a2e] border-b border-white/5 flex shrink-0">
         {[
-          { id: "messages", label: "Messages" },
-          { id: "quotes", label: "Quotes" },
-          { id: "timeline", label: "Timeline" },
+          { id: "messages", label: "Messages", icon: MessageCircle },
+          { id: "notes", label: "Notes", icon: StickyNote },
+          { id: "quotes", label: "Quotes", icon: FileText },
+          { id: "timeline", label: "Timeline", icon: Zap },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setChannelTab(tab.id as any)}
             className={cn(
-              "flex-1 py-2.5 text-xs font-bold uppercase tracking-widest transition-all border-b-2",
+              "flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all border-b-2 flex items-center justify-center gap-1.5",
               channelTab === tab.id
                 ? "text-primary border-primary"
                 : "text-muted-foreground border-transparent hover:text-foreground"
             )}
           >
+            <tab.icon size={10} />
             {tab.label}
           </button>
         ))}
@@ -404,7 +476,7 @@ export default function CustomerWorkspace({
                         </div>
                       )}
 
-                      {/* Meta absolute bottom-right */}
+                      {/* Media thumbnail */}
                       {msg.mediaData && (
                         <div className="mb-2 overflow-hidden rounded-md border border-slate-700/50 shadow-md">
                           <img 
@@ -419,7 +491,7 @@ export default function CustomerWorkspace({
                         {text}
                       </p>
 
-                      {/* Meta absolute bottom-right */}
+                      {/* Meta */}
                       <div
                         className={cn(
                           "flex justify-end items-center gap-1 mt-1 text-[10px]",
@@ -496,6 +568,65 @@ export default function CustomerWorkspace({
             </div>
           </div>
         </>
+      ) : channelTab === "notes" ? (
+        /* ── Notes Panel ── */
+        <div className="flex-grow flex flex-col bg-[#0d1117]">
+          <ScrollArea className="flex-1 px-4 py-4">
+            {!notes || notes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 text-center">
+                <StickyNote size={28} className="text-white/20 mb-2" />
+                <p className="text-white/30 text-xs">No notes yet</p>
+                <p className="text-white/20 text-[10px] mt-1">Add your first note below</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(notes as any[]).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((note: any) => (
+                  <div
+                    key={note.id}
+                    className="rounded-xl bg-slate-800/80 border border-slate-700/50 p-3 shadow-sm group hover:border-primary/30 transition-colors"
+                  >
+                    <p className="text-[13px] text-slate-200 leading-relaxed whitespace-pre-wrap">{note.content}</p>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/30">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                        {note.user ? `${note.user.firstName || ''} ${note.user.lastName || ''}`.trim() : 'Agent'}
+                      </span>
+                      <span className="text-[9px] text-slate-500 font-mono">
+                        {formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+
+          {/* Add Note Input */}
+          <div className="shrink-0 px-4 py-3 border-t border-slate-700/50" style={{ background: "#0f172a" }}>
+            <div className="flex items-end gap-2">
+              <textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleAddNote();
+                  }
+                }}
+                placeholder="Type a note... (Ctrl+Enter to save)"
+                rows={2}
+                className="flex-1 bg-slate-800 border border-slate-700 text-[13px] text-slate-200 placeholder:text-slate-500 outline-none resize-none rounded-xl px-3 py-2 focus:border-primary/50 transition-colors"
+              />
+              <Button
+                onClick={handleAddNote}
+                disabled={!noteText.trim() || isSavingNote}
+                size="icon"
+                className="h-10 w-10 rounded-xl bg-primary hover:bg-primary/90 shrink-0 disabled:opacity-40"
+              >
+                <Plus size={16} />
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : channelTab === "quotes" ? (
         /* ── Quotes Panel ── */
         <div className="flex-grow overflow-y-auto bg-[#0d1117] px-4 py-4 space-y-4">

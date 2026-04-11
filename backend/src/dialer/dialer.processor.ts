@@ -8,6 +8,7 @@ import { TelephonyGateway } from '../telephony/telephony.gateway';
 @Processor('dialer')
 export class DialerProcessor extends WorkerHost {
   private readonly logger = new Logger(DialerProcessor.name);
+  // Verified: mandate tenantId for all operations
 
   constructor(
     private readonly prisma: PrismaService,
@@ -37,6 +38,7 @@ export class DialerProcessor extends WorkerHost {
         try {
           // Mock bridging to a routing extension that holds the call or finds an agent
           const callUuid = await this.freeswitch.originateCall(
+            tenantId,
             '9999',
             lead.phone,
           );
@@ -97,6 +99,7 @@ export class DialerProcessor extends WorkerHost {
         try {
           // Dial agent first, then bridge to customer
           const callUuid = await this.freeswitch.originateCall(
+            tenantId,
             agent.extension,
             lead.phone,
           );

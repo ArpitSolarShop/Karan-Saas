@@ -39,7 +39,7 @@ export class CampaignsService {
     });
   }
 
-  async create(data: any) {
+  async create(tenantId: string, data: any) {
     if (!data.tenantId) throw new Error('Tenant ID is required for campaign creation.');
     return this.prisma.campaign.create({
       data: {
@@ -179,7 +179,7 @@ export class CampaignsService {
    * Predictive Dialer Algorithm (VICIdial Port)
    * Calculates how many concurrent calls to place for a campaign.
    */
-  async calculatePacing(campaignId: string) {
+  async calculatePacing(tenantId: string, campaignId: string) {
     const campaign = await this.prisma.campaign.findUniqueOrThrow({
       where: { id: campaignId },
       include: { 

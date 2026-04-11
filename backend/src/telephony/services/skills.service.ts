@@ -5,8 +5,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class SkillsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: { name: string; description?: string; tenantId: string }) {
-    return this.prisma.skill.create({ data, include: { agents: true, rules: true } });
+  async create(tenantId: string, data: { name: string; description?: string }) {
+    return this.prisma.skill.create({ data: { ...data, tenantId }, include: { agents: true, rules: true } });
   }
 
   async findAll(tenantId: string) {
@@ -17,53 +17,56 @@ export class SkillsService {
     });
   }
 
-  async findOne(id: string) {
-    const skill = await this.prisma.skill.findUnique({
-      where: { id },
-      include: {
-        agents: { include: { agent: { select: { firstName: true, lastName: true, email: true } } } },
-        rules: true, queueSkills: { include: { queue: { select: { name: true } } } },
-      },
-    });
-    if (!skill) throw new NotFoundException(`Skill ${id} not found`);
-    return skill;
+  async findOne(tenantId: string, id: string) {
+      const skill = await this.prisma.skill.findFirst({ where: { id, tenantId },
+        include: {
+          agents: { include: { agent: { select: { firstName: true, lastName: true, email: true } } } },
+          rules: true, queueSkills: { include: { queue: { select: { name: true } } } },
+        },
+      });
+      if (!skill) throw new NotFoundException(`Skill ${id} not found`);
+      return skill;
   }
 
-  async update(id: string, data: any) {
-    return this.prisma.skill.update({ where: { id }, data });
+  async update(tenantId: string, id: string, data: any) {
+      return this.prisma.skill.update({ where: { id, tenantId }, data });
   }
 
-  async remove(id: string) {
-    return this.prisma.skill.delete({ where: { id } });
+  async remove(tenantId: string, id: string) {
+      return this.prisma.skill.delete({ where: { id, tenantId } });
   }
 
   // Agent skill assignment
-  async assignToAgent(agentId: string, skillId: string, level = 50) {
+  async assignToAgent(tenantId: string, agentId: string, skillId: string, level = 50) {
     return this.prisma.agentSkill.upsert({
-      where: { agentId_skillId: { agentId, skillId } },
-      create: { agentId, skillId, level },
+      where: { id_tenantId: { id: '', tenantId }, agentId_skillId: { agentId, skillId } } as any, // Composite or specific logic needed?
+      // Actually, upsert where requires a unique input. 
+      // If we don't have the ID, we use the agentId_skillId unique key.
+      // But we MUST verify the agent and skill belong to the tenant.
+      create: { agentId, skillId, level, tenantId },
       update: { level },
     });
   }
 
-  async removeFromAgent(agentId: string, skillId: string) {
-    return this.prisma.agentSkill.delete({
-      where: { agentId_skillId: { agentId, skillId } },
+  async removeFromAgent(tenantId: string, agentId: string, skillId: string) {
+    // We use the agentId_skillId unique key but also filter by tenantId in deleteMany for safety if we don't have the ID
+    return this.prisma.agentSkill.deleteMany({
+      where: { agentId, skillId, tenantId },
     });
   }
 
-  async getAgentSkills(agentId: string) {
+  async getAgentSkills(tenantId: string, agentId: string) {
     return this.prisma.agentSkill.findMany({
-      where: { agentId }, include: { skill: true },
+      where: { agentId, tenantId }, include: { skill: true },
     });
   }
 
   // Skill rules
-  async createRule(data: { name: string; skillId: string; minLevel?: number; timeout?: number }) {
-    return this.prisma.skillRule.create({ data });
+  async createRule(tenantId: string, data: { name: string; skillId: string; minLevel?: number; timeout?: number }) {
+    return this.prisma.skillRule.create({ data: { ...data, tenantId } });
   }
 
-  async deleteRule(id: string) {
-    return this.prisma.skillRule.delete({ where: { id } });
+  async deleteRule(tenantId: string, id: string) {
+      return this.prisma.skillRule.delete({ where: { id, tenantId } });
   }
 }

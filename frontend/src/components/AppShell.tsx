@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -15,38 +15,85 @@ import {
   LayoutDashboard, Box, ScrollText, KanbanSquare, Zap, Target, ArrowRightLeft, MapPin, Search, Plus, Calendar as CalendarIcon, UserCircle2, Car, Database, FormInput, ShieldAlert, Workflow,
   PhoneOff, Mic, MicOff, Megaphone, BarChart2,
   ClipboardList, Shield, MessageSquare, ShieldCheck,
-  CheckSquare, ShieldOff, FileText, BookOpen, ChevronDown, Menu, X, Table, TrendingUp
+  CheckSquare, ShieldOff, FileText, BookOpen, ChevronDown, Menu, X, Table, TrendingUp,
+  Headphones, Package, Gauge, BrainCircuit, Mail
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlobalSearch } from "@/components/GlobalSearch";
 
 const BYPASS_PATHS = ["/login", "/unauthorized"];
 
-const NAV_LINKS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/inbox", label: "Inbox", icon: MessageSquare },
-  { href: "/leads", label: "Leads", icon: Users },
-  { href: "/telephony", label: "Telephony", icon: PhoneOff },
-  { href: "/campaign-engine", label: "Dialer", icon: Megaphone },
-  { href: "/supervisor", label: "Supervisor", icon: Shield },
-  { href: "/analytics/sentiment", label: "AI Sentiment", icon: TrendingUp },
-  { href: "/workflows/builder", label: "Automations", icon: Zap },
-  { href: "/deals", label: "Deals", icon: Briefcase },
-  { href: "/companies", label: "Companies", icon: Building2 },
-  { href: "/documents", label: "Documents", icon: HardDrive },
-  { href: "/projects", label: "Projects", icon: KanbanSquare },
-  { href: "/products", label: "Products", icon: Box },
-  { href: "/invoices", label: "Invoices", icon: ScrollText },
-  { href: "/calendar", label: "Calendar", icon: CalendarIcon },
-  { href: "/hr", label: "HR & Gamification", icon: UserCircle2 },
-  { href: "/assets", label: "Assets & Vehicles", icon: Car },
-  { href: "/tasks", label: "Tasks", icon: CheckSquare },
-  { href: "/approvals", label: "Approvals", icon: ShieldAlert },
-  { href: "/web-forms", label: "Web Forms", icon: FormInput },
-  { href: "/tickets", label: "Support", icon: MessageSquare },
-  { href: "/knowledge", label: "Knowledge", icon: BookOpen },
-  { href: "/audit-logs", label: "Audit Logs", icon: ShieldCheck },
-  { href: "/settings", label: "Settings", icon: Settings },
+// ── Grouped Navigation ──────────────────────────────────────────────────────
+interface NavGroup {
+  id: string;
+  label: string;
+  icon: any;
+  color: string;
+  items: { href: string; label: string; icon: any; desc?: string }[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    id: "core",
+    label: "CRM",
+    icon: Users,
+    color: "text-indigo-400",
+    items: [
+      { href: "/leads", label: "Leads", icon: Users, desc: "Contact registry" },
+      { href: "/deals", label: "Deals", icon: Briefcase, desc: "Pipeline stages" },
+      { href: "/companies", label: "Companies", icon: Building2, desc: "Accounts" },
+      { href: "/tasks", label: "Tasks", icon: CheckSquare, desc: "To-do tracking" },
+      { href: "/calendar", label: "Calendar", icon: CalendarIcon, desc: "Schedule" },
+      { href: "/inbox", label: "Inbox", icon: MessageSquare, desc: "Omnichannel" },
+    ],
+  },
+  {
+    id: "telephony",
+    label: "Telephony",
+    icon: Headphones,
+    color: "text-emerald-400",
+    items: [
+      { href: "/telephony", label: "Telephony", icon: PhoneOff, desc: "Call center" },
+      { href: "/campaign-engine", label: "Dialer", icon: Megaphone, desc: "Auto-dial campaigns" },
+      { href: "/supervisor", label: "Supervisor", icon: Shield, desc: "Agent monitoring" },
+    ],
+  },
+  {
+    id: "ai",
+    label: "Intelligence",
+    icon: BrainCircuit,
+    color: "text-violet-400",
+    items: [
+      { href: "/analytics/sentiment", label: "AI Sentiment", icon: TrendingUp, desc: "Voice analytics" },
+      { href: "/workflows/builder", label: "Automations", icon: Zap, desc: "Workflow builder" },
+      { href: "/knowledge", label: "Knowledge", icon: BookOpen, desc: "Knowledge base" },
+    ],
+  },
+  {
+    id: "commerce",
+    label: "Commerce",
+    icon: Package,
+    color: "text-amber-400",
+    items: [
+      { href: "/products", label: "Products", icon: Box, desc: "Product catalog" },
+      { href: "/invoices", label: "Invoices", icon: ScrollText, desc: "Billing" },
+      { href: "/projects", label: "Projects", icon: KanbanSquare, desc: "Project mgmt" },
+      { href: "/documents", label: "Documents", icon: HardDrive, desc: "File storage" },
+    ],
+  },
+  {
+    id: "ops",
+    label: "Operations",
+    icon: Gauge,
+    color: "text-cyan-400",
+    items: [
+      { href: "/hr", label: "HR & Team", icon: UserCircle2, desc: "Gamification" },
+      { href: "/assets", label: "Assets", icon: Car, desc: "Asset tracking" },
+      { href: "/approvals", label: "Approvals", icon: ShieldAlert, desc: "Approval flows" },
+      { href: "/web-forms", label: "Web Forms", icon: FormInput, desc: "Form builder" },
+      { href: "/tickets", label: "Support", icon: MessageSquare, desc: "Ticket system" },
+    ],
+  },
 ];
 
 const SETTINGS_LINKS = [
@@ -56,6 +103,9 @@ const SETTINGS_LINKS = [
   { href: "/settings/whatsapp", label: "WhatsApp" },
   { href: "/audit-logs", label: "Audit Logs" },
 ];
+
+// Flat nav links for mobile menu
+const ALL_NAV_LINKS = NAV_GROUPS.flatMap(g => g.items);
 
 function RealtimeStateMount() {
   const { user } = useAuth();
@@ -88,6 +138,83 @@ function ActiveCallBar() {
           <PhoneOff size={12} /> End Call
         </button>
       </div>
+    </div>
+  );
+}
+
+function NavDropdown({ group, pathname }: { group: NavGroup; pathname: string | null }) {
+  const [open, setOpen] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isActive = group.items.some(item => 
+    item.href === pathname || (item.href !== "/" && pathname?.startsWith(item.href))
+  );
+
+  const handleEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setOpen(true);
+  };
+
+  const handleLeave = () => {
+    timeoutRef.current = setTimeout(() => setOpen(false), 150);
+  };
+
+  return (
+    <div className="relative" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+      <button
+        className={cn(
+          "flex items-center gap-1.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
+          isActive
+            ? "bg-primary text-white shadow-sm shadow-primary/30"
+            : "text-text-muted hover:text-foreground hover:bg-surface-2"
+        )}
+      >
+        <group.icon size={12} className={isActive ? "text-white" : group.color} />
+        {group.label}
+        <ChevronDown size={8} className={cn("transition-transform", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="bg-surface border border-border rounded-xl shadow-2xl shadow-black/40 py-2 min-w-[200px] backdrop-blur-xl">
+            {/* Group header */}
+            <div className="px-4 py-1.5 border-b border-border/50 mb-1">
+              <span className={cn("text-[8px] font-black uppercase tracking-[0.25em]", group.color)}>
+                {group.label}
+              </span>
+            </div>
+
+            {group.items.map(item => {
+              const isItemActive = item.href === pathname || (item.href !== "/" && pathname?.startsWith(item.href));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-2 text-[11px] transition-all group/item mx-1 rounded-lg",
+                    isItemActive
+                      ? "bg-primary/10 text-primary font-bold"
+                      : "text-text-muted hover:text-foreground hover:bg-surface-2"
+                  )}
+                >
+                  <div className={cn(
+                    "h-6 w-6 rounded-md flex items-center justify-center shrink-0 transition-colors",
+                    isItemActive ? "bg-primary/20" : "bg-surface-2 group-hover/item:bg-surface"
+                  )}>
+                    <item.icon size={12} className={isItemActive ? "text-primary" : ""} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold truncate">{item.label}</div>
+                    {item.desc && (
+                      <div className="text-[9px] text-text-muted opacity-60 truncate">{item.desc}</div>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -156,66 +283,75 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="px-4 md:px-6 py-2.5 flex justify-between items-center">
           {/* Brand */}
           <div className="flex items-center gap-3">
-            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
-              {brandLogo ? <img src={brandLogo} alt="Logo" className="w-5 h-5 object-contain" /> : <span className="text-white text-[10px] font-black">α</span>}
-            </div>
-            <h1 className="text-sm font-black tracking-tight uppercase text-foreground hidden sm:block">
-              {tenantSettings.brandName || "Project Alpha"} <span className="text-primary">{tenantSettings.brandSuffix || "CRM"}</span>
-            </h1>
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
+                {brandLogo ? <img src={brandLogo} alt="Logo" className="w-5 h-5 object-contain" /> : <span className="text-white text-[10px] font-black">α</span>}
+              </div>
+              <h1 className="text-sm font-black tracking-tight uppercase text-foreground hidden sm:block">
+                {tenantSettings.brandName || "Project Alpha"} <span className="text-primary">{tenantSettings.brandSuffix || "CRM"}</span>
+              </h1>
+            </Link>
           </div>
 
-          {/* Navigation — desktop */}
-          <nav className="hidden lg:flex items-center gap-0.5 bg-surface-2/50 p-1 rounded-lg border border-border/50 max-w-3xl flex-wrap">
-            {NAV_LINKS.map(({ href, label }) => {
-              const isSettings = href === "/settings";
-              if (isSettings) {
-                return (
-                  <div key={href} className="relative" onMouseEnter={() => setSettingsHover(true)} onMouseLeave={() => setSettingsHover(false)}>
-                    <Link
-                      href={href}
-                      className={cn(
-                        "flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all",
-                        pathname?.startsWith("/settings")
-                          ? "bg-primary text-white shadow-sm shadow-primary/30"
-                          : "text-text-muted hover:text-foreground hover:bg-surface-2"
-                      )}
-                    >
-                      {label} <ChevronDown size={9} />
-                    </Link>
-                    {settingsHover && (
-                      <div className="absolute top-full left-0 mt-1 w-36 bg-surface border border-border rounded-xl shadow-xl shadow-black/30 py-1 z-50">
-                        {SETTINGS_LINKS.map(s => (
-                          <Link key={s.href} href={s.href} className="block px-3 py-2 text-[11px] hover:bg-surface-2 text-text-muted hover:text-foreground transition">
-                            {s.label}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
+          {/* Navigation — grouped mega-menu dropdowns */}
+          <nav className="hidden lg:flex items-center gap-1 bg-surface-2/50 p-1 rounded-xl border border-border/50">
+            {/* Dashboard direct link */}
+            <Link
+              href="/"
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
+                pathname === "/"
+                  ? "bg-primary text-white shadow-sm shadow-primary/30"
+                  : "text-text-muted hover:text-foreground hover:bg-surface-2"
+              )}
+            >
+              <LayoutDashboard size={12} />
+              Dashboard
+            </Link>
+
+            {/* Grouped dropdowns */}
+            {NAV_GROUPS.map(group => (
+              <NavDropdown key={group.id} group={group} pathname={pathname} />
+            ))}
+
+            {/* Settings with submenu */}
+            <div className="relative" onMouseEnter={() => setSettingsHover(true)} onMouseLeave={() => setSettingsHover(false)}>
+              <Link
+                href="/settings"
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
+                  pathname?.startsWith("/settings") || pathname?.startsWith("/audit-logs")
+                    ? "bg-primary text-white shadow-sm shadow-primary/30"
+                    : "text-text-muted hover:text-foreground hover:bg-surface-2"
+                )}
+              >
+                <Settings size={12} />
+                Settings
+                <ChevronDown size={8} />
+              </Link>
+              {settingsHover && (
+                <div className="absolute top-full right-0 mt-2 w-40 bg-surface border border-border rounded-xl shadow-2xl shadow-black/40 py-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="px-4 py-1.5 border-b border-border/50 mb-1">
+                    <span className="text-[8px] font-black uppercase tracking-[0.25em] text-text-muted">Config</span>
                   </div>
-                );
-              }
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={cn(
-                    "px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all",
-                    pathname === href || (href !== "/" && pathname?.startsWith(href))
-                      ? "bg-primary text-white shadow-sm shadow-primary/30"
-                      : "text-text-muted hover:text-foreground hover:bg-surface-2"
-                  )}
-                >
-                  {label}
-                </Link>
-              );
-            })}
+                  {SETTINGS_LINKS.map(s => (
+                    <Link
+                      key={s.href}
+                      href={s.href}
+                      className="flex items-center gap-2 px-4 py-2 text-[11px] text-text-muted hover:text-foreground hover:bg-surface-2 transition mx-1 rounded-lg"
+                    >
+                      {s.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </nav>
 
           {/* Right actions */}
           <div className="flex items-center gap-2">
             <GlobalSearch />
             <NotificationsBell recipientId={user?.id} />
-            <div className="h-2 w-2 rounded-full bg-success animate-pulse" title="System Online" />
 
             {/* User info */}
             <div className="flex items-center gap-2 group relative">
@@ -242,19 +378,44 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Mobile nav dropdown */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-border bg-surface px-4 py-3 grid grid-cols-2 gap-1">
-            {NAV_LINKS.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition",
-                  pathname === href ? "bg-primary text-white" : "text-text-muted hover:text-foreground hover:bg-surface-2"
-                )}
-              >
-                <Icon size={13} /> {label}
-              </Link>
+          <div className="lg:hidden border-t border-border bg-surface px-4 py-3 space-y-4 max-h-[70vh] overflow-y-auto">
+            {/* Dashboard */}
+            <Link
+              href="/"
+              onClick={() => setMobileMenuOpen(false)}
+              className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition",
+                pathname === "/" ? "bg-primary text-white" : "text-text-muted hover:text-foreground hover:bg-surface-2"
+              )}
+            >
+              <LayoutDashboard size={13} /> Dashboard
+            </Link>
+            
+            {NAV_GROUPS.map(group => (
+              <div key={group.id}>
+                <div className="flex items-center gap-2 px-3 py-1">
+                  <group.icon size={10} className={group.color} />
+                  <span className={cn("text-[9px] font-black uppercase tracking-[0.2em]", group.color)}>{group.label}</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                <div className="grid grid-cols-2 gap-1 mt-1">
+                  {group.items.map(({ href, label, icon: Icon }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition",
+                        pathname === href || (href !== "/" && pathname?.startsWith(href))
+                          ? "bg-primary text-white"
+                          : "text-text-muted hover:text-foreground hover:bg-surface-2"
+                      )}
+                    >
+                      <Icon size={13} /> {label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
