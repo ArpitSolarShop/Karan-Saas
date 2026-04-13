@@ -83,6 +83,7 @@ model Tenant {
   workbooks         Workbook[]
   workflowRules     WorkflowRule[]
 
+  contacts          Contact[]
   companies         Company[]
   productCategories ProductCategory[]
   products          Product[]
@@ -237,6 +238,7 @@ model User {
   importedLists     LeadList[]         @relation("ListImporter")
   omniMessages      OmniMessage[]
   assignedLeads     Lead[]             @relation("AssignedTo")
+  assignedContacts  Contact[]          @relation("ContactAssignee")
   notes             Note[]
   notifications     Notification[]
   quotes            Quote[]
@@ -300,6 +302,7 @@ model Company {
   assignedTo  String?
   
   leads       Lead[]      @relation("CompanyLeads")
+  contacts    Contact[]   @relation("CompanyContacts")
   deals       Deal[]      @relation("CompanyDeals")
   invoices    Invoice[]
   salesOrders SalesOrder[]
@@ -310,6 +313,7 @@ model Company {
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime?
   
+  @@unique([tenantId, name])
   @@index([tenantId])
   @@index([name])
   @@map("companies")
@@ -356,6 +360,8 @@ model Lead {
   consentStatus   String?
   consentExpiry   DateTime?
   aiSentimentLast String?
+  convertedAt           DateTime?
+  convertedToContactId  String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   deletedAt       DateTime?
@@ -369,6 +375,7 @@ model Lead {
   campaign        Campaign?        @relation(fields: [campaignId], references: [id])
   companyId       String?
   company         Company?         @relation("CompanyLeads", fields: [companyId], references: [id])
+  convertedToContacts Contact[]    @relation("LeadToContact")
   leadChannels    LeadChannel[]
   eventRegistrations EventRegistration[]
   campaignRecipient CampaignRecipient[]
@@ -391,10 +398,60 @@ model Lead {
   @@map("leads")
 }
 
+model Contact {
+  id              String         @id @default(uuid())
+  tenantId        String
+  firstName       String
+  lastName        String?
+  name            String?
+  phone           String
+  contactNumbers  Json           @default("[]")
+  email           String?
+  emails          Json           @default("[]")
+  title           String?
+  department      String?
+  source          String?
+  lifecycle       String         @default("CUSTOMER")
+  score           Int            @default(0)
+  assignedTo      String?
+  customFields    Json           @default("{}")
+  tags            String[]       @default([])
+  city            String?
+  state           String?
+  country         String         @default("IN")
+  description     String?        @db.Text
+  linkedinUrl     String?
+  lastContactedAt DateTime?
+  convertedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  companyId       String?
+  company         Company?       @relation("CompanyContacts", fields: [companyId], references: [id])
+  convertedFromId String?
+  convertedFrom   Lead?          @relation("LeadToContact", fields: [convertedFromId], references: [id])
+  deals           Deal[]         @relation("ContactDeals")
+  notes           Note[]
+  activities      Activity[]
+  tasks           Task[]
+  calls           Call[]
+  attachments     Attachment[]
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id])
+  assignedUser    User?          @relation("ContactAssignee", fields: [assignedTo], references: [id])
+
+  @@unique([phone, tenantId])
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([email])
+  @@map("contacts")
+}
+
 model Deal {
   id                String       @id @default(uuid())
   tenantId          String
-  leadId            String
+  leadId            String?
   ownerId           String
   name              String
   value             Float        @default(0)
@@ -405,15 +462,18 @@ model Deal {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   attachments       Attachment[]
-  lead              Lead         @relation(fields: [leadId], references: [id])
+  lead              Lead?        @relation(fields: [leadId], references: [id])
   owner             User         @relation(fields: [ownerId], references: [id])
   companyId         String?
   company           Company?     @relation("CompanyDeals", fields: [companyId], references: [id])
+  contactId         String?
+  contact           Contact?     @relation("ContactDeals", fields: [contactId], references: [id])
   dealChannels      DealChannel[]
   tenant            Tenant       @relation(fields: [tenantId], references: [id])
   quotes            Quote[]
 
   @@index([leadId])
+  @@index([contactId])
   @@map("deals")
 }
 
@@ -446,12 +506,14 @@ model Attachment {
   leadId       String
   dealId       String?
   quoteId      String?
+  contactId    String?
   uploadedById String
   name         String
   url          String
   fileType     String?
   fileSize     Int?
   createdAt    DateTime @default(now())
+  contact      Contact? @relation(fields: [contactId], references: [id])
   deal         Deal?    @relation(fields: [dealId], references: [id])
   lead         Lead     @relation(fields: [leadId], references: [id])
   quote        Quote?   @relation(fields: [quoteId], references: [id])
@@ -468,6 +530,7 @@ model Call {
   leadId             String
   agentId            String
   campaignId         String?
+  contactId          String?
   callDirection      CallDirection   @default(OUTBOUND)
   callType           CallType        @default(MANUAL)
   phoneDialed        String
@@ -492,12 +555,14 @@ model Call {
   callbacks          Callback[]
   agent              User            @relation("AgentCalls", fields: [agentId], references: [id])
   campaign           Campaign?       @relation(fields: [campaignId], references: [id])
+  contact            Contact?        @relation(fields: [contactId], references: [id])
   disposition        Disposition?    @relation(fields: [dispositionId], references: [id])
   lead               Lead            @relation(fields: [leadId], references: [id])
   tenant             Tenant          @relation(fields: [tenantId], references: [id])
 
   @@index([agentId, createdAt(sort: Desc)])
   @@index([leadId])
+  @@index([contactId])
   @@index([campaignId, createdAt])
   @@map("calls")
 }
@@ -666,9 +731,11 @@ model Note {
   tenantId  String
   leadId    String
   agentId   String
+  contactId String?
   note      String
   createdAt DateTime @default(now())
   agent     User     @relation(fields: [agentId], references: [id])
+  contact   Contact? @relation(fields: [contactId], references: [id])
   lead      Lead     @relation(fields: [leadId], references: [id])
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
 
@@ -681,9 +748,11 @@ model Activity {
   tenantId     String
   leadId       String
   userId       String
+  contactId    String?
   activityType String
   description  String
   createdAt    DateTime @default(now())
+  contact      Contact? @relation(fields: [contactId], references: [id])
   lead         Lead     @relation(fields: [leadId], references: [id])
   user         User     @relation(fields: [userId], references: [id])
   tenant       Tenant   @relation(fields: [tenantId], references: [id])
@@ -703,6 +772,7 @@ model Task {
   id         String   @id @default(uuid())
   tenantId   String
   leadId     String?
+  contactId  String?
   assignedTo String
   taskType   String?
   title      String
@@ -710,6 +780,7 @@ model Task {
   status     String   @default("PENDING")
   notes      String?
   createdAt  DateTime @default(now())
+  contact    Contact? @relation(fields: [contactId], references: [id])
   user       User     @relation("TaskAssignee", fields: [assignedTo], references: [id])
   lead       Lead?    @relation(fields: [leadId], references: [id])
   tenant     Tenant   @relation(fields: [tenantId], references: [id])

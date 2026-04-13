@@ -38,6 +38,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { BullModule as BullMQModule } from '@nestjs/bullmq';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { CompaniesModule } from './companies/companies.module';
+import { ContactsModule } from './contacts/contacts.module';
 import { ProductsModule } from './products/products.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { CalendarModule } from './calendar/calendar.module';
@@ -108,6 +109,7 @@ import { AgentManagementModule } from './agent-management/agent-management.modul
     ApprovalsModule,
     WhatsappModule,
     CompaniesModule,
+    ContactsModule,
     ProductsModule,
     InvoicesModule,
     CalendarModule,

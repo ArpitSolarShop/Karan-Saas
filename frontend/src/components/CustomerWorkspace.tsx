@@ -50,6 +50,7 @@ interface CustomerWorkspaceProps {
   onClose: () => void;
   activeLead: any;
   onCall?: (phone: string) => void;
+  onConvert?: () => void;
 }
 
 const CHANNEL_ICONS: Record<string, any> = {
@@ -237,10 +238,20 @@ export default function CustomerWorkspace({
           variant="ghost"
           size="icon"
           onClick={onClose}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white hover:bg-white/10 rounded-full h-8 w-8"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-full h-8 w-8"
         >
           <X size={18} />
         </Button>
+
+        {activeLead?.status !== 'CONVERTED' && onConvert && (
+          <Button
+            size="sm"
+            onClick={onConvert}
+            className="absolute right-12 top-1/2 -translate-y-1/2 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 h-8 px-3 text-[10px] font-bold uppercase tracking-wider"
+          >
+            <Zap size={12} className="mr-1.5" /> Convert
+          </Button>
+        )}
 
         <Avatar className="h-10 w-10 border-2 border-white/20 shrink-0">
           <AvatarImage src={`https://avatar.vercel.sh/${leadName}.png`} />

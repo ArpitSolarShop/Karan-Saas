@@ -40,6 +40,7 @@ const NAV_GROUPS: NavGroup[] = [
     color: "text-indigo-400",
     items: [
       { href: "/leads", label: "Leads", icon: Users, desc: "Contact registry" },
+      { href: "/contacts", label: "Contacts", icon: UserCircle2, desc: "Qualified people" },
       { href: "/deals", label: "Deals", icon: Briefcase, desc: "Pipeline stages" },
       { href: "/companies", label: "Companies", icon: Building2, desc: "Accounts" },
       { href: "/tasks", label: "Tasks", icon: CheckSquare, desc: "To-do tracking" },

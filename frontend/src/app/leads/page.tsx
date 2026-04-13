@@ -9,6 +9,7 @@ import Softphone from "@/components/Softphone";
 import AIOverlay from "@/components/AIOverlay";
 import CustomerWorkspace from "@/components/CustomerWorkspace";
 import AddLeadDialog from "@/components/AddLeadDialog";
+import ConvertLeadModal from "@/components/leads/ConvertLeadModal";
 import { List } from 'react-window';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Card } from "@/components/ui/card";
-import { Search, Plus, Upload, Phone, Cpu, Database, Activity, Terminal, ShieldCheck, Download, Trash2, Zap, BrainCircuit, MessageCircle, Mail } from "lucide-react";
+import { Search, Plus, Upload, Phone, Cpu, Database, Activity, Terminal, ShieldCheck, Download, Trash2, Zap, BrainCircuit, MessageCircle, Mail, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 
 const VirtualList = List as any;
@@ -42,6 +43,8 @@ export default function LeadsTerminal() {
   const [isCommDrawerOpen, setIsCommDrawerOpen] = useState(false);
   const [isAIOverlayOpen, setIsAIOverlayOpen] = useState(false);
   const [isAddLeadDialogOpen, setIsAddLeadDialogOpen] = useState(false);
+  const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
+  const [leadToConvert, setLeadToConvert] = useState<any>(null);
   
   const [tickerMsgs, setTickerMsgs] = useState([
     "[SYSTEM] ALPHA CRM TERMINAL INITIALIZED.",
@@ -306,6 +309,19 @@ export default function LeadsTerminal() {
             >
               <Mail size={11} />
             </button>
+            {row.data?.status !== 'CONVERTED' && (
+              <button
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setLeadToConvert(row.data); 
+                  setIsConvertModalOpen(true); 
+                }}
+                className="p-1 rounded hover:bg-primary/20 text-text-muted hover:text-primary transition-colors"
+                title="Convert to Contact"
+              >
+                <ArrowRightLeft size={11} />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -505,6 +521,10 @@ export default function LeadsTerminal() {
         onClose={() => setIsCommDrawerOpen(false)} 
         activeLead={activeLead} 
         onCall={(phone) => handleCallLead(phone)}
+        onConvert={() => {
+          setLeadToConvert(activeLead);
+          setIsConvertModalOpen(true);
+        }}
       />
 
       <AddLeadDialog 

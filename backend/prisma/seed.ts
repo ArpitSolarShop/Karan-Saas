@@ -182,6 +182,51 @@ async function main() {
   });
   console.log('✅ Default Sheet View created');
 
+  // ── Sample Companies ──
+  const companies = [
+    { name: "Acme Corp", industry: "Technology", website: "https://acme.com", city: "San Francisco", country: "USA" },
+    { name: "Global Logistics", industry: "Manufacturing", website: "https://globallogistics.in", city: "Mumbai", country: "India" },
+    { name: "Reliance Industries", industry: "Energy", website: "https://ril.com", city: "Ahmedabad", country: "India" },
+  ];
+
+  const createdCompanies: any[] = [];
+  for (const c of companies) {
+    const company = await prisma.company.upsert({
+      where: { tenantId_name: { tenantId: tenant.id, name: c.name } },
+      update: {},
+      create: { tenantId: tenant.id, ...c },
+    });
+    createdCompanies.push(company);
+  }
+  console.log(`✅ ${createdCompanies.length} Companies created`);
+
+  // ── Sample Contacts ──
+  const contacts = [
+    { firstName: "John", lastName: "Doe", name: "John Doe", email: "john@acme.com", phone: "1234567890", title: "CTO", lifecycle: "CUSTOMER", companyId: createdCompanies[0].id },
+    { firstName: "Jane", lastName: "Smith", name: "Jane Smith", email: "jane@logistics.com", phone: "0987654321", title: "Supply Chain Manager", lifecycle: "SQL", companyId: createdCompanies[1].id },
+    { firstName: "Ratnesh", lastName: "Mishra", name: "Ratnesh Mishra", email: "ratnesh@alpha.dev", phone: "9112233445", title: "Principal Architect", lifecycle: "EVANGELIST", country: "India" },
+  ];
+
+  for (const c of contacts) {
+    await prisma.contact.create({
+      data: { tenantId: tenant.id, ...c, assignedTo: createdUsers[4].id },
+    });
+  }
+  console.log(`✅ ${contacts.length} Contacts created`);
+
+  // ── Sample Deals ──
+  const deals = [
+    { name: "Enterprise SaaS Expansion", value: 500000, stage: "NEGOTIATION", companyId: createdCompanies[0].id },
+    { name: "Warehouse Automation", value: 1200000, stage: "PROPOSAL", companyId: createdCompanies[1].id },
+  ];
+
+  for (const d of deals) {
+    await prisma.deal.create({
+      data: { tenantId: tenant.id, ...d, ownerId: createdUsers[0].id },
+    });
+  }
+  console.log(`✅ ${deals.length} Deals created`);
+
   // ── AI Config ──
   await prisma.aiConfig.upsert({
     where: { id: 'ai-001' },
