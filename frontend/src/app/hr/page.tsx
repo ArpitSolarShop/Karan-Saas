@@ -4,18 +4,30 @@ import { Leaf, Award, Trophy, ArrowUpRight, CheckCircle2, UserCircle2 } from "lu
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import useSWR from "swr";
+import api, { fetcher } from "@/lib/api";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 export default function HrDashboardPage() {
-  const leaves = [
-    { id: 1, type: 'VACATION', dates: 'May 10 - May 15', status: 'APPROVED' },
-    { id: 2, type: 'SICK', dates: 'June 1', status: 'PENDING' },
-  ];
+  const { data: leaves, error, isLoading, mutate } = useSWR("/hr-leaves", fetcher);
 
-  const leaderboard = [
-    { id: 1, name: 'Alice Smith', points: 1450, badge: 'Sales Champion' },
-    { id: 2, name: 'Bob Jones', points: 1200, badge: 'Fast Responder' },
-    { id: 3, name: 'Charlie Day', points: 950, badge: 'Team Player' },
-  ];
+  const handleRequestLeave = async () => {
+    try {
+      await api.post("/hr-leaves", {
+        type: "VACATION",
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + 86400000 * 2).toISOString(),
+        reason: "Taking some time off"
+      });
+      toast.success("Leave requested successfully");
+      mutate();
+    } catch (err) {
+      toast.error("Failed to request leave");
+    }
+  };
+
+  const { data: leaderboardData, error: lbError, isLoading: lbLoading } = useSWR("/gamification/leaderboard", fetcher);
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6 relative overflow-hidden bg-background">
@@ -41,18 +53,31 @@ export default function HrDashboardPage() {
               </CardTitle>
               <CardDescription>Your upcoming absences.</CardDescription>
             </div>
-            <Button size="sm">Request Leave</Button>
+            <Button onClick={handleRequestLeave} size="sm">Request Leave</Button>
           </CardHeader>
           <CardContent className="space-y-4 mt-4">
-            {leaves.map(l => (
-              <div key={l.id} className="flex items-center justify-between p-3 rounded bg-surface-2 border border-border">
-                <div>
-                  <div className="font-semibold text-sm">{l.type}</div>
-                  <div className="text-xs text-muted-foreground">{l.dates}</div>
-                </div>
-                <Badge variant={l.status === 'APPROVED' ? 'default' : 'secondary'}>{l.status}</Badge>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ))}
+            ) : error ? (
+              <div className="text-center text-red-500 py-8">Failed to load leaves.</div>
+            ) : leaves?.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">No leave requests found.</div>
+            ) : (
+              leaves?.map((l: any) => (
+                <div key={l.id} className="flex items-center justify-between p-3 rounded bg-surface-2 border border-border">
+                  <div>
+                    <div className="font-semibold text-sm">{l.type}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {l.startDate ? new Date(l.startDate).toLocaleDateString() : l.dates}
+                      {l.endDate ? ` - ${new Date(l.endDate).toLocaleDateString()}` : ''}
+                    </div>
+                  </div>
+                  <Badge variant={l.status === 'APPROVED' ? 'default' : 'secondary'}>{l.status}</Badge>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -65,26 +90,36 @@ export default function HrDashboardPage() {
             <CardDescription>Top performers this month based on CRM gamification points.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 mt-2">
-            {leaderboard.map((person, index) => (
-              <div key={person.id} className="flex items-center justify-between p-4 rounded-lg bg-surface border border-orange-500/10 shadow-sm relative overflow-hidden">
-                {index === 0 && <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 blur-2xl opacity-20 pointer-events-none" />}
-                <div className="flex items-center gap-4 z-10">
-                  <div className="text-2xl font-black text-muted-foreground/30 w-6 text-center">#{index + 1}</div>
-                  <div>
-                    <div className="font-bold">{person.name}</div>
-                    <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-orange-400 tracking-widest mt-1">
-                      <Award className="h-3 w-3" /> {person.badge}
+            {lbLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : lbError ? (
+              <div className="text-center text-red-500 py-8">Failed to load leaderboard.</div>
+            ) : leaderboardData?.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">No leaderboard data yet.</div>
+            ) : (
+              leaderboardData?.map((person: any, index: number) => (
+                <div key={person.id} className="flex items-center justify-between p-4 rounded-lg bg-surface border border-orange-500/10 shadow-sm relative overflow-hidden">
+                  {index === 0 && <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 blur-2xl opacity-20 pointer-events-none" />}
+                  <div className="flex items-center gap-4 z-10">
+                    <div className="text-2xl font-black text-muted-foreground/30 w-6 text-center">#{index + 1}</div>
+                    <div>
+                      <div className="font-bold">{person.firstName} {person.lastName}</div>
+                      <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-orange-400 tracking-widest mt-1">
+                        <Award className="h-3 w-3" /> {person.badges?.[0]?.badge?.name || `Level ${person.level}`}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="text-right z-10">
-                  <div className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-red-500">
-                    {person.points}
+                  <div className="text-right z-10">
+                    <div className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-red-500">
+                      {person.totalPoints}
+                    </div>
+                    <div className="text-xs text-muted-foreground text-right uppercase tracking-[0.2em]">pts</div>
                   </div>
-                  <div className="text-xs text-muted-foreground text-right uppercase tracking-[0.2em]">pts</div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

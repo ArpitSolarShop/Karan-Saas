@@ -4,13 +4,18 @@ import { Play, Settings2, GitCommit, Bot, Send, Ticket, Clock, CreditCard, Award
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import useSWR from "swr";
+import api, { fetcher } from "@/lib/api";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
 export default function ChainsPage() {
   const [isSimulating, setIsSimulating] = useState(false);
+  const { data: realChains, error, isLoading, mutate } = useSWR("/workflows", fetcher);
 
-  // Hardcoded Macro Chains for Presentation
-  const macroChains = [
+  // Hardcoded Macro Chains fallback if backend has no workflows yet
+  const fallbackChains = [
     {
       id: 'agentic',
       title: 'The Agentic Sales Chain',
@@ -58,9 +63,29 @@ export default function ChainsPage() {
     }
   ];
 
-  const triggerSimulation = () => {
+  const macroChains = realChains && realChains.length > 0 ? realChains.map((chain: any, idx: number) => ({
+    id: chain.id,
+    title: chain.name,
+    description: chain.description || 'Custom Workflow Chain',
+    steps: chain.rules?.map((rule: any) => ({
+      icon: <Workflow className="h-5 w-5" />,
+      label: rule.name || 'Action Step'
+    })) || [{ icon: <Workflow className="h-5 w-5" />, label: 'Start' }],
+    color: ['blue', 'rose', 'emerald', 'amber'][idx % 4]
+  })) : fallbackChains;
+
+  const triggerSimulation = async () => {
     setIsSimulating(true);
-    setTimeout(() => setIsSimulating(false), 2000);
+    try {
+      // Simulate trigger endpoint
+      await api.post('/workflows/trigger', { trigger: 'test_trigger', context: {} });
+      toast.success("Simulation completed");
+    } catch (err) {
+      // It may fail if the endpoint isn't fully set up for test triggers without specific ID
+      toast.error("Simulation demo failed");
+    } finally {
+      setTimeout(() => setIsSimulating(false), 2000);
+    }
   };
 
   return (
@@ -86,32 +111,42 @@ export default function ChainsPage() {
       </div>
 
       <div className="grid grid-cols-1 mt-6 gap-8">
-        {macroChains.map((chain) => (
-          <Card key={chain.id} className="bg-surface border-border overflow-hidden relative">
-            <div className={"absolute top-0 left-0 w-2 h-full bg-" + chain.color + "-500"} />
-            <CardHeader className="pl-8 pb-2">
-              <CardTitle className="text-xl">{chain.title}</CardTitle>
-              <CardDescription>{chain.description}</CardDescription>
-            </CardHeader>
-            <CardContent className="pl-8 pt-4">
-              <div className="flex items-center gap-4 overflow-x-auto pb-4">
-                {chain.steps.map((step, idx) => (
-                  <div key={idx} className="flex items-center group">
-                    <div className={"flex flex-col items-center justify-center p-4 h-24 w-40 rounded-lg bg-surface-2 border border-border shadow-sm group-hover:border-" + chain.color + "-500/50 group-hover:bg-" + chain.color + "-500/5 transition-all"}>
-                      <div className={"text-" + chain.color + "-500 mb-2"}>{Object.assign({}, step.icon, { type: step.icon.type, props: { ...step.icon.props, className: isSimulating ? 'h-5 w-5 animate-pulse' : 'h-5 w-5' } })}</div>
-                      <div className="text-xs font-semibold text-center leading-tight">{step.label}</div>
-                    </div>
-                    {idx < chain.steps.length - 1 && (
-                      <div className="px-4 text-muted-foreground/30">
-                        <ArrowRight className="h-6 w-6" />
+        {isLoading ? (
+          <div className="col-span-full flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+           <div className="col-span-full text-center text-red-500 py-12">
+             Failed to load chains.
+           </div>
+        ) : (
+          macroChains.map((chain: any) => (
+            <Card key={chain.id} className="bg-surface border-border overflow-hidden relative">
+              <div className={"absolute top-0 left-0 w-2 h-full bg-" + chain.color + "-500"} />
+              <CardHeader className="pl-8 pb-2">
+                <CardTitle className="text-xl">{chain.title}</CardTitle>
+                <CardDescription>{chain.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="pl-8 pt-4">
+                <div className="flex items-center gap-4 overflow-x-auto pb-4">
+                  {chain.steps.map((step: any, idx: number) => (
+                    <div key={idx} className="flex items-center group">
+                      <div className={"flex flex-col items-center justify-center p-4 h-24 w-40 rounded-lg bg-surface-2 border border-border shadow-sm group-hover:border-" + chain.color + "-500/50 group-hover:bg-" + chain.color + "-500/5 transition-all"}>
+                        <div className={"text-" + chain.color + "-500 mb-2"}>{Object.assign({}, step.icon, { type: step.icon.type, props: { ...step.icon.props, className: isSimulating ? 'h-5 w-5 animate-pulse' : 'h-5 w-5' } })}</div>
+                        <div className="text-xs font-semibold text-center leading-tight">{step.label}</div>
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                      {idx < chain.steps.length - 1 && (
+                        <div className="px-4 text-muted-foreground/30">
+                          <ArrowRight className="h-6 w-6" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );

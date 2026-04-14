@@ -16,11 +16,13 @@ Welcome! This folder contains everything you need to know about using Project Al
 | 06 | [Invoices, Quotes & Products](./06_Invoices_Quotes_Products.md) | Create quotes, send invoices, track payments | 8 min |
 | 07 | [Campaigns & Marketing](./07_Campaigns_Marketing.md) | Run outbound calls, WhatsApp, and email campaigns | 8 min |
 | 08 | [Tickets & Knowledge Base](./08_Tickets_Knowledge_Base.md) | Customer support and self-service articles | 7 min |
+| 09 | [Reports & Analytics](./09_Reports_Analytics.md) | Dashboards, metrics, and data export | 6 min |
+| 10 | [Additional Features](./10_Additional_Features.md) | Custom objects, Approvals, Workbooks, HR | 8 min |
 | 11 | [FAQ](./11_FAQ.md) | Frequently Asked Questions | 5 min |
-| 12 | [B2B Enterprise Features](./12_B2B_Enterprise_Features.md) | **NEW:** Companies, Approvals, and Live Workbooks | 6 min |
-| 13 | [B2C Consumer Engagement](./13_B2C_Consumer_Engagement.md) | **NEW:** High-volume sales, WhatsApp, and Web Forms | 7 min |
-| 14 | [Telecalling Operations Guide](./14_Telecalling_Operations_Guide.md) | **NEW:** Agent console, Dialers, Dispositions, and Monitoring | 8 min |
-
+| 12 | [B2B Enterprise Features](./12_B2B_Enterprise_Features.md) | Companies, Approvals, and Live Workbooks | 6 min |
+| 13 | [B2C Consumer Engagement](./13_B2C_Consumer_Engagement.md) | High-volume sales, WhatsApp, and Web Forms | 7 min |
+| 14 | [Telecalling Operations Guide](./14_Telecalling_Operations_Guide.md) | Agent console, Dialers, Dispositions, and Monitoring | 8 min |
+| 15 | [System Architecture & Audit](./15_System_Architecture_And_Audit.md) | **TECHNICAL:** Tech stack, architecture, and final scorecard | 10 min |
 ---
 
 ## 🚀 Quick Start (2 Minutes)

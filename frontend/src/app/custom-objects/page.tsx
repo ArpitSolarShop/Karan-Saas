@@ -4,13 +4,25 @@ import { Database, Plus, Settings2, Code2, Copy, Trash2, Edit3, LayoutTemplate }
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import useSWR from "swr";
+import api, { fetcher } from "@/lib/api";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 export default function CustomObjectsPage() {
-  const schemas = [
-    { id: '1', name: 'Real Estate Properties', recordCount: 142, fields: 5, status: 'ACTIVE' },
-    { id: '2', name: 'Support SLA Thresholds', recordCount: 12, fields: 3, status: 'ACTIVE' },
-    { id: '3', name: 'Vehicle Logs', recordCount: 0, fields: 8, status: 'DRAFT' },
-  ];
+  const { data: schemas, error, isLoading, mutate } = useSWR("/custom-objects/schemas", fetcher);
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Are you sure you want to delete this schema?")) return;
+    try {
+      await api.delete(`/custom-objects/schemas/${id}`);
+      toast.success("Schema deleted successfully");
+      mutate();
+    } catch (err) {
+      toast.error("Failed to delete schema");
+    }
+  };
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6 relative overflow-hidden bg-background">
@@ -30,42 +42,52 @@ export default function CustomObjectsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-        {schemas.map((schema) => (
-          <Card key={schema.id} className="bg-surface border-border hover:border-primary/30 transition-all shadow-sm group relative overflow-hidden flex flex-col h-full">
-            <div className={`absolute top-0 left-0 w-1 h-full ${schema.status === 'ACTIVE' ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
-            <CardHeader className="pl-6 pb-2">
-              <div className="flex justify-between items-start">
-                <CardTitle className="text-lg font-bold">
-                  {schema.name}
-                </CardTitle>
-                <Badge variant={schema.status === 'ACTIVE' ? 'default' : 'secondary'} className={schema.status === 'ACTIVE' ? 'bg-primary/10 text-primary border-primary/20' : ''}>
-                  {schema.status}
-                </Badge>
-              </div>
-              <CardDescription className="flex items-center gap-4 pt-2">
-                <span className="flex items-center gap-1 font-mono text-xs">
-                  <LayoutTemplate className="h-3 w-3" /> {schema.fields} fields
-                </span>
-                <span className="flex items-center gap-1 font-mono text-xs">
-                  <Database className="h-3 w-3" /> {schema.recordCount} rows
-                </span>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pl-6 flex-1 flex flex-col justify-end">
-              <div className="flex items-center justify-end gap-2 mt-4 opacity-70 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="sm" className="h-8 hover:bg-primary/10 hover:text-primary">
-                  <Edit3 className="h-3.5 w-3.5 mr-1.5" /> Edit
-                </Button>
-                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:bg-primary/10 hover:text-primary">
-                  <Code2 className="h-3.5 w-3.5 mr-1.5" /> API
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        {isLoading ? (
+          <div className="col-span-full flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+           <div className="col-span-full text-center text-red-500 py-12">
+             Failed to load custom schemas.
+           </div>
+        ) : (
+          schemas?.map((schema: any) => (
+            <Card key={schema.id} className="bg-surface border-border hover:border-primary/30 transition-all shadow-sm group relative overflow-hidden flex flex-col h-full">
+              <div className={`absolute top-0 left-0 w-1 h-full ${schema.status === 'ACTIVE' ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+              <CardHeader className="pl-6 pb-2">
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-lg font-bold">
+                    {schema.name}
+                  </CardTitle>
+                  <Badge variant={schema.status === 'ACTIVE' ? 'default' : 'secondary'} className={schema.status === 'ACTIVE' ? 'bg-primary/10 text-primary border-primary/20' : ''}>
+                    {schema.status || 'DRAFT'}
+                  </Badge>
+                </div>
+                <CardDescription className="flex items-center gap-4 pt-2">
+                  <span className="flex items-center gap-1 font-mono text-xs">
+                    <LayoutTemplate className="h-3 w-3" /> {schema.fields?.length || Object.keys(schema.fields || {}).length || 0} fields
+                  </span>
+                  <span className="flex items-center gap-1 font-mono text-xs">
+                    <Database className="h-3 w-3" /> {schema.recordCount || 0} rows
+                  </span>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pl-6 flex-1 flex flex-col justify-end">
+                <div className="flex items-center justify-end gap-2 mt-4 opacity-70 group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="sm" className="h-8 hover:bg-primary/10 hover:text-primary">
+                    <Edit3 className="h-3.5 w-3.5 mr-1.5" /> Edit
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:bg-primary/10 hover:text-primary">
+                    <Code2 className="h-3.5 w-3.5 mr-1.5" /> API
+                  </Button>
+                  <Button onClick={(e) => handleDelete(schema.id, e)} variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
         
         {/* Empty Slot for "Add New" visually aligned in grid */}
         <Card className="bg-transparent border-dashed border-2 border-border hover:border-primary/50 transition-colors shadow-none flex items-center justify-center cursor-pointer opacity-50 hover:opacity-100 min-h-[160px]">
