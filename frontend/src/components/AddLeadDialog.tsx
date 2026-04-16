@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import CompanySelect from "@/components/companies/CompanySelect";
+import { toast } from "sonner";
 
 export default function AddLeadDialog({ isOpen, onClose, onSuccess, columns, sheetId }: AddLeadDialogProps) {
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -39,9 +40,12 @@ export default function AddLeadDialog({ isOpen, onClose, onSuccess, columns, she
       await api.post(`/sheets/${sheetId}/rows`, formData);
       setFormData({});
       setExtraFields([]);
+      toast.success("Lead registered successfully in registry.");
       onSuccess();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Failed to commit lead to registry.";
+      toast.error(msg);
       console.error("Failed to add lead:", error);
     } finally {
       setIsSubmitting(false);
@@ -69,7 +73,7 @@ export default function AddLeadDialog({ isOpen, onClose, onSuccess, columns, she
         </DialogHeader>
 
         <ScrollArea className="flex-1 p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form id="add-lead-form" onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2 mb-6">
               <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Corporate Account (Optional)</Label>
               <CompanySelect 
@@ -84,11 +88,13 @@ export default function AddLeadDialog({ isOpen, onClose, onSuccess, columns, she
             <div className="grid grid-cols-2 gap-6">
               {columns.filter(col => col.dataType !== 'FORMULA').map((col) => (
                 <div key={col.id} className="space-y-2">
-                  <Label htmlFor={col.key} className="text-[10px] font-black uppercase tracking-widest text-text-muted">{col.name}</Label>
+                  <Label htmlFor={col.key} className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+                    {col.name} {['name', 'phone'].includes(col.key.toLowerCase()) && <span className="text-primary">*</span>}
+                  </Label>
                   <Input
                     id={col.key}
                     type={col.dataType === 'NUMBER' ? 'number' : 'text'}
-                    required
+                    required={['name', 'phone'].includes(col.key.toLowerCase())}
                     placeholder={`Enter ${col.name.toLowerCase()}...`}
                     value={formData[col.key] || ""}
                     onChange={(e) => setFormData({ ...formData, [col.key]: e.target.value })}
@@ -150,7 +156,8 @@ export default function AddLeadDialog({ isOpen, onClose, onSuccess, columns, she
             Abort
           </Button>
           <Button 
-            onClick={handleSubmit}
+            form="add-lead-form"
+            type="submit"
             disabled={isSubmitting}
             className="bg-primary hover:bg-primary-dark text-white px-8"
           >

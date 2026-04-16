@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import * as fs from 'fs';
 import { PrismaService } from '../prisma/prisma.service';
 import { SheetsGateway } from './sheets.gateway';
@@ -128,8 +128,8 @@ export class SheetsService {
         where: { phoneE164: String(phone), tenantId },
       });
       if (isDnc) {
-        throw new Error(
-          `CRITICAL: Number ${phone} is on the Do-Not-Call (DNC) list.`,
+        throw new BadRequestException(
+          `CRITICAL: Number ${phone} is on the Do-Not-Call (DNC) list. Registration aborted.`,
         );
       }
 
@@ -145,8 +145,8 @@ export class SheetsService {
         },
       });
       if (existing) {
-        throw new Error(
-          `Duplicate blocked: Number ${phone} already exists in this sheet.`,
+        throw new BadRequestException(
+          `Duplicate blocked: Number ${phone} already exists in this registry.`,
         );
       }
     }

@@ -5,5 +5,12 @@
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "transformIgnorePatterns": [
+    "/node_modules/(?!.*(@scure|otplib|@noble|@whiskeysockets|libsignal))"
+  ],
+  "moduleNameMapper": {
+    "^@whiskeysockets/baileys$": "<rootDir>/mocks/baileys.mock.ts",
+    "^otplib$": "<rootDir>/mocks/otplib.mock.ts"
   }
 }

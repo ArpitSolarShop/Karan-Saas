@@ -22,3 +22,5 @@ prisma/dev.db-journal
 # WhatsApp session data
 backend/wa_auth/
 
+test-results/
+playwright-artifacts/
