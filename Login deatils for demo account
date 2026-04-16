@@ -1,0 +1,8 @@
+Role	Email	Password	Name
+Admin	admin@alpha.dev	admin123	Arpit Admin
+Manager	manager@alpha.dev	manager123	Karan Manager
+Supervisor	supervisor@alpha.dev	super123	Priya Supervisor
+Team Lead	teamlead@alpha.dev	lead123	Rahul Lead
+Agent 1	agent1@alpha.dev	agent123	Ravi Kumar
+Agent 2	agent2@alpha.dev	agent123	Neha Sharma
+QA	qa@alpha.dev	qa123	Vikram QA
