@@ -66,11 +66,11 @@ const CHANNEL_COLORS: Record<string, string> = {
 };
 
 const DISPOSITION_OPTIONS = [
-  { code: "INTERESTED", label: "Interested", color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
-  { code: "CALLBACK", label: "Callback", color: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
-  { code: "NOT_INTERESTED", label: "Not Interested", color: "bg-red-500/15 text-red-400 border-red-500/30" },
-  { code: "CONVERTED", label: "Converted", color: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
-  { code: "DNC", label: "DNC", color: "bg-rose-600/15 text-rose-400 border-rose-600/30" },
+  { code: "INTERESTED", label: "Interested", color: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" },
+  { code: "CALLBACK", label: "Callback", color: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
+  { code: "NOT_INTERESTED", label: "Not Interested", color: "bg-red-500/10 text-red-700 border-red-500/20" },
+  { code: "CONVERTED", label: "Converted", color: "bg-blue-500/10 text-blue-700 border-blue-500/20" },
+  { code: "DNC", label: "DNC", color: "bg-rose-600/10 text-rose-700 border-rose-600/20" },
 ];
 
 export default function CustomerWorkspace({
@@ -78,6 +78,7 @@ export default function CustomerWorkspace({
   onClose,
   activeLead,
   onCall,
+  onConvert,
 }: CustomerWorkspaceProps) {
   const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
@@ -229,16 +230,16 @@ export default function CustomerWorkspace({
     .toUpperCase();
 
   return (
-    <div className="fixed top-0 right-0 w-[420px] h-screen z-[200] flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed top-0 right-0 w-[420px] h-screen z-[200] flex flex-col shadow-2xl overflow-hidden bg-background border-l border-border">
       {/* ── Header ── */}
       <header
-        className="px-4 py-3 flex items-center gap-3 shrink-0 relative border-b border-border bg-card"
+        className="px-4 py-3 flex items-center gap-3 shrink-0 relative border-b border-border bg-surface"
       >
         <Button
           variant="ghost"
           size="icon"
           onClick={onClose}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white hover:bg-white/10 rounded-full h-8 w-8"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full h-8 w-8"
         >
           <X size={18} />
         </Button>
@@ -253,9 +254,9 @@ export default function CustomerWorkspace({
           </Button>
         )}
 
-        <Avatar className="h-10 w-10 border-2 border-white/20 shrink-0">
+        <Avatar className="h-10 w-10 border border-border shrink-0">
           <AvatarImage src={`https://avatar.vercel.sh/${leadName}.png`} />
-          <AvatarFallback className="font-bold text-sm bg-primary text-white">
+          <AvatarFallback className="font-bold text-sm bg-primary text-primary-foreground">
             {initials}
           </AvatarFallback>
         </Avatar>
@@ -333,7 +334,7 @@ export default function CustomerWorkspace({
       </header>
 
       {/* ── Intelligence Gauge ── */}
-      <div className="px-6 py-4 bg-[#0f172a] border-b border-white/5 relative overflow-hidden shrink-0">
+      <div className="px-6 py-4 bg-surface-2 border-b border-border relative overflow-hidden shrink-0">
         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
            <Zap size={80} className="text-primary"/>
         </div>
@@ -350,7 +351,7 @@ export default function CustomerWorkspace({
         </div>
 
         <div className="space-y-2 relative z-10">
-          <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden border border-white/5">
+          <div className="h-2 w-full bg-surface rounded-full overflow-hidden border border-border/50">
              <div 
                className={cn("h-full transition-all duration-500 ease-out shadow-lg", 
                  score > 80 ? 'bg-success' : score > 50 ? 'bg-primary' : 'bg-yellow-500'
@@ -373,7 +374,7 @@ export default function CustomerWorkspace({
 
         {/* Quick Disposition Strip */}
         <div className="mt-3 relative z-10">
-          <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-2 flex items-center gap-1">
+          <p className="text-[8px] font-black text-muted-foreground/50 uppercase tracking-widest mb-2 flex items-center gap-1">
             <Tag size={8}/> Quick Disposition
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -384,7 +385,7 @@ export default function CustomerWorkspace({
                 className={cn(
                   "px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider border transition-all hover:scale-105 active:scale-95",
                   d.color,
-                  activeLead.status === d.code && "ring-1 ring-white/40 shadow-lg"
+                  activeLead.status === d.code && "ring-1 ring-primary/40 shadow-lg"
                 )}
               >
                 {d.label}
@@ -395,7 +396,7 @@ export default function CustomerWorkspace({
       </div>
 
       {/* ── Tab Bar ── */}
-      <div className="bg-[#1a1a2e] border-b border-white/5 flex shrink-0">
+      <div className="bg-surface border-b border-border flex shrink-0">
         {[
           { id: "messages", label: "Messages", icon: MessageCircle },
           { id: "notes", label: "Notes", icon: StickyNote },
@@ -425,7 +426,7 @@ export default function CustomerWorkspace({
           <div
             className="flex-grow overflow-y-auto px-4 py-6"
             style={{
-              background: "linear-gradient(rgba(15,23,42,0.94), rgba(15,23,42,0.94)), url('https://picsum.photos/id/1015/1920/1080') center/cover no-repeat",
+              background: "linear-gradient(rgba(250,250,250,0.94), rgba(250,250,250,0.94)), url('https://picsum.photos/id/1015/1920/1080') center/cover no-repeat",
               scrollbarWidth: "thin" as any,
               scrollbarColor: "rgb(225 29 72) transparent",
             }}
@@ -433,8 +434,7 @@ export default function CustomerWorkspace({
             {/* Date Badge */}
             <div className="flex justify-center mb-4">
               <span
-                className="text-[9px] font-bold py-1 px-4 rounded-full uppercase tracking-widest"
-                style={{ background: "#1c0010", border: "1px solid rgba(180,0,60,0.2)", color: "#9a6070" }}
+                className="text-[9px] font-bold py-1 px-4 rounded-full uppercase tracking-widest bg-muted text-muted-foreground border border-border"
               >
                 {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
               </span>
@@ -470,7 +470,7 @@ export default function CustomerWorkspace({
                     <div
                       className={cn(
                         "px-4 py-2.5 shadow-sm text-[14.5px] leading-relaxed",
-                        isOutgoing ? "bg-rose-600 text-white" : "bg-slate-800 border border-slate-700 text-slate-100"
+                        isOutgoing ? "bg-primary text-primary-foreground" : "bg-surface border border-border text-foreground"
                       )}
                       style={{
                         borderRadius: isOutgoing
@@ -489,7 +489,7 @@ export default function CustomerWorkspace({
 
                       {/* Media thumbnail */}
                       {msg.mediaData && (
-                        <div className="mb-2 overflow-hidden rounded-md border border-slate-700/50 shadow-md">
+                        <div className="mb-2 overflow-hidden rounded-md border border-border/50 shadow-md">
                           <img 
                             src={`data:image/jpeg;base64,${msg.mediaData}`} 
                             alt="Media thumbnail" 
@@ -506,7 +506,7 @@ export default function CustomerWorkspace({
                       <div
                         className={cn(
                           "flex justify-end items-center gap-1 mt-1 text-[10px]",
-                          isOutgoing ? "text-emerald-300" : "text-slate-400"
+                          isOutgoing ? "text-primary-foreground/80" : "text-muted-foreground"
                         )}
                       >
                         <span>{time}</span>
@@ -523,8 +523,7 @@ export default function CustomerWorkspace({
 
           {/* ── Input Bar ── */}
           <div
-            className="shrink-0 px-4 py-4"
-            style={{ background: "#0f172a", borderTop: "1px solid #334155" }}
+            className="shrink-0 px-4 py-4 bg-surface border-t border-border"
           >
             {/* Channel selector */}
             <div className="flex gap-2 mb-3">
@@ -546,8 +545,8 @@ export default function CustomerWorkspace({
             </div>
 
             {/* Input row */}
-            <div className="flex items-end gap-3 rounded-3xl px-4 py-2.5 bg-slate-800 border border-slate-700 focus-within:border-rose-600 transition-colors">
-              <button className="shrink-0 mb-1 text-slate-400 hover:text-rose-400">
+            <div className="flex items-end gap-3 rounded-3xl px-4 py-2.5 bg-background border border-border focus-within:border-primary transition-colors">
+              <button className="shrink-0 mb-1 text-muted-foreground hover:text-primary">
                 <Smile size={20} />
               </button>
               <textarea
@@ -562,46 +561,46 @@ export default function CustomerWorkspace({
                 }}
                 placeholder={`Message via ${sendChannel.toLowerCase()}…`}
                 rows={1}
-                className="flex-1 bg-transparent text-[14px] text-slate-100 placeholder:text-slate-500 outline-none resize-none leading-relaxed py-1"
-                style={{ caretColor: "#e11d48", minHeight: 32, maxHeight: 120 }}
+                className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground outline-none resize-none leading-relaxed py-1"
+                style={{ caretColor: "var(--primary)", minHeight: 32, maxHeight: 120 }}
               />
-              <button className="shrink-0 mb-1 text-slate-400 hover:text-rose-400">
+              <button className="shrink-0 mb-1 text-muted-foreground hover:text-primary">
                 <Paperclip size={18} />
               </button>
               <button
                 onClick={handleSend}
                 disabled={isSending}
-                className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 transition-all disabled:opacity-40 bg-rose-600 hover:bg-rose-700 shadow-md mb-0.5"
-                style={{ boxShadow: "0 4px 14px rgba(225, 29, 72, 0.4)" }}
+                className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 transition-all disabled:opacity-40 bg-primary hover:bg-primary/90 shadow-md mb-0.5"
+                style={{ boxShadow: "0 4px 14px rgba(79, 70, 229, 0.4)" }}
               >
-                {message.trim() ? <Send size={16} className="text-white ml-0.5" /> : <Mic size={16} className="text-white" />}
+                {message.trim() ? <Send size={16} className="text-primary-foreground ml-0.5" /> : <Mic size={16} className="text-primary-foreground" />}
               </button>
             </div>
           </div>
         </>
       ) : channelTab === "notes" ? (
         /* ── Notes Panel ── */
-        <div className="flex-grow flex flex-col bg-[#0d1117]">
+        <div className="flex-grow flex flex-col bg-surface-2">
           <ScrollArea className="flex-1 px-4 py-4">
             {!notes || notes.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-center">
-                <StickyNote size={28} className="text-white/20 mb-2" />
-                <p className="text-white/30 text-xs">No notes yet</p>
-                <p className="text-white/20 text-[10px] mt-1">Add your first note below</p>
+                <StickyNote size={28} className="text-muted-foreground/20 mb-2" />
+                <p className="text-muted-foreground/50 text-xs">No notes yet</p>
+                <p className="text-muted-foreground/40 text-[10px] mt-1">Add your first note below</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {(notes as any[]).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((note: any) => (
                   <div
                     key={note.id}
-                    className="rounded-xl bg-slate-800/80 border border-slate-700/50 p-3 shadow-sm group hover:border-primary/30 transition-colors"
+                    className="rounded-xl bg-background border border-border p-3 shadow-sm group hover:border-primary/30 transition-colors"
                   >
-                    <p className="text-[13px] text-slate-200 leading-relaxed whitespace-pre-wrap">{note.content}</p>
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/30">
-                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                    <p className="text-[13px] text-foreground leading-relaxed whitespace-pre-wrap">{note.content}</p>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
+                      <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">
                         {note.user ? `${note.user.firstName || ''} ${note.user.lastName || ''}`.trim() : 'Agent'}
                       </span>
-                      <span className="text-[9px] text-slate-500 font-mono">
+                      <span className="text-[9px] text-muted-foreground font-mono">
                         {formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}
                       </span>
                     </div>
@@ -612,7 +611,7 @@ export default function CustomerWorkspace({
           </ScrollArea>
 
           {/* Add Note Input */}
-          <div className="shrink-0 px-4 py-3 border-t border-slate-700/50" style={{ background: "#0f172a" }}>
+          <div className="shrink-0 px-4 py-3 border-t border-border bg-surface-2">
             <div className="flex items-end gap-2">
               <textarea
                 value={noteText}
@@ -625,7 +624,7 @@ export default function CustomerWorkspace({
                 }}
                 placeholder="Type a note... (Ctrl+Enter to save)"
                 rows={2}
-                className="flex-1 bg-slate-800 border border-slate-700 text-[13px] text-slate-200 placeholder:text-slate-500 outline-none resize-none rounded-xl px-3 py-2 focus:border-primary/50 transition-colors"
+                className="flex-1 bg-background border border-border text-[13px] text-foreground placeholder:text-muted-foreground outline-none resize-none rounded-xl px-3 py-2 focus:border-primary/50 transition-colors"
               />
               <Button
                 onClick={handleAddNote}
@@ -640,36 +639,35 @@ export default function CustomerWorkspace({
         </div>
       ) : channelTab === "quotes" ? (
         /* ── Quotes Panel ── */
-        <div className="flex-grow overflow-y-auto bg-[#0d1117] px-4 py-4 space-y-4">
+        <div className="flex-grow overflow-y-auto bg-surface-2 px-4 py-4 space-y-4">
           {!quotes || quotes.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-center">
-              <FileText size={28} className="text-white/20 mb-2" />
-              <p className="text-white/30 text-xs">No quotes generated yet</p>
+              <FileText size={28} className="text-muted-foreground/30 mb-2" />
+              <p className="text-muted-foreground/50 text-xs">No quotes generated yet</p>
             </div>
           ) : (
             quotes.map((q: any) => (
               <div
                 key={q.id}
-                className="rounded-2xl overflow-hidden border border-white/10 bg-[#1f2937] shadow-lg"
+                className="rounded-2xl overflow-hidden border border-border bg-surface shadow-lg"
               >
                 <div
-                  className="px-4 py-3 flex justify-between items-center"
-                  style={{ background: "rgba(37,211,102,0.08)" }}
+                  className="px-4 py-3 flex justify-between items-center bg-emerald-500/10"
                 >
                   <div>
-                    <p className="text-[11px] font-black uppercase tracking-widest text-[#25D366]">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-emerald-600">
                       Quote v{q.version}
                     </p>
-                    <p className="text-[10px] text-white/30 font-mono mt-0.5">
+                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
                       {new Date(q.createdAt).toLocaleDateString("en-IN")}
                     </p>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border border-white/10 text-white/50">
+                  <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border border-border text-muted-foreground">
                     {q.status}
                   </span>
                 </div>
                 <div className="px-4 py-3 flex justify-between items-center">
-                  <p className="text-white font-black text-lg tabular-nums">
+                  <p className="text-foreground font-black text-lg tabular-nums">
                     ₹{q.totalValue?.toLocaleString("en-IN")}
                   </p>
                   <Button

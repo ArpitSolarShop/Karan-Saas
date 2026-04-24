@@ -66,6 +66,13 @@ export class TelephonyController {
     return { success: true };
   }
 
+  /** Hold / unhold a call */
+  @Post('hold')
+  async hold(@Body() body: { callUUID: string; hold: boolean }, @Req() req: any) {
+    await this.telephonyService.holdCall(req.user.tenantId, body.callUUID, body.hold);
+    return { success: true };
+  }
+
   // ── Supervisor Controls ─────────────────────────────────────────────────
 
   /** Supervisor whisper — speak to agent, customer can't hear */
@@ -95,6 +102,29 @@ export class TelephonyController {
       body.supervisorExtension,
     );
     return { success: true, message: 'Barged into call' };
+  }
+
+  /** Supervisor silent monitor — listen-only, neither agent nor customer hears */
+  @Post('monitor')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'MANAGER', 'SUPERVISOR')
+  async silentMonitor(
+    @Body() body: { callUUID: string; supervisorExtension: string },
+    @Req() req: any,
+  ) {
+    await this.telephonyService.silentMonitor(
+      req.user.tenantId,
+      body.callUUID,
+      body.supervisorExtension,
+    );
+    return { success: true, message: 'Silent monitor activated' };
+  }
+
+  /** Send DTMF tones on a live call (RFC 2833) */
+  @Post('dtmf')
+  async sendDtmf(@Body() body: { callUUID: string; digits: string }, @Req() req: any) {
+    await this.telephonyService.sendDtmf(req.user.tenantId, body.callUUID, body.digits);
+    return { success: true };
   }
 
   // ── Recording ───────────────────────────────────────────────────────────

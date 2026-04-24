@@ -28,7 +28,8 @@ import {
   Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Softphone from "@/components/Softphone";
+import { Softphone } from "@/components/telecalling/Softphone";
+import { useCallStore } from "@/stores/useCallStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,18 @@ export default function AgentConsole() {
   const [callDuration, setCallDuration] = useState(0);
   const [scriptStep, setScriptStep] = useState("1");
   const [agentStatus, setAgentStatus] = useState<"AVAILABLE" | "ON_CALL" | "WRAP_UP" | "BREAK">("AVAILABLE");
+
+  // Sync agent status with the global call store
+  const storeActiveCall = useCallStore((s) => s.activeCall);
+  useEffect(() => {
+    if (storeActiveCall && storeActiveCall.status === 'connected') {
+      setActiveCall({ startTime: Date.now() });
+      setAgentStatus("ON_CALL");
+    } else if (!storeActiveCall && activeCall) {
+      setActiveCall(null);
+      setAgentStatus("WRAP_UP");
+    }
+  }, [storeActiveCall]);
 
   // Synthetic data for demo if no active lead
   const currentLead = activeCall?.lead || {
@@ -389,17 +402,9 @@ export default function AgentConsole() {
         </aside>
       </main>
 
-      <Softphone 
-        agentId={user?.id}
-        onCallStart={() => {
-          setActiveCall({ startTime: Date.now() });
-          setAgentStatus("ON_CALL");
-        }}
-        onCallEnd={() => {
-          setActiveCall(null);
-          setAgentStatus("WRAP_UP");
-        }}
-      />
+      <div className="fixed bottom-6 right-6 z-[100]">
+        <Softphone />
+      </div>
     </div>
   );
 }

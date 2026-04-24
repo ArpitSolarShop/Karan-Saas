@@ -5,7 +5,7 @@ import useSWR, { mutate } from "swr";
 import { io } from "socket.io-client";
 import { fetcher } from "@/lib/api";
 import api from "@/lib/api";
-import Softphone from "@/components/Softphone";
+import { Softphone } from "@/components/telecalling/Softphone";
 import AIOverlay from "@/components/AIOverlay";
 import CustomerWorkspace from "@/components/CustomerWorkspace";
 import AddLeadDialog from "@/components/AddLeadDialog";
@@ -508,7 +508,9 @@ export default function LeadsTerminal() {
         </div>
       </main>
 
-      <Softphone onCallStart={() => setCallActive(true)} onCallEnd={() => setCallActive(false)} />
+      <div className="fixed bottom-6 right-6 z-[100]">
+        <Softphone />
+      </div>
       {isAIOverlayOpen && (
         <AIOverlay 
           activeLead={activeLead} 

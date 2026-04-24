@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import {
-  Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX,
+  Phone, PhoneOff, PhoneIncoming, Mic, MicOff, Volume2, VolumeX,
   Keyboard, ChevronDown, Wifi, WifiOff, Loader2,
-  Forward, Voicemail
+  Forward, Voicemail, Pause, Play, X
 } from "lucide-react";
 import { useSoftphone } from "@/hooks/useSoftphone";
 import { useAuth } from "@/context/AuthContext";
@@ -25,14 +25,16 @@ export function Softphone() {
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [number, setNumber] = useState("");
   const [showPad, setShowPad] = useState(false);
+  const [showDtmfPad, setShowDtmfPad] = useState(false);
   const [speakerMuted, setSpeakerMuted] = useState(false);
 
-  const { call, hangup, mute, state } = useSoftphone(sipConfig);
+  const { call, hangup, mute, hold, sendDtmf, acceptIncoming, rejectIncoming, state, incomingCall } = useSoftphone(sipConfig);
   const { activeCall, isMuted: callMuted, tickDuration } = useCallStore((s) => ({
     activeCall: s.activeCall,
     isMuted: s.activeCall ? s.activeCall.isMuted : false,
     tickDuration: s.tickDuration
   }));
+  const isOnHold = activeCall?.isOnHold ?? false;
 
   // Fetch SIP config from backend on mount
   useEffect(() => {
@@ -84,18 +86,50 @@ export function Softphone() {
         </div>
       </div>
 
-      {/* Active call view */}
-      {onCall ? (
+      {/* ── Incoming Call Ring UI ───────────────────────────────────────── */}
+      {incomingCall && !onCall ? (
         <div className="p-5 space-y-4">
           <div className="text-center">
-            <div className="h-14 w-14 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center mx-auto mb-3">
-              <span className="text-primary text-xl font-black">{activeCall.leadName?.[0] ?? "?"}</span>
+            <div className="h-16 w-16 rounded-full bg-green-500/20 border-2 border-green-500/40 flex items-center justify-center mx-auto mb-3 animate-pulse">
+              <PhoneIncoming size={28} className="text-green-400" />
+            </div>
+            <p className="text-[10px] text-text-muted uppercase tracking-widest mb-1">Incoming Call</p>
+            <p className="font-bold text-lg">{incomingCall.callerName}</p>
+            <p className="text-xs text-text-muted font-mono mt-0.5">{incomingCall.callerNumber}</p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={acceptIncoming}
+              className="flex-1 py-3 bg-green-500 hover:bg-green-600 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 transition shadow-lg shadow-green-500/20"
+            >
+              <Phone size={16} /> Accept
+            </button>
+            <button
+              onClick={rejectIncoming}
+              className="flex-1 py-3 bg-red-500 hover:bg-red-600 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 transition shadow-lg shadow-red-500/20"
+            >
+              <X size={16} /> Reject
+            </button>
+          </div>
+        </div>
+      ) : onCall ? (
+        /* ── Active call view ──────────────────────────────────────── */
+        <div className="p-5 space-y-4">
+          <div className="text-center">
+            <div className={cn(
+              "h-14 w-14 rounded-full border-2 flex items-center justify-center mx-auto mb-3",
+              isOnHold ? "bg-yellow-500/20 border-yellow-500/30" : "bg-primary/20 border-primary/30"
+            )}>
+              <span className={cn("text-xl font-black", isOnHold ? "text-yellow-400" : "text-primary")}>
+                {activeCall.leadName?.[0] ?? "?"}
+              </span>
             </div>
             <p className="font-bold text-sm">{activeCall.leadName || activeCall.phone}</p>
             <p className="text-xs text-text-muted mt-0.5">{activeCall.phone}</p>
             <p className="text-2xl font-black font-mono text-primary mt-2">{mins}:{secs}</p>
             <p className="text-[10px] text-text-muted uppercase tracking-widest">
-              {activeCall.status === "ringing" ? "Ringing…" : activeCall.status === "connected" ? "Connected" : activeCall.status}
+              {isOnHold ? "On Hold" : activeCall.status === "ringing" ? "Ringing…" : activeCall.status === "connected" ? "Connected" : activeCall.status}
             </p>
           </div>
 
@@ -107,6 +141,14 @@ export function Softphone() {
             >
               {callMuted ? <MicOff size={16} /> : <Mic size={16} />}
               <span className="text-[9px] font-bold uppercase">{callMuted ? "Unmute" : "Mute"}</span>
+            </button>
+
+            <button
+              onClick={hold}
+              className={cn("flex flex-col items-center gap-1.5 p-3 rounded-xl border transition", isOnHold ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" : "bg-surface-2 border-border text-text-muted hover:text-foreground")}
+            >
+              {isOnHold ? <Play size={16} /> : <Pause size={16} />}
+              <span className="text-[9px] font-bold uppercase">{isOnHold ? "Resume" : "Hold"}</span>
             </button>
 
             <button
@@ -141,15 +183,38 @@ export function Softphone() {
 
             <button
               onClick={hangup}
-              className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition col-span-2"
+              className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition"
             >
               <PhoneOff size={16} />
               <span className="text-[9px] font-bold uppercase">Hang up</span>
             </button>
           </div>
+
+          {/* DTMF Keypad (shown during call) */}
+          {showDtmfPad && (
+            <div className="grid grid-cols-3 gap-2 pt-2">
+              {DIALPAD.flat().map((digit) => (
+                <button
+                  key={digit}
+                  onClick={() => sendDtmf(digit)}
+                  className="bg-surface-2 hover:bg-primary/20 border border-border rounded-xl py-2 text-sm font-bold transition"
+                >
+                  {digit}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowDtmfPad(!showDtmfPad)}
+            className="w-full text-center text-[9px] text-text-muted uppercase tracking-widest hover:text-foreground transition py-1"
+          >
+            <Keyboard size={12} className="inline mr-1" />
+            {showDtmfPad ? "Hide Keypad" : "DTMF Keypad"}
+          </button>
         </div>
       ) : (
-        /* Idle / dial view */
+        /* ── Idle / dial view ─────────────────────────────────────── */
         <div className="p-4 space-y-3">
           {/* Number input */}
           <div className="relative">

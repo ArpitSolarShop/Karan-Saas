@@ -7,17 +7,17 @@
   --color-primary:       #6366F1;
   --color-primary-dark:  #4F46E5;
   --color-primary-light: #818CF8;
-  --color-bg:            #09090B;
-  --color-surface:       #18181B;
-  --color-surface-2:     #27272A;
-  --color-border:        #3F3F46;
-  --color-text:          #F4F4F5;
-  --color-text-muted:    #A1A1AA;
+  --color-bg:            #FAFAFA;
+  --color-surface:       #FFFFFF;
+  --color-surface-2:     #F4F4F5;
+  --color-border:        #E4E4E7;
+  --color-text:          #09090B;
+  --color-text-muted:    #71717A;
   --color-success:       #10B981;
   --color-success-light: #6EE7B7;
-  --color-warning:       #FCD34D;
-  --color-danger:        #F87171;
-  --color-info:          #22D3EE;
+  --color-warning:       #F59E0B;
+  --color-danger:        #EF4444;
+  --color-info:          #0EA5E9;
 
   /* shadcn/ui variables mapping */
   --background: var(--color-bg);
@@ -42,13 +42,13 @@
   --radius: 0.5rem;
 }
 
-.light {
-  --color-bg:         #FAFAFA;
-  --color-surface:    #FFFFFF;
-  --color-surface-2:  #F4F4F5;
-  --color-border:     #E4E4E7;
-  --color-text:       #09090B;
-  --color-text-muted: #71717A;
+.dark {
+  --color-bg:         #09090B;
+  --color-surface:    #18181B;
+  --color-surface-2:  #27272A;
+  --color-border:     #3F3F46;
+  --color-text:       #F4F4F5;
+  --color-text-muted: #A1A1AA;
 }
 
 @layer base {

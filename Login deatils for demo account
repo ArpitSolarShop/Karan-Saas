@@ -6,3 +6,51 @@ Team Lead	teamlead@alpha.dev	lead123	Rahul Lead
 Agent 1	agent1@alpha.dev	agent123	Ravi Kumar
 Agent 2	agent2@alpha.dev	agent123	Neha Sharma
 QA	qa@alpha.dev	qa123	Vikram QA
+
+
+
+
+
+
+
+
+
+
+
+docker compose up -d
+
+
+
+
+
+cd backend
+# 1. Install dependencies
+npm install
+
+# 2. Sync database schema (Prisma)
+npx prisma generate
+npx prisma db push
+
+# 3. Seed initial data (optional, for demo accounts)
+npm run seed
+
+# 4. Start the server in development mode
+npm run start:dev
+
+
+
+
+
+
+
+
+
+
+
+cd frontend
+# 1. Install dependencies
+npm install
+
+# 2. Start the development server
+npm run dev
+

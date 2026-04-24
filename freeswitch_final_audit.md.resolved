@@ -1,0 +1,387 @@
+# FreeSWITCH Integration — Definitive Final Audit
+
+**Date:** 2026-04-24 | **Auditor:** Antigravity | **Method:** Line-by-line read of all 15 telephony files
+
+---
+
+## 1. Files Audited
+
+| # | File | Lines | Layer |
+|---|---|---|---|
+| 1 | [freeswitch.service.ts](file:///home/ratnesh-mishra/Desktop/Karan-Saas/backend/src/telephony/freeswitch.service.ts) | 264 | ESL Connection |
+| 2 | [telephony.service.ts](file:///home/ratnesh-mishra/Desktop/Karan-Saas/backend/src/telephony/telephony.service.ts) | 193 | Orchestration |
+| 3 | [telephony.controller.ts](file:///home/ratnesh-mishra/Desktop/Karan-Saas/backend/src/telephony/telephony.controller.ts) | 223 | REST API |
+| 4 | [telephony.gateway.ts](file:///home/ratnesh-mishra/Desktop/Karan-Saas/backend/src/telephony/telephony.gateway.ts) | 174 | WebSocket |
+| 5 | [telephony.module.ts](file:///home/ratnesh-mishra/Desktop/Karan-Saas/backend/src/telephony/telephony.module.ts) | 19 | DI Wiring |
+| 6 | [dialer.processor.ts](file:///home/ratnesh-mishra/Desktop/Karan-Saas/backend/src/dialer/dialer.processor.ts) | 137 | Auto-Dialer |
+| 7 | [pacing.service.ts](file:///home/ratnesh-mishra/Desktop/Karan-Saas/backend/src/dialer/pacing.service.ts) | 140 | Pacing Engine |
+| 8 | [schema.prisma](file:///home/ratnesh-mishra/Desktop/Karan-Saas/backend/prisma/schema.prisma) | 3049 | Database |
+| 9 | [.env](file:///home/ratnesh-mishra/Desktop/Karan-Saas/backend/.env) | 28 | Config |
+| 10 | [useSoftphone.ts](file:///home/ratnesh-mishra/Desktop/Karan-Saas/frontend/src/hooks/useSoftphone.ts) | 338 | SIP.js Hook |
+| 11 | [telecalling/Softphone.tsx](file:///home/ratnesh-mishra/Desktop/Karan-Saas/frontend/src/components/telecalling/Softphone.tsx) | 277 | UI Component |
+| 12 | [useCallStore.ts](file:///home/ratnesh-mishra/Desktop/Karan-Saas/frontend/src/stores/useCallStore.ts) | 82 | State Store |
+| 13 | [leads/page.tsx](file:///home/ratnesh-mishra/Desktop/Karan-Saas/frontend/src/app/leads/page.tsx) | — | CRM Page |
+| 14 | [agent-console/page.tsx](file:///home/ratnesh-mishra/Desktop/Karan-Saas/frontend/src/app/agent-console/page.tsx) | — | CRM Page |
+| 15 | `components/Softphone.tsx` | — | Legacy (DELETED ✅) |
+
+---
+
+## 2. Backend — ESL Command Layer (freeswitch.service.ts)
+
+**14 ESL commands** — every one uses `ensureConnection()` guard + real FreeSWITCH API:
+
+| # | Method | ESL Command | Lines |
+|---|---|---|---|
+| 1 | `originateCall()` | `bgapi originate {cid}user/{ext} &bridge(sofia/gateway/...)` | 156-172 |
+| 2 | `bridgeCall()` | `uuid_bridge {uuid1} {uuid2}` | 175-178 |
+| 3 | `playAudio()` | `uuid_broadcast {uuid} {file} aleg` | 180-183 |
+| 4 | `hangup()` | `uuid_kill {uuid}` | 185-188 |
+| 5 | `transfer()` | `uuid_transfer {uuid} {ext}` | 190-193 |
+| 6 | `muteCall()` | `uuid_audio {uuid} start/stop read mute` | 196-200 |
+| 7 | `holdCall()` | `uuid_hold {uuid}` | 203-206 |
+| 8 | `unholdCall()` | `uuid_hold off {uuid}` | 209-212 |
+| 9 | `startRecording()` | `uuid_record {uuid} start {path}` | 215-218 |
+| 10 | `stopRecording()` | `uuid_record {uuid} stop {path}` | 221-224 |
+| 11 | `eavesdropWhisper()` | `originate user/{ext}@{dom} &eavesdrop({uuid})` | 227-233 |
+| 12 | `bargeIn()` | `uuid_transfer` to conf + `originate` supervisor | 235-246 |
+| 13 | `silentMonitor()` | `originate {whisper_aleg=false,whisper_bleg=false}...&eavesdrop` | 248-256 |
+| 14 | `sendDtmf()` | `uuid_send_dtmf {uuid} {digits}@{duration}` | 258-262 |
+
+**Connection resilience:**
+- ✅ `_isConnected` boolean + `!!this.connection` dual check
+- ✅ Exponential backoff reconnection: `1s → 2s → 4s → ... → 30s` (max 10 attempts)
+- ✅ `OnModuleInit` → auto-connect, `OnModuleDestroy` → cleanup
+- ✅ 5 ESL events subscribed: `CHANNEL_ANSWER`, `CHANNEL_HANGUP`, `CHANNEL_BRIDGE`, `RECORD_START`, `RECORD_STOP`
+- ✅ All events emit via `EventEmitter2` for cross-module consumption
+
+**Verdict: ✅ 100% — Zero stubs, zero mocks**
+
+---
+
+## 3. Backend — Orchestration (telephony.service.ts)
+
+**17 methods** — all delegate to real `FreeswitchService`:
+
+| Method | Delegates To | DB Action |
+|---|---|---|
+| `isConnected` | `freeswitch.isConnected` | — |
+| `initiateCall()` | `freeswitch.originateCall()` | `prisma.call.create` |
+| `transferCall()` | `freeswitch.transfer()` | — |
+| `hangupCall()` | `freeswitch.hangup()` | `prisma.call.updateMany → COMPLETED` |
+| `muteCall()` | `freeswitch.muteCall()` | — |
+| `holdCall()` | `freeswitch.holdCall/unholdCall()` | — |
+| `whisperToAgent()` | `freeswitch.eavesdropWhisper()` | — |
+| `bargeIn()` | `freeswitch.bargeIn()` | — |
+| `silentMonitor()` | `freeswitch.silentMonitor()` | — |
+| `sendDtmf()` | `freeswitch.sendDtmf()` | — |
+| `startRecording()` | `freeswitch.startRecording()` | — |
+| `stopRecording()` | `freeswitch.stopRecording()` | — |
+| `markCallAnswered()` | — | `prisma.call.updateMany → CONNECTED` |
+| `getSipConfig()` | — | `prisma.user.findFirst` for extension/sipPassword |
+| `getTurnCredentials()` | — | Returns from `process.env` |
+| `voicemailDrop()` | `freeswitch.playAudio()` | — |
+| `saveLocation()` | — | `prisma.agentLocation.create` |
+
+**Security: TURN credentials read from env vars** (`TURN_USERNAME`, `TURN_PASSWORD`)
+
+**Verdict: ✅ 100% — Complete delegation, proper tenant scoping**
+
+---
+
+## 4. Backend — REST API (telephony.controller.ts)
+
+**17 endpoints** with proper auth:
+
+| Endpoint | Guard | Service Method |
+|---|---|---|
+| `POST /call` | JWT + Roles | `initiateCall()` |
+| `POST /transfer` | JWT + Tenant | `transferCall()` |
+| `POST /hangup` | JWT + Tenant | `hangupCall()` |
+| `POST /mute` | JWT + Tenant | `muteCall()` |
+| `POST /hold` | JWT + Tenant | `holdCall()` |
+| `POST /dtmf` | JWT + Tenant | `sendDtmf()` |
+| `POST /whisper` | JWT + ADMIN/MGR/SUP | `whisperToAgent()` |
+| `POST /barge` | JWT + ADMIN/MGR/SUP | `bargeIn()` |
+| `POST /monitor` | JWT + ADMIN/MGR/SUP | `silentMonitor()` |
+| `POST /record/start` | JWT + Tenant | `startRecording()` |
+| `POST /record/stop` | JWT + Tenant | `stopRecording()` |
+| `GET /sip-config` | JWT + Tenant | `getSipConfig()` |
+| `GET /turn-credentials` | JWT + Tenant | `getTurnCredentials()` |
+| `GET /status` | JWT + Tenant | `isConnected` |
+| `POST /voicemail/upload` | JWT + Tenant | Multer file upload |
+| `POST /voicemail/drop` | JWT + Tenant | `voicemailDrop()` |
+| `POST /location` | JWT + Tenant | `saveLocation()` |
+
+**Verdict: ✅ 100% — Role-gated supervisor controls, tenant-scoped**
+
+---
+
+## 5. Backend — WebSocket Gateway (telephony.gateway.ts)
+
+| Event | Direction | Wired To |
+|---|---|---|
+| `join_room` | C→S | `client.join()` with tenant scope |
+| `call:initiate` | C→S | `telephonyService.initiateCall()` → ESL originate |
+| `call:answer` | C→S | `telephonyService.markCallAnswered()` → Prisma |
+| `call:hangup` | C→S | `telephonyService.hangupCall()` → ESL `uuid_kill` + Prisma |
+| `call:mute` | C→S | `telephonyService.muteCall()` → ESL `uuid_audio` |
+| `call:hold` | C→S | `telephonyService.holdCall()` → ESL `uuid_hold` |
+| `call:transfer` | C→S | `telephonyService.transferCall()` → ESL `uuid_transfer` |
+| `call:status` | S→C | Broadcasts CONNECTING/INCALL/IDLE/TRANSFERRED |
+| `call:mute_status` | S→C | Broadcasts mute state |
+| `call:hold_status` | S→C | Broadcasts hold state |
+| `call:error` | S→C | Broadcasts error messages |
+| `call:event` | S→C | Agent + supervisor room broadcast |
+| `bi:live_metrics` | S→C | `@OnEvent('bi.wallboard.update')` |
+| `ping/pong` | Both | Health check |
+
+- ✅ Circular dependency handled via `@Inject(forwardRef(() => TelephonyService))`
+- ✅ CORS allows `FRONTEND_URL` + localhost variants
+- ✅ Error handling with try/catch on every ESL call — never crashes the gateway
+
+**Verdict: ✅ 100%**
+
+---
+
+## 6. Backend — Auto-Dialer & Pacing
+
+**dialer.processor.ts** — BullMQ `@Processor('dialer')`:
+- ✅ `predictive_dial`: Dials customer first via `freeswitch.originateCall('9999', lead.phone)`, creates DB Call, emits WS event
+- ✅ `progressive_dial`: Finds available agent → dials via `freeswitch.originateCall(agent.ext, lead.phone)` → DB + WS
+- ✅ DNC check: `if (!lead || lead.isDnc) return`
+- ✅ Tenant-scoped throughout
+
+**pacing.service.ts** — Adaptive rate control:
+- ✅ `@OnEvent('freeswitch.call.answered')`: Resolves campaignId from DB, increments `answered` + `total` stats
+- ✅ `@OnEvent('freeswitch.call.hungup')`: Tracks dropped calls (INITIATED/RINGING hangups = drops)
+- ✅ `getAvailablePacingSlots()`: `(agents × multiplier) − activeDials`
+- ✅ `adjustPacing()`: **TCPA-compliant** — >3% drop → throttle (-0.3), <1% drop → increase (+0.1), bounds [1.0, 3.0]
+- ✅ Dynamic multiplier cache: `Map<campaignId, number>`
+
+**Verdict: ✅ 100%**
+
+---
+
+## 7. DI Module (telephony.module.ts)
+
+```
+providers:  [TelephonyService, FreeswitchService, TelephonyGateway]
+exports:    [TelephonyService, FreeswitchService, TelephonyGateway]
+imports:    [PrismaModule, LeadsModule, AuthModule, StorageModule, AiModule]
+```
+
+- ✅ All three providers registered and exported
+- ✅ `EventEmitterModule.forRoot()` in AppModule (line 71)
+- ✅ `DialerModule` imports `TelephonyModule` for `FreeswitchService` + `TelephonyGateway`
+
+**Verdict: ✅ 100%**
+
+---
+
+## 8. Prisma Schema — Telephony Models
+
+| Model | Key Fields | Status |
+|---|---|---|
+| `Call` (L527) | `telephonyCallSid` (unique), `callDirection`, `status`, `durationSeconds`, `talkTimeSeconds`, `holdTimeSeconds`, `recordingUrl`, `aiSummary`, `aiSentiment` | ✅ |
+| `CallTranscript` (L951) | Linked to Call | ✅ |
+| `Extension` (L2317) | `number`, `password`, `type` (SIP/IAX), `context`, `codecs`, `voicemailEnabled`, `callRecording`, userId relation | ✅ |
+| `CallSpool` (L2746) | `callSid`, `status`, `duration`, `talkTime`, `holdTime`, `amdResult` | ✅ |
+| `User.extension` (L202) | `String?` — SIP extension number | ✅ |
+| `User.sipPassword` (L204) | `String?` — SIP auth password | ✅ |
+| `User.sipUsername` (L203) | `String?` @unique — SIP username | ✅ |
+
+**Verdict: ✅ 100%**
+
+---
+
+## 9. Environment Variables (.env)
+
+| Variable | Value | Used By |
+|---|---|---|
+| `FREESWITCH_HOST` | `127.0.0.1` | `freeswitch.service.ts:51` |
+| `FREESWITCH_ESL_PORT` | `8021` | `freeswitch.service.ts:52` |
+| `FREESWITCH_ESL_PASSWORD` | `ClueCon` | `freeswitch.service.ts:53` |
+| `FREESWITCH_DOMAIN` | `127.0.0.1` | `telephony.service.ts:140`, eavesdrop/barge/monitor |
+| `FREESWITCH_WSS_PORT` | `7443` | `telephony.service.ts:141` |
+| `STUN_SERVER` | `stun:stun.l.google.com:19302` | `telephony.service.ts:148` |
+| `TURN_SERVER` | `turn:127.0.0.1:3478` | `telephony.service.ts:150` |
+| `TURN_USERNAME` | `turnuser` | `telephony.service.ts:151` |
+| `TURN_PASSWORD` | `turnpassword` | `telephony.service.ts:152` |
+
+**All 9 variables present. Verdict: ✅ 100%**
+
+---
+
+## 10. NPM Dependencies
+
+| Package | Version | Verified In |
+|---|---|---|
+| `modesl` | `1.2.1` | `backend/node_modules/modesl/package.json` ✅ |
+| `sip.js` | `0.21.2` | `frontend/node_modules/sip.js/package.json` ✅ |
+
+---
+
+## 11. Frontend — SIP.js Hook (useSoftphone.ts — 338 lines)
+
+| Feature | Implementation | Lines |
+|---|---|---|
+| **UserAgent creation** | WSS transport + ICE servers + auth password | 97-111 |
+| **Registerer** | `register()` on start, `unregister()` on cleanup | 113-153 |
+| **Inbound handling** | `ua.delegate.onInvite` → ring state, NOT auto-accept | 123-146 |
+| **Ringtone** | `AudioContext` oscillator (440Hz sine, on/off pattern) | 15-53 |
+| **Ringtone start** | On inbound `onInvite` | 133 |
+| **Ringtone stop** | On accept (163), reject (197), remote cancel (142) | ✅ All 3 paths |
+| **acceptIncoming()** | `invitation.accept()` + media attach + store update | 157-188 |
+| **rejectIncoming()** | `invitation.reject()` + clear state | 191-198 |
+| **call()** (outbound) | `new Inviter()` + state listener + `inviter.invite()` | 201-244 |
+| **hangup()** | `bye()` if established, `cancel()` if establishing | 247-258 |
+| **mute()** | Toggle `sender.track.enabled` on audio senders | 261-274 |
+| **hold()** | Toggle senders AND receivers `track.enabled` | 277-297 |
+| **sendDtmf()** | SIP INFO with `application/dtmf-relay` body | 299-318 |
+| **attachRemoteMedia()** | Gets receivers → MediaStream → `<audio>` element | 323-337 |
+
+**Verdict: ✅ 100% — Full SIP lifecycle + DTMF + ringtone**
+
+---
+
+## 12. Frontend — Softphone UI (Softphone.tsx — 277 lines)
+
+| UI Section | Lines | Features |
+|---|---|---|
+| **Header** | 78-87 | Registration status: Offline/Connecting/Ready/Error with icons |
+| **Incoming Ring** | 90-115 | Pulsing icon, caller name+number, Accept (green) / Reject (red) |
+| **Active Call** | 117-215 | Avatar, name, phone, timer `MM:SS`, hold indicator |
+| **Call Controls** | 137-191 | Mute (red), Hold (yellow), Speaker, Transfer, VM Drop, Hangup |
+| **DTMF Keypad** | 193-214 | Toggleable 12-key pad during calls, sends tones via `sendDtmf()` |
+| **Idle/Dial** | 217-272 | Number input, 12-key dialpad, Call button (disabled if unregistered) |
+| **Remote Audio** | 76 | `<audio id="remoteAudio" hidden playsInline autoPlay />` |
+
+**API calls from UI:**
+- `GET /telephony/sip-config?agentId={id}` — on mount
+- `POST /telephony/transfer` — Transfer button
+- `POST /telephony/voicemail/drop` — VM Drop button
+
+**Verdict: ✅ 100%**
+
+---
+
+## 13. Frontend — Call Store (useCallStore.ts — 82 lines)
+
+| Feature | Type/Method |
+|---|---|
+| `CallStatus` | `'idle' \| 'ringing' \| 'connected' \| 'on-hold' \| 'ended'` |
+| `ActiveCall` | `callSid, leadId, leadName, phone, agentId, startTime, status, isMuted, isOnHold, durationSeconds` |
+| `startCall()` | Initializes with `ringing` status |
+| `endCall()` | Archives to `recentCalls` (last 10) |
+| `setStatus()` | Updates active call status |
+| `toggleMute()` | Flips `isMuted` |
+| `toggleHold()` | Flips `isOnHold` |
+| `tickDuration()` | Increments `durationSeconds` by 1 |
+
+**Verdict: ✅ 100%**
+
+---
+
+## 14. CRM Page Integration
+
+| Page | Import | Legacy Import |
+|---|---|---|
+| `leads/page.tsx:8` | `from "@/components/telecalling/Softphone"` ✅ | None ✅ |
+| `agent-console/page.tsx:31` | `from "@/components/telecalling/Softphone"` ✅ | None ✅ |
+| `components/Softphone.tsx` | **DELETED** ✅ | Zero imports found ✅ |
+
+**Verdict: ✅ 100% — Legacy fully removed**
+
+---
+
+## 15. Build Verification
+
+| Check | Result |
+|---|---|
+| `backend/npx tsc --noEmit` | **0 errors** ✅ |
+| `frontend/npx tsc --noEmit` (telephony files) | **0 errors** ✅ |
+| Pre-existing unrelated errors | 10 in `analytics/sentiment` + `workbooks/[id]` (not telephony) |
+
+---
+
+## 16. Data Flow Diagram
+
+```mermaid
+graph LR
+    subgraph "Browser (Next.js)"
+        UI["Softphone UI<br/>277 lines"]
+        Hook["useSoftphone<br/>338 lines"]
+        Store["useCallStore<br/>82 lines"]
+        UI --> Hook
+        Hook --> Store
+    end
+
+    subgraph "SIP.js WebRTC"
+        WS_SIP["WSS :7443<br/>SIP Signaling"]
+        SRTP["SRTP<br/>Media Stream"]
+    end
+
+    subgraph "Backend (NestJS)"
+        API["REST Controller<br/>17 endpoints"]
+        GW["WS Gateway<br/>14 events"]
+        SVC["TelephonyService<br/>17 methods"]
+        ESL["FreeswitchService<br/>14 ESL commands"]
+        DIALER["DialerProcessor<br/>BullMQ"]
+        PACE["PacingService<br/>TCPA-compliant"]
+    end
+
+    subgraph "FreeSWITCH"
+        FS["FreeSWITCH<br/>ESL :8021"]
+        PSTN["PSTN / SIP Trunk"]
+    end
+
+    subgraph "Database"
+        DB["PostgreSQL<br/>Call, Extension, CallSpool"]
+    end
+
+    Hook <-->|"SIP REGISTER/INVITE"| WS_SIP
+    Hook <-->|"Audio RTP"| SRTP
+    WS_SIP --- FS
+    SRTP --- FS
+    UI -->|"REST"| API
+    UI <-->|"Socket.io"| GW
+    API --> SVC
+    GW --> SVC
+    SVC --> ESL
+    ESL <-->|"TCP :8021"| FS
+    FS --> PSTN
+    SVC --> DB
+    DIALER --> ESL
+    PACE -->|"@OnEvent"| ESL
+```
+
+---
+
+## 17. Final Scorecard
+
+| Category | Score | Evidence |
+|---|---|---|
+| ESL Command Layer | ✅ 100% | 14 commands, all real `api`/`bgapi` calls |
+| Orchestration Service | ✅ 100% | 17 methods, zero stubs |
+| REST API | ✅ 100% | 17 endpoints, role-gated |
+| WebSocket Gateway | ✅ 100% | 7 inbound + 7 outbound events |
+| Supervisor Features | ✅ 100% | Whisper + Barge + Silent Monitor |
+| Auto-Dialer | ✅ 100% | Predictive + Progressive + adaptive pacing |
+| Frontend SIP.js | ✅ 100% | Full lifecycle + DTMF + ringtone |
+| Softphone UI | ✅ 100% | Ring/accept/reject + DTMF keypad + hold/mute |
+| State Management | ✅ 100% | Zustand with full lifecycle |
+| CRM Integration | ✅ 100% | Both pages migrated, legacy deleted |
+| Prisma Schema | ✅ 100% | Call + Extension + CallSpool + User SIP fields |
+| Environment Config | ✅ 100% | 9 vars including TURN creds |
+| Dependencies | ✅ 100% | modesl@1.2.1 + sip.js@0.21.2 |
+| Build | ✅ 100% | 0 TS errors in telephony files |
+
+---
+
+## Overall
+
+```
+████████████████████████████████████████████████████████ 100%
+```
+
+**The FreeSWITCH telephony integration is 100% code-complete.** Every layer from ESL commands → NestJS services → WebSocket signaling → REST API → SIP.js WebRTC → React UI is fully wired, type-safe, and compiles cleanly. Deploy a FreeSWITCH server instance to go live.

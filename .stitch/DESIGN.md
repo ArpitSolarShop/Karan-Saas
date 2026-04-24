@@ -16,13 +16,13 @@ Source of truth for the modern, high-performance UI/UX of the Karan SaaS project
 ## Color Palette (Shadcn Defaults + Custom)
 | Token | Role | Hex Code |
 |:---|:---|:---|
-| `primary` | Brand/Action | `#000000` |
-| `secondary` | Secondary brand | `#F4F4F5` |
-| `background` | Page background | `#FFFFFF` |
-| `foreground` | Main text | `#09090B` |
-| `muted` | Secondary text | `#71717A` |
-| `accent` | Highlight | `#F4F4F5` |
-| `border` | Dividers | `#E2E8F0` |
+| `primary` | Brand/Action | `#4F46E5` |
+| `secondary` | Secondary brand | `#F3F4F6` |
+| `background` | Page background | `#FAFAFA` |
+| `foreground` | Main text | `#111827` |
+| `muted` | Secondary text | `#6B7280` |
+| `accent` | Highlight | `#EEF2FF` |
+| `border` | Dividers | `#E5E7EB` |
 
 ## Typography
 - **Font Family**: Inter (Standard for Shadcn)

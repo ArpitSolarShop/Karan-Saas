@@ -16,7 +16,7 @@ import {
   PhoneOff, Mic, MicOff, Megaphone, BarChart2,
   ClipboardList, Shield, MessageSquare, ShieldCheck,
   CheckSquare, ShieldOff, FileText, BookOpen, ChevronDown, Menu, X, Table, TrendingUp,
-  Headphones, Package, Gauge, BrainCircuit, Mail
+  Headphones, Package, Gauge, BrainCircuit, Mail, Focus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -143,83 +143,6 @@ function ActiveCallBar() {
   );
 }
 
-function NavDropdown({ group, pathname }: { group: NavGroup; pathname: string | null }) {
-  const [open, setOpen] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isActive = group.items.some(item => 
-    item.href === pathname || (item.href !== "/" && pathname?.startsWith(item.href))
-  );
-
-  const handleEnter = () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    setOpen(true);
-  };
-
-  const handleLeave = () => {
-    timeoutRef.current = setTimeout(() => setOpen(false), 150);
-  };
-
-  return (
-    <div className="relative" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
-      <button
-        className={cn(
-          "flex items-center gap-1.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
-          isActive
-            ? "bg-primary text-white shadow-sm shadow-primary/30"
-            : "text-text-muted hover:text-foreground hover:bg-surface-2"
-        )}
-      >
-        <group.icon size={12} className={isActive ? "text-white" : group.color} />
-        {group.label}
-        <ChevronDown size={8} className={cn("transition-transform", open && "rotate-180")} />
-      </button>
-
-      {open && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="bg-surface border border-border rounded-xl shadow-2xl shadow-black/40 py-2 min-w-[200px] backdrop-blur-xl">
-            {/* Group header */}
-            <div className="px-4 py-1.5 border-b border-border/50 mb-1">
-              <span className={cn("text-[8px] font-black uppercase tracking-[0.25em]", group.color)}>
-                {group.label}
-              </span>
-            </div>
-
-            {group.items.map(item => {
-              const isItemActive = item.href === pathname || (item.href !== "/" && pathname?.startsWith(item.href));
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-2 text-[11px] transition-all group/item mx-1 rounded-lg",
-                    isItemActive
-                      ? "bg-primary/10 text-primary font-bold"
-                      : "text-text-muted hover:text-foreground hover:bg-surface-2"
-                  )}
-                >
-                  <div className={cn(
-                    "h-6 w-6 rounded-md flex items-center justify-center shrink-0 transition-colors",
-                    isItemActive ? "bg-primary/20" : "bg-surface-2 group-hover/item:bg-surface"
-                  )}>
-                    <item.icon size={12} className={isItemActive ? "text-primary" : ""} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-bold truncate">{item.label}</div>
-                    {item.desc && (
-                      <div className="text-[9px] text-text-muted opacity-60 truncate">{item.desc}</div>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -227,7 +150,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { activeCall } = useCallStore();
   const [showWrapUp, setShowWrapUp] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [settingsHover, setSettingsHover] = useState(false);
 
   const prevCallRef: { current: typeof activeCall } = { current: activeCall };
   const isBypassPath = BYPASS_PATHS.some((p) => pathname?.startsWith(p));
@@ -263,130 +185,147 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Branded styles for White-labelling
   const tenantSettings = (user as any)?.tenant?.settings || {};
-  const primaryColor = tenantSettings.primaryColor || "#6366f1"; // Default indigo-500
+  const primaryColor = tenantSettings.primaryColor || "#4F46E5"; // Default indigo
   const brandLogo = tenantSettings.brandLogo;
 
   return (
-    <main className="h-screen flex flex-col overflow-hidden">
+    <div className="h-screen flex overflow-hidden bg-background font-sans text-foreground selection:bg-primary selection:text-white">
       <style jsx global>{`
         :root {
           --primary: ${primaryColor};
         }
       `}</style>
       <RealtimeStateMount />
-
+      
       {/* Global floating components */}
       <InboundCallPopup />
       {showWrapUp && <WrapUpTimer onComplete={() => setShowWrapUp(false)} onSkip={() => setShowWrapUp(false)} />}
 
-      {/* Header */}
-      <header className="border-b border-border bg-surface/90 backdrop-blur-xl sticky top-0 z-50 shrink-0">
-        <div className="px-4 md:px-6 py-2.5 flex justify-between items-center">
-          {/* Brand */}
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
-                {brandLogo ? <img src={brandLogo} alt="Logo" className="w-5 h-5 object-contain" /> : <span className="text-white text-[10px] font-black">α</span>}
-              </div>
-              <h1 className="text-sm font-black tracking-tight uppercase text-foreground hidden sm:block">
-                {tenantSettings.brandName || "Project Alpha"} <span className="text-primary">{tenantSettings.brandSuffix || "CRM"}</span>
-              </h1>
+      {/* NavigationDrawer Shell (from Stitch) */}
+      <aside className="w-64 border-r border-border bg-surface flex-col p-4 gap-y-1 hidden md:flex shrink-0">
+        <div className="mb-6 px-3 pt-4 flex items-center gap-2">
+          {brandLogo ? (
+            <img src={brandLogo} alt="Logo" className="h-6 object-contain" />
+          ) : (
+            <Focus className="h-6 w-6 text-primary" />
+          )}
+          <span className="text-sm font-black uppercase tracking-[0.05em] text-foreground">
+            {tenantSettings.brandName || "KARAN SAAS"}
+          </span>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto no-scrollbar space-y-6">
+          <div className="space-y-1">
+            <div className="mb-2 px-3">
+              <span className="text-[0.65rem] font-bold tracking-[0.1em] text-muted-foreground uppercase">MAIN NAVIGATION</span>
+            </div>
+            <Link 
+              href="/"
+              className={cn("flex items-center gap-3 p-2 rounded-md tracking-[-0.01em] text-[0.75rem] transition-all", 
+                pathname === "/" ? "bg-surface-2 text-primary shadow-sm font-semibold border border-border/50" : "text-muted-foreground hover:bg-surface-2 hover:text-foreground font-medium"
+              )}
+            >
+              <LayoutDashboard size={16} />
+              <span>Overview</span>
             </Link>
           </div>
 
-          {/* Navigation — grouped mega-menu dropdowns */}
-          <nav className="hidden lg:flex items-center gap-1 bg-surface-2/50 p-1 rounded-xl border border-border/50 relative z-[100]">
-            {/* Dashboard direct link */}
-            <Link
-              href="/"
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
-                pathname === "/"
-                  ? "bg-primary text-white shadow-sm shadow-primary/30"
-                  : "text-text-muted hover:text-foreground hover:bg-surface-2"
-              )}
-            >
-              <LayoutDashboard size={12} />
-              Dashboard
-            </Link>
-
-            {/* Grouped dropdowns */}
-            {NAV_GROUPS.map(group => (
-              <NavDropdown key={group.id} group={group} pathname={pathname} />
-            ))}
-
-            {/* Settings with submenu */}
-            <div className="relative" onMouseEnter={() => setSettingsHover(true)} onMouseLeave={() => setSettingsHover(false)}>
-              <Link
-                href="/settings"
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all",
-                  pathname?.startsWith("/settings") || pathname?.startsWith("/audit-logs")
-                    ? "bg-primary text-white shadow-sm shadow-primary/30"
-                    : "text-text-muted hover:text-foreground hover:bg-surface-2"
-                )}
-              >
-                <Settings size={12} />
-                Settings
-                <ChevronDown size={8} />
-              </Link>
-              {settingsHover && (
-                <div className="absolute top-full right-0 mt-2 w-40 bg-surface border border-border rounded-xl shadow-2xl shadow-black/40 py-2 z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="px-4 py-1.5 border-b border-border/50 mb-1">
-                    <span className="text-[8px] font-black uppercase tracking-[0.25em] text-text-muted">Config</span>
-                  </div>
-                  {SETTINGS_LINKS.map(s => (
-                    <Link
-                      key={s.href}
-                      href={s.href}
-                      className="flex items-center gap-2 px-4 py-2 text-[11px] text-text-muted hover:text-foreground hover:bg-surface-2 transition mx-1 rounded-lg"
-                    >
-                      {s.label}
-                    </Link>
-                  ))}
-                </div>
-              )}
+          {NAV_GROUPS.map(group => (
+            <div key={group.id} className="space-y-1">
+              <div className="mb-2 px-3">
+                <span className="text-[0.65rem] font-bold tracking-[0.1em] text-muted-foreground uppercase">{group.label}</span>
+              </div>
+              {group.items.map(item => {
+                const isActive = item.href === pathname || (item.href !== "/" && pathname?.startsWith(item.href));
+                return (
+                  <Link 
+                    key={item.href} 
+                    href={item.href}
+                    className={cn("flex items-center gap-3 p-2 rounded-md tracking-[-0.01em] text-[0.75rem] transition-all", 
+                      isActive ? "bg-surface-2 text-primary shadow-sm font-semibold border border-border/50" : "text-muted-foreground hover:bg-surface-2 hover:text-foreground font-medium"
+                    )}
+                  >
+                    <item.icon size={16} className={isActive ? "text-primary" : ""} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
             </div>
-          </nav>
+          ))}
+        </div>
 
-          {/* Right actions */}
-          <div className="flex items-center gap-2">
+        <div className="mt-auto pt-4 border-t border-border/50 space-y-1">
+           {SETTINGS_LINKS.map(s => {
+             const isActive = pathname?.startsWith(s.href);
+             return (
+               <Link 
+                  key={s.href} 
+                  href={s.href}
+                  className={cn("flex items-center gap-3 p-2 rounded-md tracking-[-0.01em] text-[0.75rem] transition-all", 
+                    isActive ? "bg-surface-2 text-primary shadow-sm font-semibold border border-border/50" : "text-muted-foreground hover:bg-surface-2 hover:text-foreground font-medium"
+                  )}
+                >
+                  <Settings size={16} />
+                  <span>{s.label}</span>
+               </Link>
+             )
+           })}
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        
+        {/* Active Call Bar */}
+        <ActiveCallBar />
+
+        {/* Top Header */}
+        <header className="flex items-center justify-between border-b border-border bg-surface/50 backdrop-blur-xl px-4 md:px-8 py-3 shrink-0 z-40">
+          <div className="flex items-center gap-4 text-sm font-semibold tracking-[-0.02em] md:hidden">
+            <span className="text-foreground font-black uppercase">KARAN SAAS</span>
+          </div>
+          
+          <div className="hidden md:flex items-center gap-4 text-sm font-semibold tracking-[-0.02em]">
+            <span className="text-muted-foreground font-normal">Workspace /</span>
+            <span className="text-primary border-b-2 border-primary pb-1 capitalize">
+              {pathname === "/" ? "Dashboard" : pathname?.split('/')[1]?.replace('-', ' ')}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 md:gap-6">
             <GlobalSearch />
             <NotificationsBell recipientId={user?.id} />
 
-            {/* User info */}
-            <div className="flex items-center gap-2 group relative">
-              <div className="h-8 w-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center cursor-pointer">
-                <span className="text-primary text-[10px] font-black">
-                  {user?.firstName?.[0]?.toUpperCase() ?? "U"}
-                </span>
+            <div className="flex items-center gap-3 md:ml-2 md:border-l md:border-border/50 md:pl-4">
+              <div className="text-right hidden sm:block">
+                <p className="text-[0.75rem] font-bold text-foreground">{user?.firstName}</p>
+                <p className="text-[0.65rem] text-muted-foreground uppercase tracking-wider">{user?.role}</p>
               </div>
-              <div className="hidden md:block">
-                <p className="text-xs font-bold">{user?.firstName}</p>
-                <p className="text-[9px] text-text-muted uppercase tracking-widest">{user?.role}</p>
-              </div>
-              <button onClick={logout} title="Sign out" className="ml-1 p-1.5 rounded-md text-text-muted hover:text-red-400 hover:bg-red-500/10 transition">
-                <LogOut size={13} />
+              <button 
+                onClick={logout} 
+                title="Sign out"
+                className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-[0.65rem] font-bold text-white shadow-sm hover:opacity-90 transition-opacity"
+              >
+                {user?.firstName?.[0]?.toUpperCase() ?? "U"}
               </button>
             </div>
 
             {/* Mobile menu toggle */}
-            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 rounded-lg border border-border text-text-muted hover:text-foreground transition">
-              {mobileMenuOpen ? <X size={15} /> : <Menu size={15} />}
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground transition">
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* Mobile nav dropdown */}
+        {/* Mobile Navigation Dropdown */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-border bg-surface px-4 py-3 space-y-4 max-h-[70vh] overflow-y-auto">
-            {/* Dashboard */}
+          <div className="md:hidden border-b border-border bg-surface px-4 py-3 space-y-4 max-h-[70vh] overflow-y-auto">
             <Link
               href="/"
               onClick={() => setMobileMenuOpen(false)}
               className={cn(
                 "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition",
-                pathname === "/" ? "bg-primary text-white" : "text-text-muted hover:text-foreground hover:bg-surface-2"
+                pathname === "/" ? "bg-primary text-white" : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
               )}
             >
               <LayoutDashboard size={13} /> Dashboard
@@ -395,8 +334,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {NAV_GROUPS.map(group => (
               <div key={group.id}>
                 <div className="flex items-center gap-2 px-3 py-1">
-                  <group.icon size={10} className={group.color} />
-                  <span className={cn("text-[9px] font-black uppercase tracking-[0.2em]", group.color)}>{group.label}</span>
+                  <group.icon size={10} className={cn("text-primary")} />
+                  <span className={cn("text-[9px] font-black uppercase tracking-[0.2em] text-primary")}>{group.label}</span>
                   <div className="flex-1 h-px bg-border" />
                 </div>
                 <div className="grid grid-cols-2 gap-1 mt-1">
@@ -409,7 +348,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition",
                         pathname === href || (href !== "/" && pathname?.startsWith(href))
                           ? "bg-primary text-white"
-                          : "text-text-muted hover:text-foreground hover:bg-surface-2"
+                          : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
                       )}
                     >
                       <Icon size={13} /> {label}
@@ -420,27 +359,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </div>
         )}
-      </header>
 
-      {/* Active call banner */}
-      <ActiveCallBar />
-
-      {/* Page Content */}
-      <div className="flex-grow relative overflow-auto">{children}</div>
-
-      {/* Footer */}
-      <footer className="border-t border-border/50 px-6 py-2.5 bg-surface/50 shrink-0">
-        <div className="flex justify-between items-center max-w-7xl mx-auto">
-          <p className="text-[9px] text-text-muted uppercase tracking-[0.3em] opacity-40 italic">
-            © 2026 Project Alpha CRM // Silicon Valley Night
-          </p>
-          <div className="flex gap-6 text-[9px] uppercase tracking-[0.2em] text-text-muted opacity-40">
-            <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-            <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-            <a href="#" className="hover:text-foreground transition-colors">Support</a>
-          </div>
-        </div>
-      </footer>
-    </main>
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto bg-background p-4 md:p-8">
+          {children}
+        </main>
+      </div>
+    </div>
   );
 }

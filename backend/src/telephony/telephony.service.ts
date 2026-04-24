@@ -13,8 +13,9 @@ export class TelephonyService {
     private readonly gateway: TelephonyGateway,
   ) {}
 
-  get isConnected() {
-    return true; // Expand later if needed
+  /** Actual ESL connection state — delegates to FreeswitchService */
+  get isConnected(): boolean {
+    return this.freeswitch.isConnected;
   }
 
   // ── Call Management ─────────────────────────────────────────────────────
@@ -72,28 +73,64 @@ export class TelephonyService {
   }
 
   async muteCall(tenantId: string, callUUID: string, mute: boolean) {
-    this.logger.log(`[Tenant: ${tenantId}] Muted ${callUUID}: ${mute}`);
+    this.logger.log(`[Tenant: ${tenantId}] ${mute ? 'Muting' : 'Unmuting'} ${callUUID}`);
+    await this.freeswitch.muteCall(callUUID, mute);
+  }
+
+  async holdCall(tenantId: string, callUUID: string, hold: boolean) {
+    this.logger.log(`[Tenant: ${tenantId}] ${hold ? 'Holding' : 'Resuming'} ${callUUID}`);
+    if (hold) {
+      await this.freeswitch.holdCall(callUUID);
+    } else {
+      await this.freeswitch.unholdCall(callUUID);
+    }
   }
 
   // ── Supervisor Controls ─────────────────────────────────────────────────
 
   async whisperToAgent(tenantId: string, callUUID: string, supervisorExtension: string) {
     this.logger.log(`[Tenant: ${tenantId}] Whispering on ${callUUID} from ${supervisorExtension}`);
+    await this.freeswitch.eavesdropWhisper(callUUID, supervisorExtension);
   }
 
   async bargeIn(tenantId: string, callUUID: string, supervisorExtension: string) {
     this.logger.log(`[Tenant: ${tenantId}] Barging in on ${callUUID} from ${supervisorExtension}`);
+    await this.freeswitch.bargeIn(callUUID, supervisorExtension);
+  }
+
+  /** Supervisor silent monitor — listen-only eavesdrop (no whisper) */
+  async silentMonitor(tenantId: string, callUUID: string, supervisorExtension: string) {
+    this.logger.log(`[Tenant: ${tenantId}] Silent monitor on ${callUUID} from ${supervisorExtension}`);
+    await this.freeswitch.silentMonitor(callUUID, supervisorExtension);
+  }
+
+  /** Send DTMF tones on a live call */
+  async sendDtmf(tenantId: string, callUUID: string, digits: string) {
+    this.logger.log(`[Tenant: ${tenantId}] Sending DTMF '${digits}' on ${callUUID}`);
+    await this.freeswitch.sendDtmf(callUUID, digits);
   }
 
   // ── Recording ───────────────────────────────────────────────────────────
 
   async startRecording(tenantId: string, callUUID: string) {
     this.logger.log(`[Tenant: ${tenantId}] Start recording ${callUUID}`);
-    return `recordings/${callUUID}.wav`;
+    const filePath = `/var/lib/freeswitch/recordings/${tenantId}/${callUUID}.wav`;
+    await this.freeswitch.startRecording(callUUID, filePath);
+    return filePath;
   }
 
   async stopRecording(tenantId: string, callUUID: string) {
     this.logger.log(`[Tenant: ${tenantId}] Stop recording ${callUUID}`);
+    const filePath = `/var/lib/freeswitch/recordings/${tenantId}/${callUUID}.wav`;
+    await this.freeswitch.stopRecording(callUUID, filePath);
+  }
+
+  /** Mark call as answered in DB */
+  async markCallAnswered(tenantId: string, callUUID: string) {
+    await this.prisma.call.updateMany({
+      where: { telephonyCallSid: callUUID, tenantId },
+      data: { status: 'CONNECTED' as any },
+    });
   }
 
   // ── SIP.js Configuration ───────────────────────────────────────────────
@@ -111,8 +148,8 @@ export class TelephonyService {
         { urls: [process.env.STUN_SERVER || 'stun:stun.l.google.com:19302'] },
         {
           urls: [process.env.TURN_SERVER || `turn:${domain}:3478`],
-          username: 'turnuser',
-          credential: 'turnpassword',
+          username: process.env.TURN_USERNAME || 'turnuser',
+          credential: process.env.TURN_PASSWORD || 'turnpassword',
         },
       ],
     };
@@ -121,9 +158,9 @@ export class TelephonyService {
   async getTurnCredentials(tenantId: string, agentId: string) {
     const domain = process.env.FREESWITCH_DOMAIN || '127.0.0.1';
     return {
-      username: 'turnuser',
-      credential: 'turnpassword',
-      urls: [`turn:${domain}:3478`],
+      username: process.env.TURN_USERNAME || 'turnuser',
+      credential: process.env.TURN_PASSWORD || 'turnpassword',
+      urls: [process.env.TURN_SERVER || `turn:${domain}:3478`],
     };
   }
 

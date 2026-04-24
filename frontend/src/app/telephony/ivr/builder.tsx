@@ -123,7 +123,7 @@ export default function IvrBuilder({ ivrId, onClose, onSave }: IvrBuilderProps) 
         </div>
       </header>
 
-      <main className="flex-1 relative bg-[#020617]">
+      <main className="flex-1 relative bg-surface-2">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -131,13 +131,13 @@ export default function IvrBuilder({ ivrId, onClose, onSave }: IvrBuilderProps) 
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           fitView
-          colorMode="dark"
+          colorMode="light"
         >
-          <Background color="#1e293b" gap={20} />
+          <Background color="var(--border)" gap={20} />
           <Controls />
           <MiniMap 
             style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
-            nodeStrokeColor={(n) => (n.type === 'input' ? '#6366f1' : '#1e293b')}
+            nodeStrokeColor={(n) => (n.type === 'input' ? '#6366f1' : 'var(--border)')}
             nodeColor={(n) => (n.type === 'input' ? '#6366f1' : 'var(--surface)')}
           />
           
