@@ -4,7 +4,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # ── Stage 2: Build ──
 FROM node:20-alpine AS builder
@@ -30,7 +30,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
+# No public directory to copy
 
 # Leverage Next.js standalone output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

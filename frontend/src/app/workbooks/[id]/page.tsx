@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, ReactNode, CSSProperties } from "react";
 import useSWR, { mutate } from "swr";
 import api from "@/lib/api";
-import { VariableSizeGrid as Grid } from "react-window";
+import { Grid } from "react-window";
 import { Plus, ArrowLeft, Loader2, Save, Filter, Download } from "lucide-react";
 import Link from "next/link";
 import { useRealtimeSocket } from "@/hooks/useRealtimeSocket";
