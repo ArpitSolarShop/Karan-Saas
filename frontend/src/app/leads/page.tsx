@@ -10,7 +10,7 @@ import AIOverlay from "@/components/AIOverlay";
 import CustomerWorkspace from "@/components/CustomerWorkspace";
 import AddLeadDialog from "@/components/AddLeadDialog";
 import ConvertLeadModal from "@/components/leads/ConvertLeadModal";
-import { List } from 'react-window';
+import { FixedSizeList as List } from 'react-window';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

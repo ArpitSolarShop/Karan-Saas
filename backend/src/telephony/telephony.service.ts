@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { FreeswitchService } from './freeswitch.service';
 import { TelephonyGateway } from './telephony.gateway';
@@ -10,6 +10,7 @@ export class TelephonyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly freeswitch: FreeswitchService,
+    @Inject(forwardRef(() => TelephonyGateway))
     private readonly gateway: TelephonyGateway,
   ) {}
 

@@ -208,11 +208,15 @@ async function main() {
   ];
 
   for (const c of contacts) {
-    await prisma.contact.create({
-      data: { tenantId: tenant.id, ...c, assignedTo: createdUsers[4].id },
-    });
+    try {
+      await prisma.contact.create({
+        data: { tenantId: tenant.id, ...c, assignedTo: createdUsers[4].id },
+      });
+    } catch (e) {
+      // Ignored if already exists
+    }
   }
-  console.log(`✅ ${contacts.length} Contacts created`);
+  console.log(`✅ ${contacts.length} Contacts processed`);
 
   // ── Sample Deals ──
   const deals = [
@@ -221,11 +225,15 @@ async function main() {
   ];
 
   for (const d of deals) {
-    await prisma.deal.create({
-      data: { tenantId: tenant.id, ...d, ownerId: createdUsers[0].id },
-    });
+    try {
+      await prisma.deal.create({
+        data: { tenantId: tenant.id, ...d, ownerId: createdUsers[0].id },
+      });
+    } catch (e) {
+      // Ignored if already exists
+    }
   }
-  console.log(`✅ ${deals.length} Deals created`);
+  console.log(`✅ ${deals.length} Deals processed`);
 
   // ── AI Config ──
   await prisma.aiConfig.upsert({

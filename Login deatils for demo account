@@ -25,7 +25,9 @@ docker compose up -d
 
 cd backend
 # 1. Install dependencies
-npm install
+# npm install
+    or
+# npm install --legacy-peer-deps
 
 # 2. Sync database schema (Prisma)
 npx prisma generate

@@ -3,8 +3,8 @@
 import { useEffect, useState, useRef, ReactNode, CSSProperties } from "react";
 import useSWR, { mutate } from "swr";
 import api from "@/lib/api";
-import { Grid } from "react-window";
-import { Plus, ArrowLeft, Loader2, Save, Filter, Download } from "lucide-react";
+import { VariableSizeGrid as Grid } from "react-window";
+import { Plus, ArrowLeft, Loader2, Save, Filter, Download, Table } from "lucide-react";
 import Link from "next/link";
 import { useRealtimeSocket } from "@/hooks/useRealtimeSocket";
 import { toast } from "@/components/ui/use-toast";
@@ -95,8 +95,6 @@ function CellEditor({
  */
 export default function SpreadsheetView({ params }: { params: { id: string } }) {
   const sheetId = params.id;
-  const socket = useRealtimeSocket();
-
   // Fetch sheet metadata (columns, views)
   const { data: sheet, isLoading: sheetLoading } = useSWR(`/sheets/${sheetId}`, () => 
     api.get(`/sheets/${sheetId}`).then(res => res.data)
@@ -123,10 +121,8 @@ export default function SpreadsheetView({ params }: { params: { id: string } }) 
   }, [sheet]);
 
   // WebSocket Bindings
-  useEffect(() => {
-    if (!socket) return;
-    
-    const onRowUpdated = (updatedRow: any) => {
+  useRealtimeSocket({
+    rowUpdated: (updatedRow: any) => {
       if (updatedRow.sheetId !== sheetId) return;
       setRows(prev => {
         const idx = prev.findIndex(r => r.id === updatedRow.id);
@@ -137,23 +133,14 @@ export default function SpreadsheetView({ params }: { params: { id: string } }) 
         }
         return [...prev, updatedRow]; // New row appended
       });
-    };
-
-    const onSheetUpdated = (data: { sheetId: string }) => {
+    },
+    sheetUpdated: (data: any) => {
       if (data.sheetId === sheetId) {
         // Just re-fetch columns
         mutate(`/sheets/${sheetId}`);
       }
-    };
-
-    socket.on("rowUpdated", onRowUpdated);
-    socket.on("sheetUpdated", onSheetUpdated);
-
-    return () => {
-      socket.off("rowUpdated", onRowUpdated);
-      socket.off("sheetUpdated", onSheetUpdated);
-    };
-  }, [socket, sheetId]);
+    }
+  });
 
   const handleAddColumn = async () => {
     const name = prompt("Enter new column name:");
@@ -325,7 +312,7 @@ export default function SpreadsheetView({ params }: { params: { id: string } }) 
                   itemData={{ rows, columns }}
                   className="scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
                 >
-                  {Cell}
+                  {Cell as any}
                 </Grid>
               </div>
             ) : (
